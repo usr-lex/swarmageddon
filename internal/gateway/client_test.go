@@ -35,7 +35,9 @@ func fake(t *testing.T, answer func(method, uri string) (int, any)) (*[]rec, *Cl
 }
 
 func TestGenerateRoomKey(t *testing.T) {
-	calls, c := fake(t, func(string, string) (int, any) { return 200, map[string]any{"key": "sk-room", "key_alias": "room-acme-athena-1"} })
+	calls, c := fake(t, func(string, string) (int, any) {
+		return 200, map[string]any{"key": "sk-room", "key_alias": "room-acme-athena-1"}
+	})
 	k, err := c.GenerateKey(context.Background(), RoomKeyRequest("acme", "athena", "room-acme-athena-1", 200, []string{"claude-opus-5-5"}))
 	if err != nil || k.Key != "sk-room" {
 		t.Fatal(k, err)

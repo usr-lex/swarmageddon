@@ -160,15 +160,15 @@ func (c *Client) DeleteKeyAliases(ctx context.Context, aliases ...string) error 
 
 // KeyInfo is a key's row as /key/info returns it.
 type KeyInfo struct {
-	KeyAlias       string            `json:"key_alias"`
-	Spend          float64           `json:"spend"`
-	MaxBudget      *float64          `json:"max_budget"`
-	BudgetDuration string            `json:"budget_duration"`
-	BudgetResetAt  string            `json:"budget_reset_at"`
-	Models         []string          `json:"models"`
-	Metadata       map[string]any    `json:"metadata"`
-	Blocked        *bool             `json:"blocked"`
-	Status         string            `json:"status"`
+	KeyAlias       string         `json:"key_alias"`
+	Spend          float64        `json:"spend"`
+	MaxBudget      *float64       `json:"max_budget"`
+	BudgetDuration string         `json:"budget_duration"`
+	BudgetResetAt  string         `json:"budget_reset_at"`
+	Models         []string       `json:"models"`
+	Metadata       map[string]any `json:"metadata"`
+	Blocked        *bool          `json:"blocked"`
+	Status         string         `json:"status"`
 }
 
 // HashKey is the sha256 hex LiteLLM stores; pass it instead of the raw key in URLs.

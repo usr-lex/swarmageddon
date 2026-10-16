@@ -1,0 +1,13 @@
+# Managed by swarmageddon from RoleTemplate "reviewer". Read-only.
+model = "claude-opus-5-5"
+model_provider = "gateway"
+model_reasoning_effort = "high"
+approval_policy = "on-request"
+approvals_reviewer = "user"
+
+[mcp_servers]
+[mcp_servers.swarm]
+command = "swarm"
+args = ["mcp"]
+required = true
+enabled_tools = ["send_message", "list_agents"]
