@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net"
+	"slices"
 	"sort"
 	"strings"
 
@@ -35,6 +36,8 @@ const (
 
 	// AnnotationTemplateHash on the StatefulSet records the pod template it was rendered from.
 	AnnotationTemplateHash = "swarmageddon.dev/template-hash"
+	// AnnotationPersonaHash on the pod template rolls the pod when its persona changes.
+	AnnotationPersonaHash = "swarmageddon.dev/persona-hash"
 
 	vncPort = 5900
 )
@@ -99,9 +102,21 @@ func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
 	}
 }
 
+// podExtras are what the pod template takes from the layered settings and
+// the workspace (§6.6).
+type podExtras struct {
+	// Env is the merged environment; nil means the room's own spec.env.
+	Env map[string]string
+	// Shared are the workspace's shared volumes the room mounts.
+	Shared []sharedMount
+	// PersonaHash is a hash of the persona ConfigMap's data.
+	PersonaHash string
+}
+
 // desiredStatefulSet is the room's StatefulSet. Its pod template depends only
-// on the Room, the image and the tier, never on other rooms.
-func desiredStatefulSet(r *v1.Room, ws, image, tier string) *appsv1.StatefulSet {
+// on the Room, its role and workspace settings, the image and the tier, never
+// on other rooms.
+func desiredStatefulSet(r *v1.Room, ws, image, tier string, x podExtras) *appsv1.StatefulSet {
 	name := r.Name
 	cpu, mem := defaultCPU, defaultMemory
 	if r.Spec.Resources.CPU != nil {
@@ -123,13 +138,17 @@ func desiredStatefulSet(r *v1.Room, ws, image, tier string) *appsv1.StatefulSet 
 		{Name: "SWARM_WORKSPACE", Value: ws},
 		{Name: "ANTHROPIC_BASE_URL", Value: GatewayURL},
 	}
-	keys := make([]string, 0, len(r.Spec.Env))
-	for k := range r.Spec.Env {
+	vars := x.Env
+	if vars == nil {
+		vars = r.Spec.Env
+	}
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		env = append(env, corev1.EnvVar{Name: k, Value: r.Spec.Env[k]})
+		env = append(env, corev1.EnvVar{Name: k, Value: vars[k]})
 	}
 
 	mounts := []corev1.VolumeMount{
@@ -150,7 +169,18 @@ func desiredStatefulSet(r *v1.Room, ws, image, tier string) *appsv1.StatefulSet 
 				LocalObjectReference: corev1.LocalObjectReference{Name: CABundleConfigMap}, Optional: ptr.To(true)}}},
 		}}},
 	}
+	shared := map[string]bool{}
+	for _, m := range x.Shared {
+		vn := "shared-" + m.Name
+		shared[m.Name] = true
+		volumes = append(volumes, corev1.Volume{Name: vn, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: SharedVolumeClaim(m.Name), ReadOnly: m.ReadOnly}}})
+		mounts = append(mounts, corev1.VolumeMount{Name: vn, MountPath: "/srv/shared/" + m.Name, ReadOnly: m.ReadOnly})
+	}
 	for _, d := range r.Spec.SharedDirs {
+		if shared[d.Name] {
+			continue
+		}
 		vn := "shared-" + d.Name
 		volumes = append(volumes, corev1.Volume{Name: vn, VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: d.Name, ReadOnly: d.ReadOnly}}})
@@ -196,6 +226,9 @@ func desiredStatefulSet(r *v1.Room, ws, image, tier string) *appsv1.StatefulSet 
 	tmpl := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Labels: objectLabels(r, ws)},
 		Spec:       spec,
+	}
+	if x.PersonaHash != "" {
+		tmpl.Annotations = map[string]string{AnnotationPersonaHash: x.PersonaHash}
 	}
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: Name(name), Namespace: r.Namespace, Labels: objectLabels(r, ws)},
@@ -243,8 +276,12 @@ func desiredServiceAccount(r *v1.Room, ws string) *corev1.ServiceAccount {
 
 // Egress describes where a room or runner may connect.
 type Egress struct {
-	// Internet allows 0.0.0.0/0 and ::/0 minus Denied.
+	// Internet allows 0.0.0.0/0 and ::/0 minus Denied (network mode full).
 	Internet bool
+	// Proxy allows the egress proxy (network mode limited).
+	Proxy bool
+	// Quarantined leaves only DNS and the gateway, whatever else is set.
+	Quarantined bool
 	// Denied are cluster CIDRs and the admin's extra ranges.
 	Denied []string
 	// Allowed are reachable even inside denied ranges.
@@ -268,6 +305,12 @@ var RoomPlatformPeers = []PlatformPeer{
 	{App: "gateway", Ports: []int32{4000}},
 	{App: "registry-cache", Ports: []int32{5000}},
 }
+
+// EgressProxyPeer is the egress proxy, for rooms in limited mode.
+var EgressProxyPeer = PlatformPeer{App: "egress", Ports: []int32{3128}}
+
+// GatewayPeer is the model gateway (the warden in front of LiteLLM).
+var GatewayPeer = PlatformPeer{App: "gateway", Ports: []int32{4000}}
 
 // EgressRules builds egress rules: DNS, the given platform services, and the
 // internet per e.
@@ -337,7 +380,23 @@ func dedup(s []string) []string {
 	return out
 }
 
+// roomPeers are the platform services a room reaches with egress e.
+func roomPeers(e Egress) []PlatformPeer {
+	switch {
+	case e.Quarantined:
+		return []PlatformPeer{GatewayPeer}
+	case e.Proxy:
+		return append(slices.Clone(RoomPlatformPeers), EgressProxyPeer)
+	}
+	return RoomPlatformPeers
+}
+
+// desiredNetworkPolicy is the room's NetworkPolicy for its network mode, or
+// its quarantine (only DNS and the gateway).
 func desiredNetworkPolicy(r *v1.Room, ws string, e Egress) *networkingv1.NetworkPolicy {
+	if e.Quarantined {
+		e = Egress{Quarantined: true}
+	}
 	tcp := corev1.ProtocolTCP
 	return &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: Name(r.Name), Namespace: r.Namespace, Labels: objectLabels(r, ws)},
@@ -351,7 +410,7 @@ func desiredNetworkPolicy(r *v1.Room, ws string, e Egress) *networkingv1.Network
 				}},
 				Ports: []networkingv1.NetworkPolicyPort{{Protocol: &tcp, Port: ptr.To(intstr.FromInt32(vncPort))}},
 			}},
-			Egress: EgressRules(RoomPlatformPeers, e),
+			Egress: EgressRules(roomPeers(e), e),
 		},
 	}
 }

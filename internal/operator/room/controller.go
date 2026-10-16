@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -55,6 +56,8 @@ const (
 	annForgeSynced     = "swarmageddon.dev/forge-synced"
 	annForgeTokenName  = "swarmageddon.dev/forge-token-name"
 	annGatewayAlias    = "swarmageddon.dev/gateway-key-alias"
+	annForgePaused     = "swarmageddon.dev/forge-paused"
+	annRoomSpecHash    = "swarmageddon.dev/room-spec-hash"
 
 	certTTL                 = 30 * 24 * time.Hour
 	defaultDeletedRetention = 7 * 24 * time.Hour
@@ -218,16 +221,35 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 		return retry, client.IgnoreNotFound(err)
 	}
 	r.keepVolumes(ctx, room)
+	if err := r.noteQuarantine(ctx, room, st); err != nil {
+		return retry, err
+	}
+
+	merged, set, secretValues, problems := r.settings(ctx, room, &ws, &role)
+	shared, wallMsgs, err := r.sharedVolumes(ctx, room, &ws)
+	if err != nil {
+		return retry, err
+	}
+	var msgs []string
+	for _, e := range problems {
+		msgs = append(msgs, e.Error())
+	}
+	msgs = append(msgs, wallMsgs...)
+	if len(msgs) > 0 {
+		setCond(st, gen, ConditionSettingsReady, false, "Incomplete", strings.Join(msgs, "; "))
+	} else {
+		setCond(st, gen, ConditionSettingsReady, true, "Applied", "network "+set.Network.Mode)
+	}
 
 	if err := r.apply(ctx, room, desiredServiceAccount(room, wsName)); err != nil {
 		return retry, err
 	}
-	ready, err := r.reconcileIdentity(ctx, room, &ws, &role, st)
+	sec, ready, err := r.reconcileIdentity(ctx, room, &ws, &role, st, secretValues)
 	if err != nil {
 		return retry, err
 	}
 
-	data, err := persona.Render(persona.Input{Room: room, Role: &role, Workspace: &ws, Endpoints: persona.Endpoints{
+	data, err := persona.Render(persona.Input{Room: room, Role: &role, Workspace: &ws, Settings: &set, Endpoints: persona.Endpoints{
 		ForgeURL: ForgeURL, ForgeSSHHost: ForgeSSHHost, MessagingURL: MessagingURL, GatewayURL: GatewayURL,
 	}})
 	if err != nil {
@@ -240,12 +262,15 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 	if err := r.apply(ctx, room, desiredService(room, wsName)); err != nil {
 		return retry, err
 	}
-	np := desiredNetworkPolicy(room, wsName, r.egress(ctx, &ws))
+	np := desiredNetworkPolicy(room, wsName, r.egress(ctx, &ws, persona.NetworkMode(merged), room.Spec.Quarantined))
 	if err := r.apply(ctx, room, np); err != nil {
 		return retry, err
 	}
+	if err := r.syncTables(ctx, room, &ws, &role, sec, merged, set); err != nil {
+		return retry, err
+	}
 
-	res, err := r.reconcileStatefulSet(ctx, room, &ws, st)
+	res, err := r.reconcileStatefulSet(ctx, room, &ws, st, podExtras{Env: set.Env, Shared: shared, PersonaHash: dataHash(data)})
 	if err != nil {
 		return retry, err
 	}
@@ -308,9 +333,21 @@ func specEqual(a, b networkingv1.NetworkPolicySpec) bool {
 	return a.String() == b.String()
 }
 
-// egress is the room egress of a workspace on this platform (§11.2).
-func (r *Reconciler) egress(ctx context.Context, ws *v1.Workspace) Egress {
-	e := Egress{Internet: ws.Spec.Internet == nil || *ws.Spec.Internet, Allowed: ws.Spec.AllowedCIDRs}
+// dataHash is a stable hash of ConfigMap data.
+func dataHash(data map[string]string) string {
+	h := sha256.New()
+	for _, k := range slices.Sorted(maps.Keys(data)) {
+		h.Write([]byte(k + "\x00" + data[k] + "\x00"))
+	}
+	return hex.EncodeToString(h.Sum(nil)[:8])
+}
+
+// egress is a room's egress for its network mode on this platform (§11.2).
+func (r *Reconciler) egress(ctx context.Context, ws *v1.Workspace, mode v1.NetworkMode, quarantined bool) Egress {
+	e := Egress{Internet: mode == v1.NetworkFull, Proxy: mode == v1.NetworkLimited, Quarantined: quarantined}
+	if mode != v1.NetworkNone {
+		e.Allowed = ws.Spec.AllowedCIDRs
+	}
 	var p v1.Platform
 	if err := r.Get(ctx, types.NamespacedName{Name: v1.PlatformName}, &p); err == nil {
 		cl := p.Spec.Egress.ClusterCIDRs
@@ -324,14 +361,14 @@ func (r *Reconciler) egress(ctx context.Context, ws *v1.Workspace) Egress {
 
 // ---- identity, forge account, gateway key ----
 
-func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate, st *v1.RoomStatus) (bool, error) {
+func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate, st *v1.RoomStatus, secretEnv map[string]string) (*corev1.Secret, bool, error) {
 	gen := room.Generation
 	name, wsName := room.Name, ws.Name
 	sec := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: room.Namespace, Name: IdentitySecretName(name)}, sec)
 	isNew := apierrors.IsNotFound(err)
 	if err != nil && !isNew {
-		return false, err
+		return nil, false, err
 	}
 	if isNew {
 		sec = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: IdentitySecretName(name), Namespace: room.Namespace}}
@@ -354,20 +391,24 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 	if rotating || len(sec.Data[KeySSHPrivate]) == 0 {
 		priv, pub, err := newSSHKey(email)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 		sec.Data[KeySSHPrivate], sec.Data[KeySSHPublic] = priv, pub
 	}
 	if rotating || len(sec.Data[KeyGPGSecret]) == 0 {
 		kp, err := forgejo.NewGPGKey(displayName(room), email)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 		sec.Data[KeyGPGSecret] = []byte(kp.ArmoredPrivate)
 	}
 	if rotating || len(sec.Data[KeyVNCPassword]) == 0 {
 		sec.Data[KeyVNCPassword] = []byte(randomString(6)) // VNC uses at most 8 characters
 	}
+	if rotating || len(sec.Data[KeyEgressAuth]) == 0 {
+		sec.Data[KeyEgressAuth] = []byte(randomString(24))
+	}
+	syncSecretEnv(sec, secretEnv)
 	setCond(st, gen, v1.ConditionKeysReady, true, "Generated", "SSH, GPG and VNC credentials are in "+sec.Name)
 
 	// Messaging identity.
@@ -403,8 +444,19 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 	// Remote accounts. Revocations of old credentials run after the Secret
 	// holds the new ones.
 	var revoke []func() error
-	forgeOK := r.syncForge(ctx, room, ws, role, sec, rotating, st, &revoke)
+	var forgeOK bool
+	if room.Spec.Quarantined {
+		forgeOK = r.pauseForge(ctx, room, sec, st)
+	} else {
+		forgeOK = r.syncForge(ctx, room, ws, role, sec, rotating, st, &revoke)
+		if forgeOK {
+			delete(sec.Annotations, annForgePaused)
+		}
+	}
 	gwOK := r.syncGatewayKey(ctx, room, ws, sec, rotating, st, &revoke)
+	if gwOK {
+		gwOK = r.syncPurposeKeys(ctx, room, ws, role, sec, rotating, st, &revoke)
+	}
 	if rotating {
 		sec.Annotations[annRotateHandled] = rotate
 		st.CredentialsRotatedAt = &metav1.Time{Time: r.now()}
@@ -412,14 +464,14 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 
 	if isNew {
 		if err := controllerutil.SetControllerReference(room, sec, r.Scheme()); err != nil {
-			return false, err
+			return nil, false, err
 		}
 		if err := r.Create(ctx, sec); err != nil {
-			return false, err
+			return nil, false, err
 		}
 	} else if !maps.EqualFunc(orig.Data, sec.Data, bytes.Equal) || !maps.Equal(orig.Annotations, sec.Annotations) || !maps.Equal(orig.Labels, sec.Labels) {
 		if err := r.Update(ctx, sec); err != nil {
-			return false, err
+			return nil, false, err
 		}
 	}
 	for _, f := range revoke {
@@ -427,7 +479,7 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 			log.FromContext(ctx).Error(err, "revoke old credential")
 		}
 	}
-	return forgeOK && gwOK, nil
+	return sec, forgeOK && gwOK, nil
 }
 
 func displayName(room *v1.Room) string {
@@ -587,55 +639,79 @@ func (r *Reconciler) roomImage() string {
 	return r.Deps.Images.Room()
 }
 
-func (r *Reconciler) reconcileStatefulSet(ctx context.Context, room *v1.Room, ws *v1.Workspace, st *v1.RoomStatus) (ctrl.Result, error) {
+// roomSpecHash is a hash of the room's own spec, leaving out what doesn't
+// shape its pod (quarantine).
+func roomSpecHash(room *v1.Room) string {
+	spec := room.Spec.DeepCopy()
+	spec.Quarantined = false
+	b, _ := json.Marshal(spec)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:8])
+}
+
+// reconcileStatefulSet renders the room's StatefulSet. A change of the room's
+// own spec applies at once. Everything else that would restart the pod (a
+// new image, workspace or role defaults, the persona) waits for "update now"
+// or the workspace's update policy, which rolls one idle room at a time.
+func (r *Reconciler) reconcileStatefulSet(ctx context.Context, room *v1.Room, ws *v1.Workspace, st *v1.RoomStatus, x podExtras) (ctrl.Result, error) {
 	gen := room.Generation
 	target := room.Spec.Image
 	if target == "" {
 		target = r.roomImage()
 	}
+	tier := r.tier(ctx)
+	specHash := roomSpecHash(room)
+	full := desiredStatefulSet(room, ws.Name, target, tier, x)
+	full.Annotations[annRoomSpecHash] = specHash
+
 	cur := &appsv1.StatefulSet{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: room.Namespace, Name: Name(room.Name)}, cur)
-	exists := err == nil
-	if err != nil && !apierrors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
-	var res ctrl.Result
-	image := target
-	ann := map[string]string{}
-	if exists {
-		maps.Copy(ann, cur.Annotations)
-		inUse := ""
-		if cs := cur.Spec.Template.Spec.Containers; len(cs) > 0 {
-			inUse = cs[0].Image
+	if apierrors.IsNotFound(err) {
+		if err := controllerutil.SetControllerReference(room, full, r.Scheme()); err != nil {
+			return ctrl.Result{}, err
 		}
-		if inUse != "" && inUse != target && room.Spec.Image == "" && !room.Spec.Paused {
-			now := room.Annotations[v1.AnnotationUpdateNow]
-			switch {
-			case now != "" && now != ann[annUpdateHandled]:
-				ann[annUpdateHandled] = now
-				r.noteRoll(ws.Name)
-			case r.mayRollAutomatically(ctx, room, ws):
-				r.noteRoll(ws.Name)
-			default:
-				image = inUse
-				res.RequeueAfter = time.Minute
-			}
-		}
-	}
-	st.UpdateAvailable = image != target
-	st.ImageVersion = image
-
-	want := desiredStatefulSet(room, ws.Name, image, r.tier(ctx))
-	if !exists {
-		if err := controllerutil.SetControllerReference(room, want, r.Scheme()); err != nil {
-			return res, err
-		}
-		if err := r.Create(ctx, want); err != nil {
-			return res, err
+		if err := r.Create(ctx, full); err != nil {
+			return ctrl.Result{}, err
 		}
 		st.Phase = v1.RoomProvisioning
+		st.UpdateAvailable, st.ImageVersion = false, target
 		setCond(st, gen, v1.ConditionPodReady, false, "Creating", "StatefulSet created")
-		return res, nil
+		return ctrl.Result{}, nil
+	}
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	var res ctrl.Result
+	ann := map[string]string{}
+	maps.Copy(ann, cur.Annotations)
+	if ann[annRoomSpecHash] == "" {
+		ann[annRoomSpecHash] = specHash // adopt a StatefulSet from before this annotation
+	}
+	roomChanged := ann[annRoomSpecHash] != specHash
+	inUse := ""
+	if cs := cur.Spec.Template.Spec.Containers; len(cs) > 0 {
+		inUse = cs[0].Image
+	}
+	want, image := full, target
+	if cur.Annotations[AnnotationTemplateHash] != full.Annotations[AnnotationTemplateHash] && room.Spec.Image == "" && !room.Spec.Paused {
+		now := room.Annotations[v1.AnnotationUpdateNow]
+		switch {
+		case now != "" && now != ann[annUpdateHandled]:
+			ann[annUpdateHandled] = now
+			r.noteRoll(ws.Name)
+		case r.mayRollAutomatically(ctx, room, ws):
+			r.noteRoll(ws.Name)
+		case roomChanged:
+			// The room's own change applies now; a new image still waits.
+			if inUse != "" && inUse != target {
+				want, image = desiredStatefulSet(room, ws.Name, inUse, tier, x), inUse
+			}
+			res.RequeueAfter = time.Minute
+		default:
+			want, image = nil, inUse
+			res.RequeueAfter = time.Minute
+		}
 	}
 
 	recreate := room.Annotations[v1.AnnotationRecreate]
@@ -647,18 +723,28 @@ func (r *Reconciler) reconcileStatefulSet(ctx context.Context, room *v1.Room, ws
 		ann[annRecreateHandled] = recreate
 	}
 
-	ann[AnnotationTemplateHash] = want.Annotations[AnnotationTemplateHash]
-	specChanged := cur.Annotations[AnnotationTemplateHash] != ann[AnnotationTemplateHash] ||
-		cur.Spec.Replicas == nil || *cur.Spec.Replicas != *want.Spec.Replicas
-	if specChanged || !maps.Equal(cur.Annotations, ann) || !maps.Equal(cur.Labels, want.Labels) {
-		if specChanged {
-			cur.Spec.Replicas = want.Spec.Replicas
+	changed := false
+	if want != nil {
+		ann[AnnotationTemplateHash] = want.Annotations[AnnotationTemplateHash]
+		ann[annRoomSpecHash] = specHash
+		if cur.Annotations[AnnotationTemplateHash] != ann[AnnotationTemplateHash] {
 			cur.Spec.Template = want.Spec.Template
 			cur.Spec.UpdateStrategy = want.Spec.UpdateStrategy
 			cur.Spec.PersistentVolumeClaimRetentionPolicy = want.Spec.PersistentVolumeClaimRetentionPolicy
+			changed = true
 		}
+		st.UpdateAvailable = ann[AnnotationTemplateHash] != full.Annotations[AnnotationTemplateHash]
+	} else {
+		st.UpdateAvailable = true
+	}
+	st.ImageVersion = image
+	if cur.Spec.Replicas == nil || *cur.Spec.Replicas != *full.Spec.Replicas {
+		cur.Spec.Replicas = full.Spec.Replicas
+		changed = true
+	}
+	if changed || !maps.Equal(cur.Annotations, ann) || !maps.Equal(cur.Labels, full.Labels) {
 		cur.Annotations = ann
-		cur.Labels = want.Labels
+		cur.Labels = full.Labels
 		if err := r.Update(ctx, cur); err != nil {
 			return res, err
 		}
@@ -794,12 +880,18 @@ func (r *Reconciler) finalize(ctx context.Context, room *v1.Room, wsName string)
 	}
 	var sec corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: room.Namespace, Name: IdentitySecretName(room.Name)}, &sec); err == nil {
-		if k := string(sec.Data[KeyGatewayKey]); k != "" && r.Deps.Gateway != nil {
+		var keys []string
+		for _, k := range []string{KeyGatewayKey, KeyAdvisorKey, KeyWardenKey} {
+			if v := string(sec.Data[k]); v != "" {
+				keys = append(keys, v)
+			}
+		}
+		if len(keys) > 0 && r.Deps.Gateway != nil {
 			gc, err := r.Deps.Gateway(ctx)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete gateway key: %w", err)
 			}
-			if err := gc.DeleteKeys(ctx, k); err != nil {
+			if err := gc.DeleteKeys(ctx, keys...); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -807,6 +899,9 @@ func (r *Reconciler) finalize(ctx context.Context, room *v1.Room, wsName string)
 		return ctrl.Result{}, err
 	}
 
+	if err := r.removeTables(ctx, wsName, room.Name); err != nil {
+		return ctrl.Result{}, err
+	}
 	retention := defaultDeletedRetention
 	var ws v1.Workspace
 	if err := r.Get(ctx, types.NamespacedName{Name: wsName}, &ws); err == nil && ws.Spec.DeletedRoomRetention != nil {

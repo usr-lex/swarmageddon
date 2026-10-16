@@ -419,19 +419,19 @@ func contains(s []string, x string) bool {
 
 func TestTiers(t *testing.T) {
 	r := &v1.Room{ObjectMeta: metav1.ObjectMeta{Name: "athena", Namespace: ns}}
-	s := desiredStatefulSet(r, "acme", "room:1", "sysbox").Spec.Template.Spec
+	s := desiredStatefulSet(r, "acme", "room:1", "sysbox", podExtras{}).Spec.Template.Spec
 	if s.RuntimeClassName == nil || *s.RuntimeClassName != "sysbox-runc" || s.HostUsers != nil {
 		t.Errorf("sysbox = %+v", s)
 	}
-	p := desiredStatefulSet(r, "acme", "room:1", "privileged").Spec.Template.Spec
+	p := desiredStatefulSet(r, "acme", "room:1", "privileged", podExtras{}).Spec.Template.Spec
 	if p.Containers[0].SecurityContext == nil || !*p.Containers[0].SecurityContext.Privileged {
 		t.Error("privileged tier not privileged")
 	}
-	u := desiredStatefulSet(r, "acme", "room:1", "userns").Spec.Template.Spec
+	u := desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template.Spec
 	if u.HostUsers == nil || *u.HostUsers || u.Containers[0].SecurityContext.Privileged != nil {
 		t.Error("userns tier")
 	}
-	if TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns").Spec.Template) != TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns").Spec.Template) {
+	if TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template) != TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template) {
 		t.Error("template hash unstable")
 	}
 }

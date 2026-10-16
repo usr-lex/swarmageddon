@@ -29,6 +29,12 @@ const (
 	KeyGatewayKey     = "gateway_key"
 	KeyVNCPassword    = "vnc_password"
 	KeyForgeKnownHost = "forge_known_hosts"
+	// KeyAdvisorKey is the advisor's gateway key (ADR 0010), when the room has an advisor.
+	KeyAdvisorKey = "advisor_key"
+	// KeyWardenKey is the in-room warden's gateway key (ADR 0011), when the warden has a model.
+	KeyWardenKey = "warden_key"
+	// KeyEgressAuth is the room's credential for the egress proxy (§11.2).
+	KeyEgressAuth = "egress_auth"
 )
 
 // newSSHKey returns an OpenSSH private key and its authorized_keys line.
