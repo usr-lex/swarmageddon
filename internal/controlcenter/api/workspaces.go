@@ -52,7 +52,7 @@ func (s workspaceSvc) GetWorkspace(ctx context.Context, req *connect.Request[ccv
 	if cur.Workspace == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such workspace"))
 	}
-	out := &ccv1.GetWorkspaceResponse{Plan: wizard.FromCluster(cur), Summary: summary(cur.Workspace, len(cur.Rooms))}
+	out := &ccv1.GetWorkspaceResponse{Plan: wizard.FromCluster(cur), Summary: summary(cur.Workspace, len(cur.Rooms)), Effective: wizard.EffectiveCurrent(cur)}
 	for _, r := range s.Fleet.Rooms(func(ws string) bool { return ws == req.Msg.GetName() }) {
 		out.Rooms = append(out.Rooms, r)
 	}
@@ -95,14 +95,14 @@ var roleTitles = map[string][2]string{
 	"coordinator": {"Coordinator", "Plans the work, splits it into issues and keeps the team moving."},
 	"implementer": {"Implementer", "Takes issues, writes the code and opens pull requests."},
 	"reviewer":    {"Reviewer", "Reviews every pull request against the task card."},
-	"ci":          {"CI and infrastructure", "Owns the workflows, runners and build health."},
+	"ci-infra":    {"CI and infrastructure", "Owns the workflows, runners and build health."},
 	"qa":          {"QA", "Tests the product end to end and files what breaks."},
 	"chronicler":  {"Chronicler", "Reports on the swarm every few hours: what shipped, what's in flight, what's blocked."},
 }
 
 func (s workspaceSvc) ListRoleTemplates(ctx context.Context, req *connect.Request[ccv1.ListRoleTemplatesRequest]) (*connect.Response[ccv1.ListRoleTemplatesResponse], error) {
 	out := &ccv1.ListRoleTemplatesResponse{}
-	builtin := append(append([]string{}, wizard.BuiltinRoles...), "chronicler")
+	builtin := wizard.BuiltinRoles
 	if ws := req.Msg.GetWorkspace(); ws != "" {
 		if _, err := s.canView(ctx, ws); err != nil {
 			return nil, err
@@ -174,6 +174,7 @@ func (s workspaceSvc) plan(ctx context.Context, p *ccv1.WorkspacePlan, prune boo
 	}
 	problems := wizard.Validate(p, s.usedNames(ctx, p.GetName()))
 	d := wizard.Build(p, cur)
+	problems = append(problems, wizard.MissingTemplates(d)...)
 	return pr, cur, d, wizard.Diff(cur, d, prune), problems, nil
 }
 
@@ -192,7 +193,7 @@ func (s workspaceSvc) PreviewWorkspace(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, err
 	}
-	out := &ccv1.PreviewWorkspaceResponse{Changes: changes, Problems: problems, Fits: true}
+	out := &ccv1.PreviewWorkspaceResponse{Changes: changes, Problems: problems, Fits: true, Effective: wizard.EffectiveAll(d)}
 	if p, err := s.K.Platform(ctx); err == nil && p.Status.Preflight != nil && p.Status.Preflight.RoomEstimate > 0 {
 		total := len(d.Rooms) + len(s.usedNames(ctx, req.Msg.GetPlan().GetName()))
 		est := int(p.Status.Preflight.RoomEstimate)

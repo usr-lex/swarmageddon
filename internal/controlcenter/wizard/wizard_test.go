@@ -30,7 +30,7 @@ func TestSuggestAndRoles(t *testing.T) {
 		1: "implementer",
 		3: "coordinator,implementer,reviewer",
 		5: "coordinator,implementer,implementer,implementer,reviewer",
-		7: "coordinator,implementer,implementer,implementer,reviewer,ci,qa",
+		7: "coordinator,implementer,implementer,implementer,reviewer,ci-infra,qa",
 	}
 	for n, want := range cases {
 		if got := strings.Join(DefaultRoles(n), ","); got != want {

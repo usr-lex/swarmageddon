@@ -324,7 +324,127 @@ service WorkspaceService {
   rpc DefaultChannels(DefaultChannelsRequest) returns (DefaultChannelsResponse);
   // ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
   rpc ApplyWorkspace(ApplyWorkspaceRequest) returns (ApplyWorkspaceResponse);
+  // ListRoomSecrets lists the keys (never values) of the workspace's
+  // room-secrets Secret, which secretEnv and MCP valueFrom can reference.
+  rpc ListRoomSecrets(ListRoomSecretsRequest) returns (ListRoomSecretsResponse);
+  // SetRoomSecret writes one key of room-secrets; operators, audited without the value.
+  rpc SetRoomSecret(SetRoomSecretRequest) returns (SetRoomSecretResponse);
+  rpc DeleteRoomSecret(DeleteRoomSecretRequest) returns (DeleteRoomSecretResponse);
 }
+
+// ---- Layered room settings (docs/design.md §6.6)
+
+// SecretKeyPlan names a key of a Secret in the workspace namespace. The
+// control center manages the Secret "room-secrets" (see SetRoomSecret);
+// others are created by an admin.
+message SecretKeyPlan {
+  string name = 1;
+  string key = 2;
+}
+
+message SecretEnvPlan {
+  // Variable name.
+  string name = 1;
+  SecretKeyPlan secret = 2;
+}
+
+// McpValuePlan is a literal value or a Secret reference (exactly one).
+message McpValuePlan {
+  string value = 1;
+  SecretKeyPlan value_from = 2;
+}
+
+// McpServerPlan is one server in the .mcp.json shape.
+message McpServerPlan {
+  // stdio or http; empty: stdio when command is set.
+  string type = 1;
+  string command = 2;
+  repeated string args = 3;
+  map<string, McpValuePlan> env = 4;
+  string url = 5;
+  map<string, McpValuePlan> headers = 6;
+  repeated string enabled_tools = 7;
+  // Removes a server inherited from an earlier level.
+  bool disabled = 8;
+}
+
+message NetworkPlan {
+  // none, limited or full.
+  string mode = 1;
+  // Hosts or *.suffix, optional :port; used in limited mode.
+  repeated string domains = 2;
+  // Unset: inherit.
+  optional bool package_managers = 3;
+}
+
+// RoomSettingsPlan is one level of layered settings: Workspace.spec.roomDefaults,
+// RoleTemplate.spec.roomDefaults or a Room's own spec.
+message RoomSettingsPlan {
+  map<string, string> env = 1;
+  repeated SecretEnvPlan secret_env = 2;
+  map<string, McpServerPlan> mcp_servers = 3;
+  // Unset: inherit.
+  NetworkPlan network = 4;
+}
+
+// SettingSource says which level an effective entry came from.
+message SettingSource {
+  // env, secretEnv, mcpServer, network, domain or packageManagers.
+  string kind = 1;
+  string key = 2;
+  // workspace, role or room.
+  string level = 3;
+}
+
+// EffectiveSettings is the merged result for one room.
+message EffectiveSettings {
+  string room = 1;
+  string role = 2;
+  // Disabled MCP servers are dropped; network mode defaults to full.
+  RoomSettingsPlan settings = 3;
+  repeated SettingSource sources = 4;
+}
+
+message SharedVolumeMountPlan {
+  // everyone, role:<t>, group:<g> or room:<name>.
+  string select = 1;
+  bool read_only = 2;
+}
+
+message SharedVolumePlan {
+  string name = 1;
+  // Quantity, e.g. 20Gi.
+  string size = 2;
+  string storage_class = 3;
+  repeated SharedVolumeMountPlan mounts = 4;
+}
+
+message ListRoomSecretsRequest {
+  string workspace = 1;
+}
+message ListRoomSecretsResponse {
+  // Name of the Secret ("room-secrets").
+  string secret_name = 1;
+  repeated string keys = 2;
+}
+
+message SetRoomSecretRequest {
+  string workspace = 1;
+  // [A-Za-z0-9._-]+
+  string key = 2;
+  // Write-only.
+  string value = 3;
+}
+message SetRoomSecretResponse {
+  // The reference to use in secret_env or value_from.
+  SecretKeyPlan ref = 1;
+}
+
+message DeleteRoomSecretRequest {
+  string workspace = 1;
+  string key = 2;
+}
+message DeleteRoomSecretResponse {}
 
 message AgentPlan {
   // Room name and agent name: lower case, [a-z][a-z0-9-]*.
@@ -345,6 +465,9 @@ message AgentPlan {
   repeated string repos = 12;
   string work_dir = 13;
   bool paused = 14;
+  // The room's own layer of settings (Room.spec env, secretEnv, mcpServers,
+  // network); unset keeps the current ones.
+  RoomSettingsPlan settings = 15;
 }
 
 message RepositoryPlan {
@@ -426,6 +549,15 @@ message WorkspacePlan {
   // Warden (ADR 0011): off, monitor or gate; empty keeps the default.
   string warden_mode = 24;
   string warden_model = 25;
+  // Workspace.spec.roomDefaults; unset keeps the current ones. Its network
+  // replaces the deprecated internet flag.
+  RoomSettingsPlan room_defaults = 26;
+  // RoleTemplate.spec.roomDefaults by template name. A role left out keeps
+  // its defaults; an empty plan clears them. Built-in templates are filled in
+  // once the operator has created them; custom ones must exist.
+  map<string, RoomSettingsPlan> role_defaults = 27;
+  // Workspace.spec.sharedVolumes; offer only when preflight found RWX.
+  repeated SharedVolumePlan shared_volumes = 28;
 }
 
 message ChannelMemberPlan {
@@ -485,6 +617,8 @@ message GetWorkspaceResponse {
   WorkspaceSummary summary = 2;
   // Per-room provisioning progress.
   repeated RoomSummary rooms = 3;
+  // Merged settings per room.
+  repeated EffectiveSettings effective = 4;
 }
 
 message SuggestAgentNamesRequest {
@@ -551,6 +685,8 @@ message PreviewWorkspaceResponse {
   // Whether the planned rooms fit the preflight estimate.
   bool fits = 3;
   string fit_note = 4;
+  // Merged settings per planned room.
+  repeated EffectiveSettings effective = 5;
 }
 
 message ApplyWorkspaceRequest {
@@ -629,6 +765,30 @@ service RoomService {
   rpc StreamRoomLogs(StreamRoomLogsRequest) returns (stream StreamRoomLogsResponse);
   rpc GetRoomResources(GetRoomResourcesRequest) returns (GetRoomResourcesResponse);
   rpc GetRoomStorage(GetRoomStorageRequest) returns (GetRoomStorageResponse);
+  // GetRoomSettings returns each level of a room's settings and the merged result.
+  rpc GetRoomSettings(GetRoomSettingsRequest) returns (GetRoomSettingsResponse);
+  // UpdateRoomSettings replaces the room's own level; operators, audited.
+  rpc UpdateRoomSettings(UpdateRoomSettingsRequest) returns (UpdateRoomSettingsResponse);
+}
+
+message GetRoomSettingsRequest {
+  RoomRef room = 1;
+}
+message GetRoomSettingsResponse {
+  RoomSettingsPlan workspace = 1;
+  RoomSettingsPlan role = 2;
+  RoomSettingsPlan room = 3;
+  EffectiveSettings effective = 4;
+  // Shared volumes this room mounts: name -> "ro" or "rw".
+  map<string, string> shared_volumes = 5;
+}
+
+message UpdateRoomSettingsRequest {
+  RoomRef room = 1;
+  RoomSettingsPlan settings = 2;
+}
+message UpdateRoomSettingsResponse {
+  EffectiveSettings effective = 1;
 }
 
 message RoomRef {

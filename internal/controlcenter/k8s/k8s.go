@@ -1,7 +1,8 @@
 // Package k8s is the control center's access to Kubernetes (docs/design.md
 // §8.2, §11.3). It writes only swarmageddon custom resources, reads pods,
-// logs and metrics, and touches Secrets only in the system namespace and
-// only by the names the control center owns (AllowedSecret).
+// logs and metrics, and touches Secrets only in the system namespace by the
+// names the control center owns (AllowedSecret), plus each workspace's
+// room-secrets Secret, which the operator creates and grants by name.
 package k8s
 
 import (
@@ -277,6 +278,57 @@ func (c *Client) RoleTemplates(ctx context.Context, workspace string) ([]v1alpha
 		return nil, err
 	}
 	return l.Items, nil
+}
+
+// RoomSecretsName is the Secret in each workspace namespace that holds values
+// for rooms' secretEnv and MCP valueFrom (docs/design.md §6.6, §11.3).
+const RoomSecretsName = "room-secrets"
+
+// ErrRoomSecretsMissing means the operator hasn't created room-secrets yet.
+var ErrRoomSecretsMissing = errors.New("the workspace's room-secrets Secret is not there yet; try again in a moment")
+
+// RoomSecretKeys returns the keys of a workspace's room-secrets Secret.
+func (c *Client) RoomSecretKeys(ctx context.Context, workspace string) ([]string, error) {
+	var s corev1.Secret
+	err := c.C.Get(ctx, types.NamespacedName{Namespace: v1alpha1.WorkspaceNamespace(workspace), Name: RoomSecretsName}, &s)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(s.Data))
+	for k := range s.Data {
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
+// SetRoomSecretKey sets (value != nil) or removes (nil) one key of a
+// workspace's room-secrets Secret.
+func (c *Client) SetRoomSecretKey(ctx context.Context, workspace, key string, value []byte) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var s corev1.Secret
+		err := c.C.Get(ctx, types.NamespacedName{Namespace: v1alpha1.WorkspaceNamespace(workspace), Name: RoomSecretsName}, &s)
+		if apierrors.IsNotFound(err) {
+			return ErrRoomSecretsMissing
+		}
+		if err != nil {
+			return err
+		}
+		if s.Data == nil {
+			s.Data = map[string][]byte{}
+		}
+		if value == nil {
+			if _, ok := s.Data[key]; !ok {
+				return nil
+			}
+			delete(s.Data, key)
+		} else {
+			s.Data[key] = value
+		}
+		return c.C.Update(ctx, &s)
+	})
 }
 
 // PodName is the pod of a room's StatefulSet.

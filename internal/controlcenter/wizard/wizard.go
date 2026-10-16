@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -64,7 +65,7 @@ func Suggest(count int, used map[string]bool) []string {
 }
 
 // Built-in role template names (the operator copies them into each workspace).
-var BuiltinRoles = []string{"coordinator", "implementer", "reviewer", "ci", "qa"}
+var BuiltinRoles = []string{"coordinator", "implementer", "reviewer", "ci-infra", "qa", "chronicler"}
 
 // DefaultRoles is the default role mix for n agents: one coordinator, n
 // implementers, one reviewer, plus CI/infra and QA past five agents.
@@ -80,7 +81,7 @@ func DefaultRoles(n int) []string {
 	roles := []string{"coordinator"}
 	extra := []string{"reviewer"}
 	if n > 5 {
-		extra = append(extra, "ci", "qa")
+		extra = append(extra, "ci-infra", "qa")
 	}
 	for i := 0; i < n-1-len(extra); i++ {
 		roles = append(roles, "implementer")
@@ -158,7 +159,8 @@ func Validate(p *ccv1.WorkspacePlan, reserved map[string]bool) []string {
 			probs = append(probs, fmt.Sprintf("unknown forge notification %q", e))
 		}
 	}
-	return append(probs, validateChannels(p)...)
+	probs = append(probs, validateChannels(p)...)
+	return append(probs, validateLayers(p)...)
 }
 
 // Desired is what a plan asks for.
@@ -166,13 +168,17 @@ type Desired struct {
 	Workspace *v1alpha1.Workspace
 	Rooms     []*v1alpha1.Room
 	Pool      *v1alpha1.RunnerPool // nil: none
+	// RoleTemplates holds every template, with the plan's roomDefaults;
+	// ones without a ResourceVersion don't exist yet.
+	RoleTemplates []*v1alpha1.RoleTemplate
 }
 
 // Current is what exists.
 type Current struct {
 	Workspace *v1alpha1.Workspace
-	Rooms     []v1alpha1.Room
-	Pool      *v1alpha1.RunnerPool
+	Rooms         []v1alpha1.Room
+	Pool          *v1alpha1.RunnerPool
+	RoleTemplates []v1alpha1.RoleTemplate
 }
 
 func qty(s string) *resource.Quantity {
@@ -243,8 +249,16 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 			PushMirror: r.GetPushMirror(), MirrorSecretName: r.GetMirrorSecretName(), StatusChecks: r.GetStatusChecks()})
 	}
 	s.Owners = p.GetOwners()
-	internet := p.GetInternet()
-	s.Internet = &internet
+	if p.RoomDefaults != nil {
+		s.RoomDefaults = SettingsFromPlan(p.GetRoomDefaults())
+	}
+	if s.RoomDefaults.Network != nil {
+		s.Internet = nil // deprecated; the network setting decides
+	} else {
+		internet := p.GetInternet()
+		s.Internet = &internet
+	}
+	s.SharedVolumes = volumesFromPlan(p)
 	if d, err := time.ParseDuration(p.GetApprovalTimeout()); err == nil && p.GetApprovalTimeout() != "" {
 		s.ApprovalTimeout = &metav1.Duration{Duration: d}
 	} else {
@@ -285,7 +299,28 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 		rs.Volumes.Engine = qty(a.GetEngineVolume())
 		rs.Repos = a.GetRepos()
 		rs.WorkDir = a.GetWorkDir()
+		if a.Settings != nil {
+			SetRoomSettings(rs, SettingsFromPlan(a.GetSettings()))
+		}
 		rooms = append(rooms, r)
+	}
+	var templates []*v1alpha1.RoleTemplate
+	have := map[string]bool{}
+	for _, t := range cur.RoleTemplates {
+		t := t.DeepCopy()
+		if rd, ok := p.GetRoleDefaults()[t.Name]; ok {
+			t.Spec.RoomDefaults = SettingsFromPlan(rd)
+		}
+		have[t.Name] = true
+		templates = append(templates, t)
+	}
+	for _, name := range slices.Sorted(maps.Keys(p.GetRoleDefaults())) {
+		if !have[name] {
+			t := &v1alpha1.RoleTemplate{}
+			t.Name, t.Namespace = name, ns
+			t.Spec.RoomDefaults = SettingsFromPlan(p.GetRoleDefaults()[name])
+			templates = append(templates, t)
+		}
 	}
 	var pool *v1alpha1.RunnerPool
 	if len(p.GetRunnerLabels()) > 0 {
@@ -297,7 +332,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 		pool.Spec.Labels = p.GetRunnerLabels()
 		pool.Spec.MaxConcurrent = p.GetRunnerMaxConcurrent()
 	}
-	return Desired{Workspace: ws, Rooms: rooms, Pool: pool}
+	return Desired{Workspace: ws, Rooms: rooms, Pool: pool, RoleTemplates: templates}
 }
 
 // FromCluster turns existing resources into a plan.
@@ -309,6 +344,13 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Owners: s.Owners, DefaultModel: s.Models.Default, BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
 		UpdateMode: string(s.UpdatePolicy.Mode), UpdateWindow: s.UpdatePolicy.Window, RequiredApprovals: s.Forge.RequiredApprovals,
 		Internet: s.Internet == nil || *s.Internet,
+		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
+		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{},
+	}
+	for _, t := range cur.RoleTemplates {
+		if !isEmpty(t.Spec.RoomDefaults) {
+			p.RoleDefaults[t.Name] = SettingsToPlan(t.Spec.RoomDefaults)
+		}
 	}
 	if s.ApprovalTimeout != nil {
 		p.ApprovalTimeout = s.ApprovalTimeout.Duration.String()
@@ -339,7 +381,8 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		rs := r.Spec
 		p.Agents = append(p.Agents, &ccv1.AgentPlan{Name: r.Name, DisplayName: rs.DisplayName, Role: rs.Role, Cli: string(rs.CLI),
 			Model: rs.Model, Effort: rs.Effort, Group: rs.Group, Cpu: qstr(rs.Resources.CPU), Memory: qstr(rs.Resources.Memory),
-			HomeVolume: qstr(rs.Volumes.Home), EngineVolume: qstr(rs.Volumes.Engine), Repos: rs.Repos, WorkDir: rs.WorkDir, Paused: rs.Paused})
+			HomeVolume: qstr(rs.Volumes.Home), EngineVolume: qstr(rs.Volumes.Engine), Repos: rs.Repos, WorkDir: rs.WorkDir, Paused: rs.Paused,
+			Settings: SettingsToPlan(RoomSettings(rs))})
 	}
 	if cur.Pool != nil {
 		p.RunnerLabels = cur.Pool.Spec.Labels
@@ -433,6 +476,21 @@ func Diff(cur Current, d Desired, prune bool) []*ccv1.Change {
 	if d.Pool != nil {
 		newPool = &d.Pool.Spec
 	}
+	curRT := map[string]*v1alpha1.RoomDefaults{}
+	for i := range cur.RoleTemplates {
+		curRT[cur.RoleTemplates[i].Name] = &cur.RoleTemplates[i].Spec.RoomDefaults
+	}
+	for _, t := range d.RoleTemplates {
+		before := curRT[t.Name]
+		if before == nil {
+			before = &v1alpha1.RoomDefaults{}
+		}
+		c := change("RoleTemplate", t.Name, before, &t.Spec.RoomDefaults)
+		if c.Action != ccv1.ChangeAction_CHANGE_ACTION_UNCHANGED {
+			c.Fields = []string{"roomDefaults"}
+			out = append(out, c)
+		}
+	}
 	if curPool != nil || newPool != nil {
 		c := change("RunnerPool", "default", curPool, newPool)
 		if newPool == nil {
@@ -466,6 +524,11 @@ func LoadCurrent(ctx context.Context, c client.Client, name string) (Current, er
 	if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: "default"}, &pool); err == nil {
 		cur.Pool = &pool
 	}
+	var rts v1alpha1.RoleTemplateList
+	if err := c.List(ctx, &rts, client.InNamespace(ns)); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsForbidden(err) {
+		return cur, err
+	}
+	cur.RoleTemplates = rts.Items
 	return cur, nil
 }
 
@@ -520,6 +583,13 @@ func Apply(ctx context.Context, c client.Client, cur Current, d Desired, changes
 			}
 		}
 	}
+	for _, t := range d.RoleTemplates {
+		if ch := byKey["RoleTemplate/"+t.Name]; ch != nil && ch.Action != ccv1.ChangeAction_CHANGE_ACTION_UNCHANGED {
+			if err := setRoleDefaults(ctx, c, t, wait); err != nil {
+				return err
+			}
+		}
+	}
 	if d.Pool != nil {
 		switch byKey["RunnerPool/default"].GetAction() {
 		case ccv1.ChangeAction_CHANGE_ACTION_CREATE:
@@ -533,6 +603,39 @@ func Apply(ctx context.Context, c client.Client, cur Current, d Desired, changes
 		}
 	}
 	return nil
+}
+
+// setRoleDefaults writes a template's roomDefaults. A built-in template the
+// operator hasn't created yet is waited for; the wizard never creates one,
+// since the operator would then skip filling it in.
+func setRoleDefaults(ctx context.Context, c client.Client, t *v1alpha1.RoleTemplate, wait time.Duration) error {
+	deadline := time.Now().Add(wait)
+	for {
+		var cur v1alpha1.RoleTemplate
+		err := c.Get(ctx, types.NamespacedName{Namespace: t.Namespace, Name: t.Name}, &cur)
+		if err == nil {
+			orig := cur.DeepCopy()
+			cur.Spec.RoomDefaults = t.Spec.RoomDefaults
+			if err := c.Patch(ctx, &cur, client.MergeFrom(orig)); err != nil {
+				return fmt.Errorf("role template %s: %w", t.Name, err)
+			}
+			return nil
+		}
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("role template %s: %w", t.Name, err)
+		}
+		if !slices.Contains(BuiltinRoles, t.Name) {
+			return fmt.Errorf("role template %s does not exist", t.Name)
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("role template %s is not there yet; apply again in a moment", t.Name)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
 }
 
 func waitNamespace(ctx context.Context, c client.Client, ws string, wait time.Duration) error {

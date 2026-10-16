@@ -137,6 +137,15 @@ const (
 	// WorkspaceServiceApplyWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// ApplyWorkspace RPC.
 	WorkspaceServiceApplyWorkspaceProcedure = "/swarm.controlcenter.v1.WorkspaceService/ApplyWorkspace"
+	// WorkspaceServiceListRoomSecretsProcedure is the fully-qualified name of the WorkspaceService's
+	// ListRoomSecrets RPC.
+	WorkspaceServiceListRoomSecretsProcedure = "/swarm.controlcenter.v1.WorkspaceService/ListRoomSecrets"
+	// WorkspaceServiceSetRoomSecretProcedure is the fully-qualified name of the WorkspaceService's
+	// SetRoomSecret RPC.
+	WorkspaceServiceSetRoomSecretProcedure = "/swarm.controlcenter.v1.WorkspaceService/SetRoomSecret"
+	// WorkspaceServiceDeleteRoomSecretProcedure is the fully-qualified name of the WorkspaceService's
+	// DeleteRoomSecret RPC.
+	WorkspaceServiceDeleteRoomSecretProcedure = "/swarm.controlcenter.v1.WorkspaceService/DeleteRoomSecret"
 	// RoomServiceListRoomsProcedure is the fully-qualified name of the RoomService's ListRooms RPC.
 	RoomServiceListRoomsProcedure = "/swarm.controlcenter.v1.RoomService/ListRooms"
 	// RoomServiceGetRoomProcedure is the fully-qualified name of the RoomService's GetRoom RPC.
@@ -170,6 +179,12 @@ const (
 	// RoomServiceGetRoomStorageProcedure is the fully-qualified name of the RoomService's
 	// GetRoomStorage RPC.
 	RoomServiceGetRoomStorageProcedure = "/swarm.controlcenter.v1.RoomService/GetRoomStorage"
+	// RoomServiceGetRoomSettingsProcedure is the fully-qualified name of the RoomService's
+	// GetRoomSettings RPC.
+	RoomServiceGetRoomSettingsProcedure = "/swarm.controlcenter.v1.RoomService/GetRoomSettings"
+	// RoomServiceUpdateRoomSettingsProcedure is the fully-qualified name of the RoomService's
+	// UpdateRoomSettings RPC.
+	RoomServiceUpdateRoomSettingsProcedure = "/swarm.controlcenter.v1.RoomService/UpdateRoomSettings"
 	// FleetServiceWatchFleetProcedure is the fully-qualified name of the FleetService's WatchFleet RPC.
 	FleetServiceWatchFleetProcedure = "/swarm.controlcenter.v1.FleetService/WatchFleet"
 	// InboxServiceListInboxProcedure is the fully-qualified name of the InboxService's ListInbox RPC.
@@ -758,6 +773,12 @@ type WorkspaceServiceClient interface {
 	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
+	// ListRoomSecrets lists the keys (never values) of the workspace's
+	// room-secrets Secret, which secretEnv and MCP valueFrom can reference.
+	ListRoomSecrets(context.Context, *connect.Request[v1.ListRoomSecretsRequest]) (*connect.Response[v1.ListRoomSecretsResponse], error)
+	// SetRoomSecret writes one key of room-secrets; operators, audited without the value.
+	SetRoomSecret(context.Context, *connect.Request[v1.SetRoomSecretRequest]) (*connect.Response[v1.SetRoomSecretResponse], error)
+	DeleteRoomSecret(context.Context, *connect.Request[v1.DeleteRoomSecretRequest]) (*connect.Response[v1.DeleteRoomSecretResponse], error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the swarm.controlcenter.v1.WorkspaceService
@@ -819,6 +840,24 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("ApplyWorkspace")),
 			connect.WithClientOptions(opts...),
 		),
+		listRoomSecrets: connect.NewClient[v1.ListRoomSecretsRequest, v1.ListRoomSecretsResponse](
+			httpClient,
+			baseURL+WorkspaceServiceListRoomSecretsProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("ListRoomSecrets")),
+			connect.WithClientOptions(opts...),
+		),
+		setRoomSecret: connect.NewClient[v1.SetRoomSecretRequest, v1.SetRoomSecretResponse](
+			httpClient,
+			baseURL+WorkspaceServiceSetRoomSecretProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("SetRoomSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteRoomSecret: connect.NewClient[v1.DeleteRoomSecretRequest, v1.DeleteRoomSecretResponse](
+			httpClient,
+			baseURL+WorkspaceServiceDeleteRoomSecretProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("DeleteRoomSecret")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -832,6 +871,9 @@ type workspaceServiceClient struct {
 	previewWorkspace  *connect.Client[v1.PreviewWorkspaceRequest, v1.PreviewWorkspaceResponse]
 	defaultChannels   *connect.Client[v1.DefaultChannelsRequest, v1.DefaultChannelsResponse]
 	applyWorkspace    *connect.Client[v1.ApplyWorkspaceRequest, v1.ApplyWorkspaceResponse]
+	listRoomSecrets   *connect.Client[v1.ListRoomSecretsRequest, v1.ListRoomSecretsResponse]
+	setRoomSecret     *connect.Client[v1.SetRoomSecretRequest, v1.SetRoomSecretResponse]
+	deleteRoomSecret  *connect.Client[v1.DeleteRoomSecretRequest, v1.DeleteRoomSecretResponse]
 }
 
 // ListWorkspaces calls swarm.controlcenter.v1.WorkspaceService.ListWorkspaces.
@@ -874,6 +916,21 @@ func (c *workspaceServiceClient) ApplyWorkspace(ctx context.Context, req *connec
 	return c.applyWorkspace.CallUnary(ctx, req)
 }
 
+// ListRoomSecrets calls swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets.
+func (c *workspaceServiceClient) ListRoomSecrets(ctx context.Context, req *connect.Request[v1.ListRoomSecretsRequest]) (*connect.Response[v1.ListRoomSecretsResponse], error) {
+	return c.listRoomSecrets.CallUnary(ctx, req)
+}
+
+// SetRoomSecret calls swarm.controlcenter.v1.WorkspaceService.SetRoomSecret.
+func (c *workspaceServiceClient) SetRoomSecret(ctx context.Context, req *connect.Request[v1.SetRoomSecretRequest]) (*connect.Response[v1.SetRoomSecretResponse], error) {
+	return c.setRoomSecret.CallUnary(ctx, req)
+}
+
+// DeleteRoomSecret calls swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret.
+func (c *workspaceServiceClient) DeleteRoomSecret(ctx context.Context, req *connect.Request[v1.DeleteRoomSecretRequest]) (*connect.Response[v1.DeleteRoomSecretResponse], error) {
+	return c.deleteRoomSecret.CallUnary(ctx, req)
+}
+
 // WorkspaceServiceHandler is an implementation of the swarm.controlcenter.v1.WorkspaceService
 // service.
 type WorkspaceServiceHandler interface {
@@ -892,6 +949,12 @@ type WorkspaceServiceHandler interface {
 	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
+	// ListRoomSecrets lists the keys (never values) of the workspace's
+	// room-secrets Secret, which secretEnv and MCP valueFrom can reference.
+	ListRoomSecrets(context.Context, *connect.Request[v1.ListRoomSecretsRequest]) (*connect.Response[v1.ListRoomSecretsResponse], error)
+	// SetRoomSecret writes one key of room-secrets; operators, audited without the value.
+	SetRoomSecret(context.Context, *connect.Request[v1.SetRoomSecretRequest]) (*connect.Response[v1.SetRoomSecretResponse], error)
+	DeleteRoomSecret(context.Context, *connect.Request[v1.DeleteRoomSecretRequest]) (*connect.Response[v1.DeleteRoomSecretResponse], error)
 }
 
 // NewWorkspaceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -949,6 +1012,24 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("ApplyWorkspace")),
 		connect.WithHandlerOptions(opts...),
 	)
+	workspaceServiceListRoomSecretsHandler := connect.NewUnaryHandler(
+		WorkspaceServiceListRoomSecretsProcedure,
+		svc.ListRoomSecrets,
+		connect.WithSchema(workspaceServiceMethods.ByName("ListRoomSecrets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	workspaceServiceSetRoomSecretHandler := connect.NewUnaryHandler(
+		WorkspaceServiceSetRoomSecretProcedure,
+		svc.SetRoomSecret,
+		connect.WithSchema(workspaceServiceMethods.ByName("SetRoomSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	workspaceServiceDeleteRoomSecretHandler := connect.NewUnaryHandler(
+		WorkspaceServiceDeleteRoomSecretProcedure,
+		svc.DeleteRoomSecret,
+		connect.WithSchema(workspaceServiceMethods.ByName("DeleteRoomSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/swarm.controlcenter.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WorkspaceServiceListWorkspacesProcedure:
@@ -967,6 +1048,12 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceDefaultChannelsHandler.ServeHTTP(w, r)
 		case WorkspaceServiceApplyWorkspaceProcedure:
 			workspaceServiceApplyWorkspaceHandler.ServeHTTP(w, r)
+		case WorkspaceServiceListRoomSecretsProcedure:
+			workspaceServiceListRoomSecretsHandler.ServeHTTP(w, r)
+		case WorkspaceServiceSetRoomSecretProcedure:
+			workspaceServiceSetRoomSecretHandler.ServeHTTP(w, r)
+		case WorkspaceServiceDeleteRoomSecretProcedure:
+			workspaceServiceDeleteRoomSecretHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1008,6 +1095,18 @@ func (UnimplementedWorkspaceServiceHandler) ApplyWorkspace(context.Context, *con
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace is not implemented"))
 }
 
+func (UnimplementedWorkspaceServiceHandler) ListRoomSecrets(context.Context, *connect.Request[v1.ListRoomSecretsRequest]) (*connect.Response[v1.ListRoomSecretsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets is not implemented"))
+}
+
+func (UnimplementedWorkspaceServiceHandler) SetRoomSecret(context.Context, *connect.Request[v1.SetRoomSecretRequest]) (*connect.Response[v1.SetRoomSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.SetRoomSecret is not implemented"))
+}
+
+func (UnimplementedWorkspaceServiceHandler) DeleteRoomSecret(context.Context, *connect.Request[v1.DeleteRoomSecretRequest]) (*connect.Response[v1.DeleteRoomSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret is not implemented"))
+}
+
 // RoomServiceClient is a client for the swarm.controlcenter.v1.RoomService service.
 type RoomServiceClient interface {
 	ListRooms(context.Context, *connect.Request[v1.ListRoomsRequest]) (*connect.Response[v1.ListRoomsResponse], error)
@@ -1029,6 +1128,10 @@ type RoomServiceClient interface {
 	StreamRoomLogs(context.Context, *connect.Request[v1.StreamRoomLogsRequest]) (*connect.ServerStreamForClient[v1.StreamRoomLogsResponse], error)
 	GetRoomResources(context.Context, *connect.Request[v1.GetRoomResourcesRequest]) (*connect.Response[v1.GetRoomResourcesResponse], error)
 	GetRoomStorage(context.Context, *connect.Request[v1.GetRoomStorageRequest]) (*connect.Response[v1.GetRoomStorageResponse], error)
+	// GetRoomSettings returns each level of a room's settings and the merged result.
+	GetRoomSettings(context.Context, *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error)
+	// UpdateRoomSettings replaces the room's own level; operators, audited.
+	UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error)
 }
 
 // NewRoomServiceClient constructs a client for the swarm.controlcenter.v1.RoomService service. By
@@ -1120,6 +1223,18 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roomServiceMethods.ByName("GetRoomStorage")),
 			connect.WithClientOptions(opts...),
 		),
+		getRoomSettings: connect.NewClient[v1.GetRoomSettingsRequest, v1.GetRoomSettingsResponse](
+			httpClient,
+			baseURL+RoomServiceGetRoomSettingsProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("GetRoomSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		updateRoomSettings: connect.NewClient[v1.UpdateRoomSettingsRequest, v1.UpdateRoomSettingsResponse](
+			httpClient,
+			baseURL+RoomServiceUpdateRoomSettingsProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("UpdateRoomSettings")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -1138,6 +1253,8 @@ type roomServiceClient struct {
 	streamRoomLogs        *connect.Client[v1.StreamRoomLogsRequest, v1.StreamRoomLogsResponse]
 	getRoomResources      *connect.Client[v1.GetRoomResourcesRequest, v1.GetRoomResourcesResponse]
 	getRoomStorage        *connect.Client[v1.GetRoomStorageRequest, v1.GetRoomStorageResponse]
+	getRoomSettings       *connect.Client[v1.GetRoomSettingsRequest, v1.GetRoomSettingsResponse]
+	updateRoomSettings    *connect.Client[v1.UpdateRoomSettingsRequest, v1.UpdateRoomSettingsResponse]
 }
 
 // ListRooms calls swarm.controlcenter.v1.RoomService.ListRooms.
@@ -1205,6 +1322,16 @@ func (c *roomServiceClient) GetRoomStorage(ctx context.Context, req *connect.Req
 	return c.getRoomStorage.CallUnary(ctx, req)
 }
 
+// GetRoomSettings calls swarm.controlcenter.v1.RoomService.GetRoomSettings.
+func (c *roomServiceClient) GetRoomSettings(ctx context.Context, req *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error) {
+	return c.getRoomSettings.CallUnary(ctx, req)
+}
+
+// UpdateRoomSettings calls swarm.controlcenter.v1.RoomService.UpdateRoomSettings.
+func (c *roomServiceClient) UpdateRoomSettings(ctx context.Context, req *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error) {
+	return c.updateRoomSettings.CallUnary(ctx, req)
+}
+
 // RoomServiceHandler is an implementation of the swarm.controlcenter.v1.RoomService service.
 type RoomServiceHandler interface {
 	ListRooms(context.Context, *connect.Request[v1.ListRoomsRequest]) (*connect.Response[v1.ListRoomsResponse], error)
@@ -1226,6 +1353,10 @@ type RoomServiceHandler interface {
 	StreamRoomLogs(context.Context, *connect.Request[v1.StreamRoomLogsRequest], *connect.ServerStream[v1.StreamRoomLogsResponse]) error
 	GetRoomResources(context.Context, *connect.Request[v1.GetRoomResourcesRequest]) (*connect.Response[v1.GetRoomResourcesResponse], error)
 	GetRoomStorage(context.Context, *connect.Request[v1.GetRoomStorageRequest]) (*connect.Response[v1.GetRoomStorageResponse], error)
+	// GetRoomSettings returns each level of a room's settings and the merged result.
+	GetRoomSettings(context.Context, *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error)
+	// UpdateRoomSettings replaces the room's own level; operators, audited.
+	UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error)
 }
 
 // NewRoomServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -1313,6 +1444,18 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roomServiceMethods.ByName("GetRoomStorage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	roomServiceGetRoomSettingsHandler := connect.NewUnaryHandler(
+		RoomServiceGetRoomSettingsProcedure,
+		svc.GetRoomSettings,
+		connect.WithSchema(roomServiceMethods.ByName("GetRoomSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceUpdateRoomSettingsHandler := connect.NewUnaryHandler(
+		RoomServiceUpdateRoomSettingsProcedure,
+		svc.UpdateRoomSettings,
+		connect.WithSchema(roomServiceMethods.ByName("UpdateRoomSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/swarm.controlcenter.v1.RoomService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RoomServiceListRoomsProcedure:
@@ -1341,6 +1484,10 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceGetRoomResourcesHandler.ServeHTTP(w, r)
 		case RoomServiceGetRoomStorageProcedure:
 			roomServiceGetRoomStorageHandler.ServeHTTP(w, r)
+		case RoomServiceGetRoomSettingsProcedure:
+			roomServiceGetRoomSettingsHandler.ServeHTTP(w, r)
+		case RoomServiceUpdateRoomSettingsProcedure:
+			roomServiceUpdateRoomSettingsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1400,6 +1547,14 @@ func (UnimplementedRoomServiceHandler) GetRoomResources(context.Context, *connec
 
 func (UnimplementedRoomServiceHandler) GetRoomStorage(context.Context, *connect.Request[v1.GetRoomStorageRequest]) (*connect.Response[v1.GetRoomStorageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.GetRoomStorage is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) GetRoomSettings(context.Context, *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.GetRoomSettings is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.UpdateRoomSettings is not implemented"))
 }
 
 // FleetServiceClient is a client for the swarm.controlcenter.v1.FleetService service.

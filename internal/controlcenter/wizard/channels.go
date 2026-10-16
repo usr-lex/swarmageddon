@@ -66,7 +66,7 @@ func DefaultChannels(p *ccv1.WorkspacePlan) []*ccv1.ChannelPlan {
 
 func plural(role string) string {
 	switch role {
-	case "qa", "ci":
+	case "qa", "ci-infra":
 		return role
 	}
 	return role + "s"
