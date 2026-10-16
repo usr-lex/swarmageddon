@@ -376,7 +376,7 @@ func (d *Driver) permission(ctx context.Context, in HookInput) ([]byte, error) {
 	if dec.Allow {
 		out.HookSpecificOutput.Decision.Behavior = "allow"
 		if dec.ForSession {
-			out.HookSpecificOutput.Decision.UpdatedPermissions = in.PermissionSuggestions
+			out.HookSpecificOutput.Decision.UpdatedPermissions = sessionRules(in.PermissionSuggestions)
 		}
 	} else {
 		out.HookSpecificOutput.Decision.Behavior = "deny"
@@ -386,6 +386,23 @@ func (d *Driver) permission(ctx context.Context, in HookInput) ([]byte, error) {
 		}
 	}
 	return json.Marshal(out)
+}
+
+// sessionRules keeps the suggestions that remember an allow (rules and
+// directories) and drops mode changes such as setMode acceptEdits, which
+// would widen more than this one approval.
+func sessionRules(sugg []json.RawMessage) []json.RawMessage {
+	var out []json.RawMessage
+	for _, s := range sugg {
+		var t struct {
+			Type string `json:"type"`
+		}
+		_ = json.Unmarshal(s, &t)
+		if t.Type == "addRules" || t.Type == "addDirectories" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // Summarize makes a one-line summary of a tool call.

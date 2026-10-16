@@ -1,0 +1,1 @@
+{"content":[{"id":"toolu_mock_3","input":{"body":"hello","to":"hermes"},"name":"mcp__swarm__send_message","type":"tool_use"}],"id":"msg_mock_3","model":"m","role":"assistant","stop_reason":"tool_use","stop_sequence":null,"type":"message","usage":{"input_tokens":10,"output_tokens":5}}

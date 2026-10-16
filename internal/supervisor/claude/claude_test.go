@@ -241,7 +241,7 @@ func TestHooksAndDelivery(t *testing.T) {
 	if ev.last() != messagingv1.Presence_PRESENCE_WAITING_ON_HUMAN {
 		t.Error("notification")
 	}
-	out, err = d.Hook(context.Background(), "PermissionRequest", []byte(`{"tool_name":"Bash","tool_input":{"command":"rm x"},"permission_suggestions":[{"type":"addRules"}]}`), nil)
+	out, err = d.Hook(context.Background(), "PermissionRequest", []byte(`{"tool_name":"Bash","tool_input":{"command":"rm x"},"permission_suggestions":[{"type":"addRules"},{"type":"setMode","mode":"acceptEdits"}]}`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

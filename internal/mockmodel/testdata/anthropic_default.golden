@@ -1,0 +1,1 @@
+{"content":[{"text":"fine","type":"text"}],"id":"msg_mock_4","model":"m","role":"assistant","stop_reason":"end_turn","stop_sequence":null,"type":"message","usage":{"input_tokens":10,"output_tokens":5}}
