@@ -221,7 +221,9 @@ func (f *Forge) SetJobs(j []forgejo.RunJob) {
 }
 
 // Client returns a client for the fake.
-func (f *Forge) Client(context.Context) (*forgejo.Client, error) { return forgejo.New(f.URL, "admintoken"), nil }
+func (f *Forge) Client(context.Context) (*forgejo.Client, error) {
+	return forgejo.New(f.URL, "admintoken"), nil
+}
 
 // Gateway is a fake LiteLLM.
 type Gateway struct {
@@ -247,4 +249,6 @@ func NewGateway(t *testing.T) *Gateway {
 }
 
 // Client returns a client for the fake.
-func (g *Gateway) Client(context.Context) (*gateway.Client, error) { return gateway.New(g.URL, "sk-master"), nil }
+func (g *Gateway) Client(context.Context) (*gateway.Client, error) {
+	return gateway.New(g.URL, "sk-master"), nil
+}

@@ -52,7 +52,7 @@ func newEnv(t *testing.T) *env {
 	ctx := context.Background()
 	must(t, c.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}))
 	must(t, c.Create(ctx, &v1.Workspace{ObjectMeta: metav1.ObjectMeta{Name: "acme"}, Spec: v1.WorkspaceSpec{
-		Forge: v1.ForgeSpec{Org: "acme", Teams: []v1.TeamSpec{{Name: "mergers", Members: []string{"athena"}}}},
+		Forge:  v1.ForgeSpec{Org: "acme", Teams: []v1.TeamSpec{{Name: "mergers", Members: []string{"athena"}}}},
 		Models: v1.ModelSettings{Default: "claude-opus-5-5", Budgets: v1.BudgetSettings{PerRoomMonthlyUSD: 200}},
 	}}))
 	must(t, c.Create(ctx, &v1.RoleTemplate{ObjectMeta: metav1.ObjectMeta{Name: "reviewer", Namespace: ns}, Spec: v1.RoleTemplateSpec{
