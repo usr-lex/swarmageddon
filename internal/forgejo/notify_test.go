@@ -31,7 +31,8 @@ func TestEnsureOrgHookCreatesThenPatches(t *testing.T) {
 	stored := []string{"issues", "issue_assign", "issue_label", "issue_milestone", "issue_comment", "pull_request",
 		"pull_request_assign", "pull_request_label", "pull_request_milestone", "pull_request_comment",
 		"pull_request_review_approved", "pull_request_review_rejected", "pull_request_review_comment",
-		"pull_request_sync", "pull_request_review_request", "action_run_failure", "workflow_run_failure"}
+		"pull_request_sync", "pull_request_review_request", "action_run_failure", "workflow_run_failure",
+		"push", "workflow_run_success"}
 	existing := Hook{ID: 3, Active: true, Events: stored, Config: map[string]string{"url": "https://cc/hooks/forgejo/acme", "content_type": "json"}}
 	f2, c2 := newFake(t, map[string]func(http.ResponseWriter){
 		"GET /orgs/acme/hooks?limit=50": jsonResp(200, []Hook{existing}),

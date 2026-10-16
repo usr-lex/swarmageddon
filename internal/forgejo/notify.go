@@ -7,11 +7,14 @@ import (
 )
 
 // ForgeNotificationEvents are the org webhook events behind forge
-// notifications to agents (docs/design.md §9.7). Verified against Forgejo
-// 17.0.0; "workflow_run" is not an event there and is dropped silently.
+// notifications to agents (docs/design.md §9.7) and the observatory (§8.7):
+// push for per-commit activity, workflow_run_success for passing CI.
+// Verified against Forgejo 17.0.0; "workflow_run" is not an event there and
+// is dropped silently.
 var ForgeNotificationEvents = []string{
 	"issues", "issue_comment", "pull_request", "pull_request_review",
 	"pull_request_comment", "workflow_run_failure", "action_run_failure",
+	"push", "workflow_run_success",
 }
 
 // eventExpansion is how Forgejo 17.0.0 stores the umbrella events it
