@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: messaging
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-messaging
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+rules:
+  - apiGroups: [swarmageddon.dev]
+    resources: [workspaces, rooms]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-messaging
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: swarmageddon-messaging}
+subjects:
+  - {kind: ServiceAccount, name: messaging, namespace: {{ .Namespace }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+spec:
+  selector: {swarmageddon.dev/component: messaging}
+  ports:
+    - {name: api, port: 8443, targetPort: 8443}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-headless
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector: {swarmageddon.dev/component: messaging}
+  ports:
+    - {name: api, port: 8443, targetPort: 8443}
+    - {name: nats-route, port: 6222, targetPort: 6222}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: messaging
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {swarmageddon.dev/component: messaging}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: messaging
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+spec:
+  replicas: {{ .Messaging.Replicas }}
+  serviceName: messaging-headless
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels: {swarmageddon.dev/component: messaging}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+    spec:
+      serviceAccountName: messaging
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext: {fsGroup: 65532, runAsUser: 65532, runAsGroup: 65532, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {swarmageddon.dev/component: messaging}
+      containers:
+        - name: messaging
+          image: {{ .Images.Messaging }}
+          args:
+            - --listen=:8443
+            - --health=:8080
+            - --tls-cert=/etc/swarm/tls/tls.crt
+            - --tls-key=/etc/swarm/tls/tls.key
+            - --ca=/etc/swarm/tls/ca.crt
+            - --data=/data
+            - --nats-routes={{ .Messaging.Routes }}
+            - --server-name=$(POD_NAME)
+            - --cluster-size={{ .Messaging.Replicas }}
+            - --namespace={{ .Namespace }}
+          env:
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+          ports:
+            - {name: api, containerPort: 8443}
+            - {name: nats-route, containerPort: 6222}
+            - {name: health, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: tls, mountPath: /etc/swarm/tls, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: messaging-tls}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ .Messaging.Storage }}}

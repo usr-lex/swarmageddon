@@ -20,18 +20,17 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/usr-lex/swarmageddon/internal/operator/testenv"
+
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/forgejo"
@@ -48,29 +47,17 @@ func Scheme() *k8sruntime.Scheme {
 
 // Client returns a client to a real API server (envtest) when
 // KUBEBUILDER_ASSETS is set, else a fake client. real tells which.
-func Client(t *testing.T) (c client.Client, real bool) {
+func Client(t *testing.T) (admin, operator client.Client, real bool) {
 	t.Helper()
-	s := Scheme()
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
-		return fake.NewClientBuilder().WithScheme(s).
-			WithStatusSubresource(&v1.Room{}, &v1.RunnerPool{}).Build(), false
+		c := fake.NewClientBuilder().WithScheme(Scheme()).
+			WithStatusSubresource(&v1.Room{}, &v1.RunnerPool{}).Build()
+		return c, c, false
 	}
-	_, file, _, _ := runtime.Caller(0)
-	env := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "config", "crd")},
-		ErrorIfCRDPathMissing: true,
-		Scheme:                s,
-	}
-	cfg, err := env.Start()
-	if err != nil {
-		t.Fatalf("envtest: %v", err)
-	}
-	t.Cleanup(func() { _ = env.Stop() })
-	c, err = client.New(cfg, client.Options{Scheme: s})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c, true
+	env := testenv.Start(t)
+	// The reconciler runs as the operator's ServiceAccount with the generated
+	// ClusterRole, so a missing permission fails the test.
+	return env.Client, env.OperatorClient(t), true
 }
 
 // PKI is a throwaway CA.

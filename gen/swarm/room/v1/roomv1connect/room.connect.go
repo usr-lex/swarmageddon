@@ -11,6 +11,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
+	v11 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	v1 "github.com/usr-lex/swarmageddon/gen/swarm/room/v1"
 	http "net/http"
 	strings "strings"
@@ -48,6 +49,29 @@ const (
 	// SupervisorServiceSetStatusProcedure is the fully-qualified name of the SupervisorService's
 	// SetStatus RPC.
 	SupervisorServiceSetStatusProcedure = "/swarm.room.v1.SupervisorService/SetStatus"
+	// SupervisorServicePostProcedure is the fully-qualified name of the SupervisorService's Post RPC.
+	SupervisorServicePostProcedure = "/swarm.room.v1.SupervisorService/Post"
+	// SupervisorServiceReadMessagesProcedure is the fully-qualified name of the SupervisorService's
+	// ReadMessages RPC.
+	SupervisorServiceReadMessagesProcedure = "/swarm.room.v1.SupervisorService/ReadMessages"
+	// SupervisorServiceGetMessageProcedure is the fully-qualified name of the SupervisorService's
+	// GetMessage RPC.
+	SupervisorServiceGetMessageProcedure = "/swarm.room.v1.SupervisorService/GetMessage"
+	// SupervisorServiceMarkReadProcedure is the fully-qualified name of the SupervisorService's
+	// MarkRead RPC.
+	SupervisorServiceMarkReadProcedure = "/swarm.room.v1.SupervisorService/MarkRead"
+	// SupervisorServiceUnreadSummaryProcedure is the fully-qualified name of the SupervisorService's
+	// UnreadSummary RPC.
+	SupervisorServiceUnreadSummaryProcedure = "/swarm.room.v1.SupervisorService/UnreadSummary"
+	// SupervisorServiceListChannelsProcedure is the fully-qualified name of the SupervisorService's
+	// ListChannels RPC.
+	SupervisorServiceListChannelsProcedure = "/swarm.room.v1.SupervisorService/ListChannels"
+	// SupervisorServiceSetDeliveryProcedure is the fully-qualified name of the SupervisorService's
+	// SetDelivery RPC.
+	SupervisorServiceSetDeliveryProcedure = "/swarm.room.v1.SupervisorService/SetDelivery"
+	// SupervisorServiceAdviseProcedure is the fully-qualified name of the SupervisorService's Advise
+	// RPC.
+	SupervisorServiceAdviseProcedure = "/swarm.room.v1.SupervisorService/Advise"
 	// SupervisorServiceHookProcedure is the fully-qualified name of the SupervisorService's Hook RPC.
 	SupervisorServiceHookProcedure = "/swarm.room.v1.SupervisorService/Hook"
 )
@@ -58,6 +82,16 @@ type SupervisorServiceClient interface {
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	WhoAmI(context.Context, *connect.Request[v1.WhoAmIRequest]) (*connect.Response[v1.WhoAmIResponse], error)
 	SetStatus(context.Context, *connect.Request[v1.SetStatusRequest]) (*connect.Response[v1.SetStatusResponse], error)
+	// Channels and reading (docs/design.md §7.8); mirrors the messaging API.
+	Post(context.Context, *connect.Request[v11.PostRequest]) (*connect.Response[v11.PostResponse], error)
+	ReadMessages(context.Context, *connect.Request[v11.ReadMessagesRequest]) (*connect.Response[v11.ReadMessagesResponse], error)
+	GetMessage(context.Context, *connect.Request[v11.GetMessageRequest]) (*connect.Response[v11.GetMessageResponse], error)
+	MarkRead(context.Context, *connect.Request[v11.MarkReadRequest]) (*connect.Response[v11.MarkReadResponse], error)
+	UnreadSummary(context.Context, *connect.Request[v11.UnreadSummaryRequest]) (*connect.Response[v11.UnreadSummaryResponse], error)
+	ListChannels(context.Context, *connect.Request[v11.ListChannelsRequest]) (*connect.Response[v11.ListChannelsResponse], error)
+	SetDelivery(context.Context, *connect.Request[v11.SetDeliveryRequest]) (*connect.Response[v11.SetDeliveryResponse], error)
+	// Advise asks the room's advisor (ADR 0010).
+	Advise(context.Context, *connect.Request[v1.AdviseRequest]) (*connect.Response[v1.AdviseResponse], error)
 	// Hook reports a CLI hook event. For PermissionRequest it blocks until the
 	// approval is answered (or the hook's own timeout ends the call).
 	Hook(context.Context, *connect.Request[v1.HookRequest]) (*connect.Response[v1.HookResponse], error)
@@ -98,6 +132,54 @@ func NewSupervisorServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(supervisorServiceMethods.ByName("SetStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		post: connect.NewClient[v11.PostRequest, v11.PostResponse](
+			httpClient,
+			baseURL+SupervisorServicePostProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("Post")),
+			connect.WithClientOptions(opts...),
+		),
+		readMessages: connect.NewClient[v11.ReadMessagesRequest, v11.ReadMessagesResponse](
+			httpClient,
+			baseURL+SupervisorServiceReadMessagesProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("ReadMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		getMessage: connect.NewClient[v11.GetMessageRequest, v11.GetMessageResponse](
+			httpClient,
+			baseURL+SupervisorServiceGetMessageProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("GetMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		markRead: connect.NewClient[v11.MarkReadRequest, v11.MarkReadResponse](
+			httpClient,
+			baseURL+SupervisorServiceMarkReadProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("MarkRead")),
+			connect.WithClientOptions(opts...),
+		),
+		unreadSummary: connect.NewClient[v11.UnreadSummaryRequest, v11.UnreadSummaryResponse](
+			httpClient,
+			baseURL+SupervisorServiceUnreadSummaryProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("UnreadSummary")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannels: connect.NewClient[v11.ListChannelsRequest, v11.ListChannelsResponse](
+			httpClient,
+			baseURL+SupervisorServiceListChannelsProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("ListChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		setDelivery: connect.NewClient[v11.SetDeliveryRequest, v11.SetDeliveryResponse](
+			httpClient,
+			baseURL+SupervisorServiceSetDeliveryProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("SetDelivery")),
+			connect.WithClientOptions(opts...),
+		),
+		advise: connect.NewClient[v1.AdviseRequest, v1.AdviseResponse](
+			httpClient,
+			baseURL+SupervisorServiceAdviseProcedure,
+			connect.WithSchema(supervisorServiceMethods.ByName("Advise")),
+			connect.WithClientOptions(opts...),
+		),
 		hook: connect.NewClient[v1.HookRequest, v1.HookResponse](
 			httpClient,
 			baseURL+SupervisorServiceHookProcedure,
@@ -109,11 +191,19 @@ func NewSupervisorServiceClient(httpClient connect.HTTPClient, baseURL string, o
 
 // supervisorServiceClient implements SupervisorServiceClient.
 type supervisorServiceClient struct {
-	sendMessage *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
-	listAgents  *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
-	whoAmI      *connect.Client[v1.WhoAmIRequest, v1.WhoAmIResponse]
-	setStatus   *connect.Client[v1.SetStatusRequest, v1.SetStatusResponse]
-	hook        *connect.Client[v1.HookRequest, v1.HookResponse]
+	sendMessage   *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
+	listAgents    *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
+	whoAmI        *connect.Client[v1.WhoAmIRequest, v1.WhoAmIResponse]
+	setStatus     *connect.Client[v1.SetStatusRequest, v1.SetStatusResponse]
+	post          *connect.Client[v11.PostRequest, v11.PostResponse]
+	readMessages  *connect.Client[v11.ReadMessagesRequest, v11.ReadMessagesResponse]
+	getMessage    *connect.Client[v11.GetMessageRequest, v11.GetMessageResponse]
+	markRead      *connect.Client[v11.MarkReadRequest, v11.MarkReadResponse]
+	unreadSummary *connect.Client[v11.UnreadSummaryRequest, v11.UnreadSummaryResponse]
+	listChannels  *connect.Client[v11.ListChannelsRequest, v11.ListChannelsResponse]
+	setDelivery   *connect.Client[v11.SetDeliveryRequest, v11.SetDeliveryResponse]
+	advise        *connect.Client[v1.AdviseRequest, v1.AdviseResponse]
+	hook          *connect.Client[v1.HookRequest, v1.HookResponse]
 }
 
 // SendMessage calls swarm.room.v1.SupervisorService.SendMessage.
@@ -136,6 +226,46 @@ func (c *supervisorServiceClient) SetStatus(ctx context.Context, req *connect.Re
 	return c.setStatus.CallUnary(ctx, req)
 }
 
+// Post calls swarm.room.v1.SupervisorService.Post.
+func (c *supervisorServiceClient) Post(ctx context.Context, req *connect.Request[v11.PostRequest]) (*connect.Response[v11.PostResponse], error) {
+	return c.post.CallUnary(ctx, req)
+}
+
+// ReadMessages calls swarm.room.v1.SupervisorService.ReadMessages.
+func (c *supervisorServiceClient) ReadMessages(ctx context.Context, req *connect.Request[v11.ReadMessagesRequest]) (*connect.Response[v11.ReadMessagesResponse], error) {
+	return c.readMessages.CallUnary(ctx, req)
+}
+
+// GetMessage calls swarm.room.v1.SupervisorService.GetMessage.
+func (c *supervisorServiceClient) GetMessage(ctx context.Context, req *connect.Request[v11.GetMessageRequest]) (*connect.Response[v11.GetMessageResponse], error) {
+	return c.getMessage.CallUnary(ctx, req)
+}
+
+// MarkRead calls swarm.room.v1.SupervisorService.MarkRead.
+func (c *supervisorServiceClient) MarkRead(ctx context.Context, req *connect.Request[v11.MarkReadRequest]) (*connect.Response[v11.MarkReadResponse], error) {
+	return c.markRead.CallUnary(ctx, req)
+}
+
+// UnreadSummary calls swarm.room.v1.SupervisorService.UnreadSummary.
+func (c *supervisorServiceClient) UnreadSummary(ctx context.Context, req *connect.Request[v11.UnreadSummaryRequest]) (*connect.Response[v11.UnreadSummaryResponse], error) {
+	return c.unreadSummary.CallUnary(ctx, req)
+}
+
+// ListChannels calls swarm.room.v1.SupervisorService.ListChannels.
+func (c *supervisorServiceClient) ListChannels(ctx context.Context, req *connect.Request[v11.ListChannelsRequest]) (*connect.Response[v11.ListChannelsResponse], error) {
+	return c.listChannels.CallUnary(ctx, req)
+}
+
+// SetDelivery calls swarm.room.v1.SupervisorService.SetDelivery.
+func (c *supervisorServiceClient) SetDelivery(ctx context.Context, req *connect.Request[v11.SetDeliveryRequest]) (*connect.Response[v11.SetDeliveryResponse], error) {
+	return c.setDelivery.CallUnary(ctx, req)
+}
+
+// Advise calls swarm.room.v1.SupervisorService.Advise.
+func (c *supervisorServiceClient) Advise(ctx context.Context, req *connect.Request[v1.AdviseRequest]) (*connect.Response[v1.AdviseResponse], error) {
+	return c.advise.CallUnary(ctx, req)
+}
+
 // Hook calls swarm.room.v1.SupervisorService.Hook.
 func (c *supervisorServiceClient) Hook(ctx context.Context, req *connect.Request[v1.HookRequest]) (*connect.Response[v1.HookResponse], error) {
 	return c.hook.CallUnary(ctx, req)
@@ -147,6 +277,16 @@ type SupervisorServiceHandler interface {
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	WhoAmI(context.Context, *connect.Request[v1.WhoAmIRequest]) (*connect.Response[v1.WhoAmIResponse], error)
 	SetStatus(context.Context, *connect.Request[v1.SetStatusRequest]) (*connect.Response[v1.SetStatusResponse], error)
+	// Channels and reading (docs/design.md §7.8); mirrors the messaging API.
+	Post(context.Context, *connect.Request[v11.PostRequest]) (*connect.Response[v11.PostResponse], error)
+	ReadMessages(context.Context, *connect.Request[v11.ReadMessagesRequest]) (*connect.Response[v11.ReadMessagesResponse], error)
+	GetMessage(context.Context, *connect.Request[v11.GetMessageRequest]) (*connect.Response[v11.GetMessageResponse], error)
+	MarkRead(context.Context, *connect.Request[v11.MarkReadRequest]) (*connect.Response[v11.MarkReadResponse], error)
+	UnreadSummary(context.Context, *connect.Request[v11.UnreadSummaryRequest]) (*connect.Response[v11.UnreadSummaryResponse], error)
+	ListChannels(context.Context, *connect.Request[v11.ListChannelsRequest]) (*connect.Response[v11.ListChannelsResponse], error)
+	SetDelivery(context.Context, *connect.Request[v11.SetDeliveryRequest]) (*connect.Response[v11.SetDeliveryResponse], error)
+	// Advise asks the room's advisor (ADR 0010).
+	Advise(context.Context, *connect.Request[v1.AdviseRequest]) (*connect.Response[v1.AdviseResponse], error)
 	// Hook reports a CLI hook event. For PermissionRequest it blocks until the
 	// approval is answered (or the hook's own timeout ends the call).
 	Hook(context.Context, *connect.Request[v1.HookRequest]) (*connect.Response[v1.HookResponse], error)
@@ -183,6 +323,54 @@ func NewSupervisorServiceHandler(svc SupervisorServiceHandler, opts ...connect.H
 		connect.WithSchema(supervisorServiceMethods.ByName("SetStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	supervisorServicePostHandler := connect.NewUnaryHandler(
+		SupervisorServicePostProcedure,
+		svc.Post,
+		connect.WithSchema(supervisorServiceMethods.ByName("Post")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceReadMessagesHandler := connect.NewUnaryHandler(
+		SupervisorServiceReadMessagesProcedure,
+		svc.ReadMessages,
+		connect.WithSchema(supervisorServiceMethods.ByName("ReadMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceGetMessageHandler := connect.NewUnaryHandler(
+		SupervisorServiceGetMessageProcedure,
+		svc.GetMessage,
+		connect.WithSchema(supervisorServiceMethods.ByName("GetMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceMarkReadHandler := connect.NewUnaryHandler(
+		SupervisorServiceMarkReadProcedure,
+		svc.MarkRead,
+		connect.WithSchema(supervisorServiceMethods.ByName("MarkRead")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceUnreadSummaryHandler := connect.NewUnaryHandler(
+		SupervisorServiceUnreadSummaryProcedure,
+		svc.UnreadSummary,
+		connect.WithSchema(supervisorServiceMethods.ByName("UnreadSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceListChannelsHandler := connect.NewUnaryHandler(
+		SupervisorServiceListChannelsProcedure,
+		svc.ListChannels,
+		connect.WithSchema(supervisorServiceMethods.ByName("ListChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceSetDeliveryHandler := connect.NewUnaryHandler(
+		SupervisorServiceSetDeliveryProcedure,
+		svc.SetDelivery,
+		connect.WithSchema(supervisorServiceMethods.ByName("SetDelivery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	supervisorServiceAdviseHandler := connect.NewUnaryHandler(
+		SupervisorServiceAdviseProcedure,
+		svc.Advise,
+		connect.WithSchema(supervisorServiceMethods.ByName("Advise")),
+		connect.WithHandlerOptions(opts...),
+	)
 	supervisorServiceHookHandler := connect.NewUnaryHandler(
 		SupervisorServiceHookProcedure,
 		svc.Hook,
@@ -199,6 +387,22 @@ func NewSupervisorServiceHandler(svc SupervisorServiceHandler, opts ...connect.H
 			supervisorServiceWhoAmIHandler.ServeHTTP(w, r)
 		case SupervisorServiceSetStatusProcedure:
 			supervisorServiceSetStatusHandler.ServeHTTP(w, r)
+		case SupervisorServicePostProcedure:
+			supervisorServicePostHandler.ServeHTTP(w, r)
+		case SupervisorServiceReadMessagesProcedure:
+			supervisorServiceReadMessagesHandler.ServeHTTP(w, r)
+		case SupervisorServiceGetMessageProcedure:
+			supervisorServiceGetMessageHandler.ServeHTTP(w, r)
+		case SupervisorServiceMarkReadProcedure:
+			supervisorServiceMarkReadHandler.ServeHTTP(w, r)
+		case SupervisorServiceUnreadSummaryProcedure:
+			supervisorServiceUnreadSummaryHandler.ServeHTTP(w, r)
+		case SupervisorServiceListChannelsProcedure:
+			supervisorServiceListChannelsHandler.ServeHTTP(w, r)
+		case SupervisorServiceSetDeliveryProcedure:
+			supervisorServiceSetDeliveryHandler.ServeHTTP(w, r)
+		case SupervisorServiceAdviseProcedure:
+			supervisorServiceAdviseHandler.ServeHTTP(w, r)
 		case SupervisorServiceHookProcedure:
 			supervisorServiceHookHandler.ServeHTTP(w, r)
 		default:
@@ -224,6 +428,38 @@ func (UnimplementedSupervisorServiceHandler) WhoAmI(context.Context, *connect.Re
 
 func (UnimplementedSupervisorServiceHandler) SetStatus(context.Context, *connect.Request[v1.SetStatusRequest]) (*connect.Response[v1.SetStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.SetStatus is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) Post(context.Context, *connect.Request[v11.PostRequest]) (*connect.Response[v11.PostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.Post is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) ReadMessages(context.Context, *connect.Request[v11.ReadMessagesRequest]) (*connect.Response[v11.ReadMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.ReadMessages is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) GetMessage(context.Context, *connect.Request[v11.GetMessageRequest]) (*connect.Response[v11.GetMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.GetMessage is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) MarkRead(context.Context, *connect.Request[v11.MarkReadRequest]) (*connect.Response[v11.MarkReadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.MarkRead is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) UnreadSummary(context.Context, *connect.Request[v11.UnreadSummaryRequest]) (*connect.Response[v11.UnreadSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.UnreadSummary is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) ListChannels(context.Context, *connect.Request[v11.ListChannelsRequest]) (*connect.Response[v11.ListChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.ListChannels is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) SetDelivery(context.Context, *connect.Request[v11.SetDeliveryRequest]) (*connect.Response[v11.SetDeliveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.SetDelivery is not implemented"))
+}
+
+func (UnimplementedSupervisorServiceHandler) Advise(context.Context, *connect.Request[v1.AdviseRequest]) (*connect.Response[v1.AdviseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.room.v1.SupervisorService.Advise is not implemented"))
 }
 
 func (UnimplementedSupervisorServiceHandler) Hook(context.Context, *connect.Request[v1.HookRequest]) (*connect.Response[v1.HookResponse], error) {

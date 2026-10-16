@@ -42,6 +42,9 @@ type WorkspaceSpec struct {
 	// (docs/design.md §9.7). Empty: all of them.
 	// +optional
 	ForgeNotifications []ForgeEvent `json:"forgeNotifications,omitempty"`
+	// Warden watches agents for drift and risky actions (ADR 0011).
+	// +optional
+	Warden WardenSpec `json:"warden,omitempty"`
 	// DeletedRoomRetention keeps a removed room's volumes this long. Default 168h.
 	// +optional
 	DeletedRoomRetention *metav1.Duration `json:"deletedRoomRetention,omitempty"`
@@ -112,6 +115,12 @@ type MessagingPolicy struct {
 	Limits MessageLimits `json:"limits,omitempty"`
 	// +optional
 	Retention RetentionSettings `json:"retention,omitempty"`
+	// Channels are the workspace's one-to-many conversations (docs/design.md §7.8).
+	// +optional
+	Channels []ChannelSpec `json:"channels,omitempty"`
+	// Storm keeps agents' sessions from being flooded (docs/design.md §7.8).
+	// +optional
+	Storm StormControl `json:"storm,omitempty"`
 	// People with the operator role may message agents; agents may message people.
 	// +kubebuilder:default=true
 	// +optional
@@ -132,6 +141,71 @@ type GroupLink struct {
 	// RequirePrefix the message must start with; {recipient} is replaced by the recipient's name.
 	// +optional
 	RequirePrefix string `json:"requirePrefix,omitempty"`
+}
+
+// ChannelAccess is what a channel member may do.
+// +kubebuilder:validation:Enum=read;write;readWrite
+type ChannelAccess string
+
+const (
+	AccessRead      ChannelAccess = "read"
+	AccessWrite     ChannelAccess = "write"
+	AccessReadWrite ChannelAccess = "readWrite"
+)
+
+// DeliveryMode is how a channel's posts reach a reader's session.
+// +kubebuilder:validation:Enum=push;digest;pull
+type DeliveryMode string
+
+const (
+	DeliveryPush   DeliveryMode = "push"
+	DeliveryDigest DeliveryMode = "digest"
+	DeliveryPull   DeliveryMode = "pull"
+)
+
+// ChannelSpec is a named conversation and who may read and post in it.
+type ChannelSpec struct {
+	// Name without the leading #.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9][a-z0-9_-]{0,62}$`
+	Name string `json:"name"`
+	// +optional
+	Description string `json:"description,omitempty"`
+	// +kubebuilder:validation:MinItems=1
+	Members []ChannelMember `json:"members"`
+	// +kubebuilder:default=digest
+	// +optional
+	DefaultDelivery DeliveryMode `json:"defaultDelivery,omitempty"`
+	// AllowedDelivery lists the modes readers may switch to. Empty: all.
+	// +optional
+	AllowedDelivery []DeliveryMode `json:"allowedDelivery,omitempty"`
+	// PostsPerMinute across all posters. Default 20.
+	// +optional
+	PostsPerMinute int32 `json:"postsPerMinute,omitempty"`
+}
+
+// ChannelMember selects members and gives them access.
+type ChannelMember struct {
+	// Selector: everyone, people, role:<template>, team:<forge team>,
+	// group:<group>, room:<name> or person:<handle>.
+	// +kubebuilder:validation:Pattern=`^(everyone|people|(role|team|group|room|person):[a-z0-9][a-z0-9_-]{0,62})$`
+	Select string        `json:"select"`
+	Access ChannelAccess `json:"access"`
+}
+
+// StormControl limits what reaches an agent's session (docs/design.md §7.8).
+type StormControl struct {
+	// PushPerMinute is how many items may be pushed into a session per minute. Default 6.
+	// +optional
+	PushPerMinute int32 `json:"pushPerMinute,omitempty"`
+	// CoalesceBytes caps one coalesced injection. Default 4096.
+	// +optional
+	CoalesceBytes int32 `json:"coalesceBytes,omitempty"`
+	// DigestInterval between digest notices per channel. Default 15m.
+	// +optional
+	DigestInterval *metav1.Duration `json:"digestInterval,omitempty"`
+	// FanoutPerMinute caps recipients a sender reaches per minute. Default 60.
+	// +optional
+	FanoutPerMinute int32 `json:"fanoutPerMinute,omitempty"`
 }
 
 type MessageLimits struct {
@@ -175,7 +249,7 @@ type BudgetSettings struct {
 type ChannelKind string
 
 // NotificationEvent is something people get notified about.
-// +kubebuilder:validation:Enum=approvalWaiting;idleWithOpenWork;ciRed;budget;diskLow;roomCrashed
+// +kubebuilder:validation:Enum=approvalWaiting;idleWithOpenWork;ciRed;budget;diskLow;roomCrashed;wardenFlag
 type NotificationEvent string
 
 const (
@@ -185,6 +259,7 @@ const (
 	EventBudget           NotificationEvent = "budget"
 	EventDiskLow          NotificationEvent = "diskLow"
 	EventRoomCrashed      NotificationEvent = "roomCrashed"
+	EventWardenFlag       NotificationEvent = "wardenFlag"
 )
 
 type NotificationSettings struct {
@@ -221,6 +296,36 @@ type RepositorySpec struct {
 	// StatusChecks required on the default branch.
 	// +optional
 	StatusChecks []string `json:"statusChecks,omitempty"`
+}
+
+// WardenMode is how closely the warden watches.
+// +kubebuilder:validation:Enum=off;monitor;gate
+type WardenMode string
+
+const (
+	WardenOff     WardenMode = "off"
+	WardenMonitor WardenMode = "monitor"
+	WardenGate    WardenMode = "gate"
+)
+
+// WardenSpec configures the warden (ADR 0011).
+type WardenSpec struct {
+	// +kubebuilder:default=monitor
+	// +optional
+	Mode WardenMode `json:"mode,omitempty"`
+	// Model the warden judges with: a small, fast model on the gateway. Empty: rules only.
+	// +optional
+	Model string `json:"model,omitempty"`
+	// InterruptOnHigh interrupts the agent's turn on a high-severity verdict.
+	// +kubebuilder:default=true
+	// +optional
+	InterruptOnHigh *bool `json:"interruptOnHigh,omitempty"`
+	// QuarantineOnHigh quarantines on high verdicts from the gateway guard, not only critical ones.
+	// +optional
+	QuarantineOnHigh bool `json:"quarantineOnHigh,omitempty"`
+	// Monthly budget of each room's warden key in USD. Default 20.
+	// +optional
+	MonthlyUSD int32 `json:"monthlyUSD,omitempty"`
 }
 
 // ForgeEvent is a kind of forge activity delivered to agents.

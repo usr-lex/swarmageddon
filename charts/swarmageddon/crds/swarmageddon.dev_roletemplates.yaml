@@ -1,0 +1,160 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: roletemplates.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: RoleTemplate
+    listKind: RoleTemplateList
+    plural: roletemplates
+    singular: roletemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.title
+      name: Title
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RoleTemplate is a persona rooms are created from.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              RoleTemplateSpec is a persona: role text plus CLI policy. Personas are
+              guardrails, not security (docs/design.md §6.4).
+            properties:
+              autoApprove:
+                description: AutoApprove rules the control center applies to approval
+                  requests.
+                items:
+                  properties:
+                    decision:
+                      default: allow
+                      description: ApprovalDecision is what an automatic rule answers.
+                      enum:
+                      - allow
+                      - deny
+                      type: string
+                    match:
+                      description: Match is a regular expression against the command
+                        or file path.
+                      type: string
+                    tool:
+                      description: 'Tool name (Claude: Bash, Edit, ...; ore: exec,
+                        patch). "*" for any.'
+                      type: string
+                  required:
+                  - tool
+                  type: object
+                type: array
+              claudeCode:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  deny:
+                    items:
+                      type: string
+                    type: array
+                  hooks:
+                    description: Hooks in Claude Code's settings.json format, added
+                      after the platform's own.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  managedRulesOnly:
+                    description: ManagedRulesOnly sets allowManagedPermissionRulesOnly.
+                    type: boolean
+                  permissionMode:
+                    description: PermissionMode is Claude Code's permission mode.
+                    enum:
+                    - default
+                    - acceptEdits
+                    - auto
+                    - plan
+                    - bypassPermissions
+                    type: string
+                type: object
+              firstTurn:
+                description: 'FirstTurn is the prompt a room gets when it starts.
+                  Empty: the built-in one.'
+                type: string
+              forgeTeams:
+                description: ForgeTeams the room's forge user joins (implementers,
+                  reviewers, mergers, ci).
+                items:
+                  type: string
+                type: array
+              ore:
+                properties:
+                  approvalPolicy:
+                    default: on-request
+                    description: OreApprovalPolicy is ore's approval_policy.
+                    enum:
+                    - on-request
+                    - on-failure
+                    - never
+                    type: string
+                  approvalsReviewer:
+                    default: user
+                    enum:
+                    - user
+                    - auto_review
+                    type: string
+                  bypass:
+                    description: Bypass runs ore without approvals or sandbox.
+                    type: boolean
+                  mcpTools:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: 'MCPTools: per server, the tools enabled. Empty:
+                      all.'
+                    type: object
+                  rules:
+                    description: Rules in execpolicy syntax (prefix_rule(...)), one
+                      file.
+                    type: string
+                  sandboxMode:
+                    description: 'SandboxMode: read-only, workspace-write or danger-full-access.'
+                    type: string
+                type: object
+              roleText:
+                description: RoleText is written to the agent.
+                type: string
+              summary:
+                description: One line, shown in teammates' team lists.
+                type: string
+              title:
+                type: string
+            required:
+            - roleText
+            - title
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}

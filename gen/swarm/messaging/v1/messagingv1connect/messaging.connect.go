@@ -67,9 +67,32 @@ const (
 	// MessagingServiceAnswerApprovalProcedure is the fully-qualified name of the MessagingService's
 	// AnswerApproval RPC.
 	MessagingServiceAnswerApprovalProcedure = "/swarm.messaging.v1.MessagingService/AnswerApproval"
+	// MessagingServicePostProcedure is the fully-qualified name of the MessagingService's Post RPC.
+	MessagingServicePostProcedure = "/swarm.messaging.v1.MessagingService/Post"
+	// MessagingServiceReadMessagesProcedure is the fully-qualified name of the MessagingService's
+	// ReadMessages RPC.
+	MessagingServiceReadMessagesProcedure = "/swarm.messaging.v1.MessagingService/ReadMessages"
+	// MessagingServiceGetMessageProcedure is the fully-qualified name of the MessagingService's
+	// GetMessage RPC.
+	MessagingServiceGetMessageProcedure = "/swarm.messaging.v1.MessagingService/GetMessage"
+	// MessagingServiceMarkReadProcedure is the fully-qualified name of the MessagingService's MarkRead
+	// RPC.
+	MessagingServiceMarkReadProcedure = "/swarm.messaging.v1.MessagingService/MarkRead"
+	// MessagingServiceUnreadSummaryProcedure is the fully-qualified name of the MessagingService's
+	// UnreadSummary RPC.
+	MessagingServiceUnreadSummaryProcedure = "/swarm.messaging.v1.MessagingService/UnreadSummary"
+	// MessagingServiceListChannelsProcedure is the fully-qualified name of the MessagingService's
+	// ListChannels RPC.
+	MessagingServiceListChannelsProcedure = "/swarm.messaging.v1.MessagingService/ListChannels"
+	// MessagingServiceSetDeliveryProcedure is the fully-qualified name of the MessagingService's
+	// SetDelivery RPC.
+	MessagingServiceSetDeliveryProcedure = "/swarm.messaging.v1.MessagingService/SetDelivery"
 	// MessagingServiceReportStatusProcedure is the fully-qualified name of the MessagingService's
 	// ReportStatus RPC.
 	MessagingServiceReportStatusProcedure = "/swarm.messaging.v1.MessagingService/ReportStatus"
+	// MessagingServiceReportVerdictProcedure is the fully-qualified name of the MessagingService's
+	// ReportVerdict RPC.
+	MessagingServiceReportVerdictProcedure = "/swarm.messaging.v1.MessagingService/ReportVerdict"
 	// MessagingServiceWatchPresenceProcedure is the fully-qualified name of the MessagingService's
 	// WatchPresence RPC.
 	MessagingServiceWatchPresenceProcedure = "/swarm.messaging.v1.MessagingService/WatchPresence"
@@ -97,8 +120,21 @@ type MessagingServiceClient interface {
 	WithdrawApproval(context.Context, *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error)
 	WatchApprovals(context.Context, *connect.Request[v1.WatchApprovalsRequest]) (*connect.ServerStreamForClient[v1.ApprovalEvent], error)
 	AnswerApproval(context.Context, *connect.Request[v1.AnswerApprovalRequest]) (*connect.Response[v1.AnswerApprovalResponse], error)
+	// Channels and reading (docs/design.md §7.8). Rooms and the control
+	// center (acting for a person) call these for themselves.
+	Post(context.Context, *connect.Request[v1.PostRequest]) (*connect.Response[v1.PostResponse], error)
+	ReadMessages(context.Context, *connect.Request[v1.ReadMessagesRequest]) (*connect.Response[v1.ReadMessagesResponse], error)
+	GetMessage(context.Context, *connect.Request[v1.GetMessageRequest]) (*connect.Response[v1.GetMessageResponse], error)
+	MarkRead(context.Context, *connect.Request[v1.MarkReadRequest]) (*connect.Response[v1.MarkReadResponse], error)
+	UnreadSummary(context.Context, *connect.Request[v1.UnreadSummaryRequest]) (*connect.Response[v1.UnreadSummaryResponse], error)
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	SetDelivery(context.Context, *connect.Request[v1.SetDeliveryRequest]) (*connect.Response[v1.SetDeliveryResponse], error)
 	// Room telemetry for the control center: current task, usage, disk.
 	ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error)
+	// ReportVerdict records a warden verdict (ADR 0011) in the audit log
+	// (kind "verdict"). Rooms report their own (source "room"); the gateway
+	// guard (principal "warden") reports for any room (source "gateway").
+	ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error)
 	// Control center only.
 	WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest]) (*connect.ServerStreamForClient[v1.PresenceEvent], error)
 	QueryAudit(context.Context, *connect.Request[v1.QueryAuditRequest]) (*connect.ServerStreamForClient[v1.AuditRecord], error)
@@ -169,10 +205,58 @@ func NewMessagingServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(messagingServiceMethods.ByName("AnswerApproval")),
 			connect.WithClientOptions(opts...),
 		),
+		post: connect.NewClient[v1.PostRequest, v1.PostResponse](
+			httpClient,
+			baseURL+MessagingServicePostProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("Post")),
+			connect.WithClientOptions(opts...),
+		),
+		readMessages: connect.NewClient[v1.ReadMessagesRequest, v1.ReadMessagesResponse](
+			httpClient,
+			baseURL+MessagingServiceReadMessagesProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("ReadMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		getMessage: connect.NewClient[v1.GetMessageRequest, v1.GetMessageResponse](
+			httpClient,
+			baseURL+MessagingServiceGetMessageProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("GetMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		markRead: connect.NewClient[v1.MarkReadRequest, v1.MarkReadResponse](
+			httpClient,
+			baseURL+MessagingServiceMarkReadProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("MarkRead")),
+			connect.WithClientOptions(opts...),
+		),
+		unreadSummary: connect.NewClient[v1.UnreadSummaryRequest, v1.UnreadSummaryResponse](
+			httpClient,
+			baseURL+MessagingServiceUnreadSummaryProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("UnreadSummary")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannels: connect.NewClient[v1.ListChannelsRequest, v1.ListChannelsResponse](
+			httpClient,
+			baseURL+MessagingServiceListChannelsProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("ListChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		setDelivery: connect.NewClient[v1.SetDeliveryRequest, v1.SetDeliveryResponse](
+			httpClient,
+			baseURL+MessagingServiceSetDeliveryProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("SetDelivery")),
+			connect.WithClientOptions(opts...),
+		),
 		reportStatus: connect.NewClient[v1.ReportStatusRequest, v1.ReportStatusResponse](
 			httpClient,
 			baseURL+MessagingServiceReportStatusProcedure,
 			connect.WithSchema(messagingServiceMethods.ByName("ReportStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		reportVerdict: connect.NewClient[v1.ReportVerdictRequest, v1.ReportVerdictResponse](
+			httpClient,
+			baseURL+MessagingServiceReportVerdictProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("ReportVerdict")),
 			connect.WithClientOptions(opts...),
 		),
 		watchPresence: connect.NewClient[v1.WatchPresenceRequest, v1.PresenceEvent](
@@ -201,7 +285,15 @@ type messagingServiceClient struct {
 	withdrawApproval *connect.Client[v1.WithdrawApprovalRequest, v1.WithdrawApprovalResponse]
 	watchApprovals   *connect.Client[v1.WatchApprovalsRequest, v1.ApprovalEvent]
 	answerApproval   *connect.Client[v1.AnswerApprovalRequest, v1.AnswerApprovalResponse]
+	post             *connect.Client[v1.PostRequest, v1.PostResponse]
+	readMessages     *connect.Client[v1.ReadMessagesRequest, v1.ReadMessagesResponse]
+	getMessage       *connect.Client[v1.GetMessageRequest, v1.GetMessageResponse]
+	markRead         *connect.Client[v1.MarkReadRequest, v1.MarkReadResponse]
+	unreadSummary    *connect.Client[v1.UnreadSummaryRequest, v1.UnreadSummaryResponse]
+	listChannels     *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
+	setDelivery      *connect.Client[v1.SetDeliveryRequest, v1.SetDeliveryResponse]
 	reportStatus     *connect.Client[v1.ReportStatusRequest, v1.ReportStatusResponse]
+	reportVerdict    *connect.Client[v1.ReportVerdictRequest, v1.ReportVerdictResponse]
 	watchPresence    *connect.Client[v1.WatchPresenceRequest, v1.PresenceEvent]
 	queryAudit       *connect.Client[v1.QueryAuditRequest, v1.AuditRecord]
 }
@@ -251,9 +343,49 @@ func (c *messagingServiceClient) AnswerApproval(ctx context.Context, req *connec
 	return c.answerApproval.CallUnary(ctx, req)
 }
 
+// Post calls swarm.messaging.v1.MessagingService.Post.
+func (c *messagingServiceClient) Post(ctx context.Context, req *connect.Request[v1.PostRequest]) (*connect.Response[v1.PostResponse], error) {
+	return c.post.CallUnary(ctx, req)
+}
+
+// ReadMessages calls swarm.messaging.v1.MessagingService.ReadMessages.
+func (c *messagingServiceClient) ReadMessages(ctx context.Context, req *connect.Request[v1.ReadMessagesRequest]) (*connect.Response[v1.ReadMessagesResponse], error) {
+	return c.readMessages.CallUnary(ctx, req)
+}
+
+// GetMessage calls swarm.messaging.v1.MessagingService.GetMessage.
+func (c *messagingServiceClient) GetMessage(ctx context.Context, req *connect.Request[v1.GetMessageRequest]) (*connect.Response[v1.GetMessageResponse], error) {
+	return c.getMessage.CallUnary(ctx, req)
+}
+
+// MarkRead calls swarm.messaging.v1.MessagingService.MarkRead.
+func (c *messagingServiceClient) MarkRead(ctx context.Context, req *connect.Request[v1.MarkReadRequest]) (*connect.Response[v1.MarkReadResponse], error) {
+	return c.markRead.CallUnary(ctx, req)
+}
+
+// UnreadSummary calls swarm.messaging.v1.MessagingService.UnreadSummary.
+func (c *messagingServiceClient) UnreadSummary(ctx context.Context, req *connect.Request[v1.UnreadSummaryRequest]) (*connect.Response[v1.UnreadSummaryResponse], error) {
+	return c.unreadSummary.CallUnary(ctx, req)
+}
+
+// ListChannels calls swarm.messaging.v1.MessagingService.ListChannels.
+func (c *messagingServiceClient) ListChannels(ctx context.Context, req *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return c.listChannels.CallUnary(ctx, req)
+}
+
+// SetDelivery calls swarm.messaging.v1.MessagingService.SetDelivery.
+func (c *messagingServiceClient) SetDelivery(ctx context.Context, req *connect.Request[v1.SetDeliveryRequest]) (*connect.Response[v1.SetDeliveryResponse], error) {
+	return c.setDelivery.CallUnary(ctx, req)
+}
+
 // ReportStatus calls swarm.messaging.v1.MessagingService.ReportStatus.
 func (c *messagingServiceClient) ReportStatus(ctx context.Context, req *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error) {
 	return c.reportStatus.CallUnary(ctx, req)
+}
+
+// ReportVerdict calls swarm.messaging.v1.MessagingService.ReportVerdict.
+func (c *messagingServiceClient) ReportVerdict(ctx context.Context, req *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error) {
+	return c.reportVerdict.CallUnary(ctx, req)
 }
 
 // WatchPresence calls swarm.messaging.v1.MessagingService.WatchPresence.
@@ -285,8 +417,21 @@ type MessagingServiceHandler interface {
 	WithdrawApproval(context.Context, *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error)
 	WatchApprovals(context.Context, *connect.Request[v1.WatchApprovalsRequest], *connect.ServerStream[v1.ApprovalEvent]) error
 	AnswerApproval(context.Context, *connect.Request[v1.AnswerApprovalRequest]) (*connect.Response[v1.AnswerApprovalResponse], error)
+	// Channels and reading (docs/design.md §7.8). Rooms and the control
+	// center (acting for a person) call these for themselves.
+	Post(context.Context, *connect.Request[v1.PostRequest]) (*connect.Response[v1.PostResponse], error)
+	ReadMessages(context.Context, *connect.Request[v1.ReadMessagesRequest]) (*connect.Response[v1.ReadMessagesResponse], error)
+	GetMessage(context.Context, *connect.Request[v1.GetMessageRequest]) (*connect.Response[v1.GetMessageResponse], error)
+	MarkRead(context.Context, *connect.Request[v1.MarkReadRequest]) (*connect.Response[v1.MarkReadResponse], error)
+	UnreadSummary(context.Context, *connect.Request[v1.UnreadSummaryRequest]) (*connect.Response[v1.UnreadSummaryResponse], error)
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	SetDelivery(context.Context, *connect.Request[v1.SetDeliveryRequest]) (*connect.Response[v1.SetDeliveryResponse], error)
 	// Room telemetry for the control center: current task, usage, disk.
 	ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error)
+	// ReportVerdict records a warden verdict (ADR 0011) in the audit log
+	// (kind "verdict"). Rooms report their own (source "room"); the gateway
+	// guard (principal "warden") reports for any room (source "gateway").
+	ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error)
 	// Control center only.
 	WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest], *connect.ServerStream[v1.PresenceEvent]) error
 	QueryAudit(context.Context, *connect.Request[v1.QueryAuditRequest], *connect.ServerStream[v1.AuditRecord]) error
@@ -353,10 +498,58 @@ func NewMessagingServiceHandler(svc MessagingServiceHandler, opts ...connect.Han
 		connect.WithSchema(messagingServiceMethods.ByName("AnswerApproval")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagingServicePostHandler := connect.NewUnaryHandler(
+		MessagingServicePostProcedure,
+		svc.Post,
+		connect.WithSchema(messagingServiceMethods.ByName("Post")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceReadMessagesHandler := connect.NewUnaryHandler(
+		MessagingServiceReadMessagesProcedure,
+		svc.ReadMessages,
+		connect.WithSchema(messagingServiceMethods.ByName("ReadMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceGetMessageHandler := connect.NewUnaryHandler(
+		MessagingServiceGetMessageProcedure,
+		svc.GetMessage,
+		connect.WithSchema(messagingServiceMethods.ByName("GetMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceMarkReadHandler := connect.NewUnaryHandler(
+		MessagingServiceMarkReadProcedure,
+		svc.MarkRead,
+		connect.WithSchema(messagingServiceMethods.ByName("MarkRead")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceUnreadSummaryHandler := connect.NewUnaryHandler(
+		MessagingServiceUnreadSummaryProcedure,
+		svc.UnreadSummary,
+		connect.WithSchema(messagingServiceMethods.ByName("UnreadSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceListChannelsHandler := connect.NewUnaryHandler(
+		MessagingServiceListChannelsProcedure,
+		svc.ListChannels,
+		connect.WithSchema(messagingServiceMethods.ByName("ListChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceSetDeliveryHandler := connect.NewUnaryHandler(
+		MessagingServiceSetDeliveryProcedure,
+		svc.SetDelivery,
+		connect.WithSchema(messagingServiceMethods.ByName("SetDelivery")),
+		connect.WithHandlerOptions(opts...),
+	)
 	messagingServiceReportStatusHandler := connect.NewUnaryHandler(
 		MessagingServiceReportStatusProcedure,
 		svc.ReportStatus,
 		connect.WithSchema(messagingServiceMethods.ByName("ReportStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagingServiceReportVerdictHandler := connect.NewUnaryHandler(
+		MessagingServiceReportVerdictProcedure,
+		svc.ReportVerdict,
+		connect.WithSchema(messagingServiceMethods.ByName("ReportVerdict")),
 		connect.WithHandlerOptions(opts...),
 	)
 	messagingServiceWatchPresenceHandler := connect.NewServerStreamHandler(
@@ -391,8 +584,24 @@ func NewMessagingServiceHandler(svc MessagingServiceHandler, opts ...connect.Han
 			messagingServiceWatchApprovalsHandler.ServeHTTP(w, r)
 		case MessagingServiceAnswerApprovalProcedure:
 			messagingServiceAnswerApprovalHandler.ServeHTTP(w, r)
+		case MessagingServicePostProcedure:
+			messagingServicePostHandler.ServeHTTP(w, r)
+		case MessagingServiceReadMessagesProcedure:
+			messagingServiceReadMessagesHandler.ServeHTTP(w, r)
+		case MessagingServiceGetMessageProcedure:
+			messagingServiceGetMessageHandler.ServeHTTP(w, r)
+		case MessagingServiceMarkReadProcedure:
+			messagingServiceMarkReadHandler.ServeHTTP(w, r)
+		case MessagingServiceUnreadSummaryProcedure:
+			messagingServiceUnreadSummaryHandler.ServeHTTP(w, r)
+		case MessagingServiceListChannelsProcedure:
+			messagingServiceListChannelsHandler.ServeHTTP(w, r)
+		case MessagingServiceSetDeliveryProcedure:
+			messagingServiceSetDeliveryHandler.ServeHTTP(w, r)
 		case MessagingServiceReportStatusProcedure:
 			messagingServiceReportStatusHandler.ServeHTTP(w, r)
+		case MessagingServiceReportVerdictProcedure:
+			messagingServiceReportVerdictHandler.ServeHTTP(w, r)
 		case MessagingServiceWatchPresenceProcedure:
 			messagingServiceWatchPresenceHandler.ServeHTTP(w, r)
 		case MessagingServiceQueryAuditProcedure:
@@ -442,8 +651,40 @@ func (UnimplementedMessagingServiceHandler) AnswerApproval(context.Context, *con
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.AnswerApproval is not implemented"))
 }
 
+func (UnimplementedMessagingServiceHandler) Post(context.Context, *connect.Request[v1.PostRequest]) (*connect.Response[v1.PostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.Post is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) ReadMessages(context.Context, *connect.Request[v1.ReadMessagesRequest]) (*connect.Response[v1.ReadMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ReadMessages is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) GetMessage(context.Context, *connect.Request[v1.GetMessageRequest]) (*connect.Response[v1.GetMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.GetMessage is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) MarkRead(context.Context, *connect.Request[v1.MarkReadRequest]) (*connect.Response[v1.MarkReadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.MarkRead is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) UnreadSummary(context.Context, *connect.Request[v1.UnreadSummaryRequest]) (*connect.Response[v1.UnreadSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.UnreadSummary is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ListChannels is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) SetDelivery(context.Context, *connect.Request[v1.SetDeliveryRequest]) (*connect.Response[v1.SetDeliveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.SetDelivery is not implemented"))
+}
+
 func (UnimplementedMessagingServiceHandler) ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ReportStatus is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ReportVerdict is not implemented"))
 }
 
 func (UnimplementedMessagingServiceHandler) WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest], *connect.ServerStream[v1.PresenceEvent]) error {

@@ -1,0 +1,123 @@
+{
+  "realm": "swarmageddon",
+  "enabled": true,
+  "displayName": "swarmageddon dev",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "groups": [
+    { "name": "platform-admins", "path": "/platform-admins" },
+    { "name": "operators", "path": "/operators" },
+    { "name": "viewers", "path": "/viewers" }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "email": "alice@example.test",
+      "firstName": "Alice",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "alice", "temporary": false }],
+      "groups": ["/platform-admins"]
+    },
+    {
+      "username": "oscar",
+      "email": "oscar@example.test",
+      "firstName": "Oscar",
+      "lastName": "Operator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "oscar", "temporary": false }],
+      "groups": ["/operators"]
+    },
+    {
+      "username": "victor",
+      "email": "victor@example.test",
+      "firstName": "Victor",
+      "lastName": "Viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "victor", "temporary": false }],
+      "groups": ["/viewers"]
+    },
+    {
+      "username": "nobody",
+      "email": "nobody@example.test",
+      "firstName": "No",
+      "lastName": "Groups",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "nobody", "temporary": false }]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "swarmageddon",
+      "name": "swarmageddon control center (OIDC)",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "swarmageddon-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["+"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "swarmageddon-saml",
+      "name": "swarmageddon control center (SAML)",
+      "protocol": "saml",
+      "enabled": true,
+      "frontchannelLogout": true,
+      "redirectUris": ["*"],
+      "attributes": {
+        "saml.authnstatement": "true",
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.client.signature": "false",
+        "saml.force.post.binding": "true",
+        "saml_name_id_format": "username",
+        "saml.signature.algorithm": "RSA_SHA256"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "saml",
+          "protocolMapper": "saml-group-membership-mapper",
+          "config": {
+            "attribute.name": "groups",
+            "full.path": "false",
+            "single": "false",
+            "attribute.nameformat": "Basic"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "attribute.name": "email",
+            "attribute.nameformat": "Basic"
+          }
+        }
+      ]
+    }
+  ]
+}

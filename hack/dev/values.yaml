@@ -1,0 +1,7 @@
+# Chart values for `make dev`: images from the k3d registry.
+image:
+  registry: k3d-swarm-registry.localhost:5005
+  tag: dev
+  pullPolicy: Always
+welcome:
+  ttlSecondsAfterFinished: 600

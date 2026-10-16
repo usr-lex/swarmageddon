@@ -57,6 +57,30 @@ spec:
               RoomSpec describes one worker's room. It lives in its workspace's namespace;
               the room's name is the agent's name.
             properties:
+              advisor:
+                description: Advisor overrides the role template's advisor.
+                properties:
+                  effort:
+                    type: string
+                  maxCallsPerHour:
+                    default: 10
+                    format: int32
+                    type: integer
+                  model:
+                    description: Model, as the gateway names it.
+                    type: string
+                  monthlyUSD:
+                    description: 'Monthly budget of the advisor''s own gateway key
+                      in USD; 0: the workspace''s per-room budget.'
+                    format: int32
+                    type: integer
+                  native:
+                    description: Native also turns on Claude Code's built-in advisor
+                      tool (Claude rooms only; unauditable).
+                    type: boolean
+                required:
+                - model
+                type: object
               cli:
                 default: claude
                 description: CLI is the agent CLI a room runs.
@@ -85,6 +109,12 @@ spec:
                 type: string
               paused:
                 description: Paused scales the room to zero; its volumes stay.
+                type: boolean
+              quarantined:
+                description: |-
+                  Quarantined cuts the room off: model requests are refused, its network
+                  shrinks to the gateway, its forge token is paused. Set by the warden or a
+                  person; only a person clears it.
                 type: boolean
               repos:
                 description: Repos (owner/name in the forge) cloned into ~/work on
@@ -144,6 +174,14 @@ spec:
                   storageClassName:
                     type: string
                 type: object
+              wardenMode:
+                description: WardenMode overrides the workspace's warden mode for
+                  this room.
+                enum:
+                - "off"
+                - monitor
+                - gate
+                type: string
               workDir:
                 description: WorkDir the agent starts in, relative to its home. Default
                   "work".
