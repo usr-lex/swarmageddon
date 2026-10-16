@@ -46,15 +46,15 @@ type Driver struct {
 	// MinBackoff between restarts (default 2 s).
 	MinBackoff time.Duration
 
-	mu         sync.Mutex
-	socket     string
-	token      string
-	ready      chan struct{} // closed when the inbox socket is known
-	runSeq     int           // increments per CLI start
-	firstAt    int           // runSeq for which the first turn was sent
-	pending    map[*context.CancelFunc]string
+	mu      sync.Mutex
+	socket  string
+	token   string
+	ready   chan struct{} // closed when the inbox socket is known
+	runSeq  int           // increments per CLI start
+	firstAt int           // runSeq for which the first turn was sent
+	pending map[*context.CancelFunc]string
 	// escalated holds the warden's reason for calls it escalated, by toolKey.
-	escalated map[string]string
+	escalated  map[string]string
 	transcript string
 }
 

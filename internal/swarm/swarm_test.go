@@ -125,7 +125,7 @@ func TestMCPTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names = append(names, tl.Name)
 	}
-	if strings.Join(names, ",") != "list_agents,send_message,set_status,whoami" {
+	if strings.Join(names, ",") != "advise,get_message,list_agents,list_channels,mark_read,post,read_messages,send_message,set_delivery,set_status,unread_summary,whoami" {
 		t.Errorf("tools %v", names)
 	}
 	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "send_message", Arguments: map[string]any{"to": "hermes@acme", "body": "hi"}})
