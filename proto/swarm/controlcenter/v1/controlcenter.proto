@@ -1,0 +1,1006 @@
+syntax = "proto3";
+
+// The control center's browser API (docs/design.md §3.3, §3.4, §8, §10).
+//
+// Served with Connect under /api on the control center. Browsers call it with
+// @connectrpc/connect-web (Connect protocol, JSON or binary).
+//
+// Authentication is a session cookie ("swarm_session"). Every unary call must
+// carry the Connect protocol header "Connect-Protocol-Version: 1" (connect-web
+// sends it) and, if the browser sends an Origin header, it must match the
+// control center's own origin; that is the CSRF protection. Server streams
+// need the cookie only and change nothing.
+//
+// Sign-in with OIDC and SAML is a browser redirect, not an RPC:
+//   GET  /auth/oidc/{provider}/login?return=/path
+//   GET  /auth/oidc/{provider}/callback
+//   GET  /auth/saml/{provider}/login?return=/path
+//   POST /auth/saml/{provider}/acs
+//   GET  /auth/saml/{provider}/metadata   (SP metadata to paste into the IdP)
+//
+// Fields only ever get added; a breaking change gets a v2 package.
+package swarm.controlcenter.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1;controlcenterv1";
+
+// Role is a control center role. Higher values include lower ones.
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_VIEWER = 1;
+  ROLE_OPERATOR = 2;
+  ROLE_ADMIN = 3;
+}
+
+// ---------------------------------------------------------------- Setup
+
+// SetupService claims the installation with the setup token (§3.3). It is the
+// only service that works without a session before admin is claimed.
+service SetupService {
+  rpc GetSetupStatus(GetSetupStatusRequest) returns (GetSetupStatusResponse);
+  // ClaimAdmin checks the setup token (rate-limited per client IP) and creates
+  // the local admin. With an empty username it only signs the caller in as a
+  // temporary admin, to configure OIDC or SAML first. Sets the session cookie.
+  rpc ClaimAdmin(ClaimAdminRequest) returns (ClaimAdminResponse);
+}
+
+message GetSetupStatusRequest {}
+
+message GetSetupStatusResponse {
+  bool admin_claimed = 1;
+  // PostgreSQL is connected; before that the control center is stateless.
+  bool database_ready = 2;
+  // SHA-256 fingerprint of the control center CA, to compare with the welcome output.
+  string ca_fingerprint = 3;
+  string url = 4;
+}
+
+message ClaimAdminRequest {
+  string token = 1;
+  // Local admin account. Empty username: no local account, temporary session only.
+  string username = 2;
+  string password = 3;
+  string email = 4;
+}
+
+message ClaimAdminResponse {
+  User user = 1;
+}
+
+// ---------------------------------------------------------------- Auth
+
+service AuthService {
+  // ListProviders is public: what the sign-in page shows.
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  rpc LocalLogin(LocalLoginRequest) returns (LocalLoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // GetMe returns the signed-in person; Unauthenticated if nobody is.
+  rpc GetMe(GetMeRequest) returns (GetMeResponse);
+}
+
+enum ProviderKind {
+  PROVIDER_KIND_UNSPECIFIED = 0;
+  PROVIDER_KIND_LOCAL = 1;
+  PROVIDER_KIND_OIDC = 2;
+  PROVIDER_KIND_SAML = 3;
+}
+
+message Provider {
+  string name = 1;
+  ProviderKind kind = 2;
+  string display_name = 3;
+  // Where the browser goes to start signing in (OIDC and SAML); append ?return=/path.
+  string login_url = 4;
+}
+
+message ListProvidersRequest {}
+
+message ListProvidersResponse {
+  repeated Provider providers = 1;
+  bool admin_claimed = 2;
+}
+
+message LocalLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LocalLoginResponse {
+  User user = 1;
+}
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+message GetMeRequest {}
+
+message GetMeResponse {
+  User user = 1;
+  // Session expiry (absolute); the idle timeout is 12 h.
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message User {
+  string id = 1;
+  // Handle used as the person's messaging address: <handle>@<workspace>.
+  string handle = 2;
+  string email = 3;
+  string display_name = 4;
+  Role role = 5;
+  // Workspaces assigned or owned. Admins see all and get an empty list.
+  repeated string workspaces = 6;
+  // "local", "oidc:<name>", "saml:<name>" or "setup".
+  string provider = 7;
+  bool disabled = 8;
+  // The role was set by an admin, not by the identity provider's groups.
+  bool role_override = 9;
+  google.protobuf.Timestamp last_login = 10;
+}
+
+// ---------------------------------------------------------------- Platform
+
+// PlatformService edits subsets of the Platform resource and shows the
+// operator's progress (§3.4). Admin only, except GetPlatform for operators.
+service PlatformService {
+  rpc GetPlatform(GetPlatformRequest) returns (GetPlatformResponse);
+  rpc UpdateSignIn(UpdateSignInRequest) returns (UpdateSignInResponse);
+  rpc UpdateServices(UpdateServicesRequest) returns (UpdateServicesResponse);
+  rpc UpdateHostname(UpdateHostnameRequest) returns (UpdateHostnameResponse);
+  rpc SetWizardStep(SetWizardStepRequest) returns (SetWizardStepResponse);
+  // WatchPlatform streams the Platform on every change: preflight results and
+  // service progress.
+  rpc WatchPlatform(WatchPlatformRequest) returns (stream WatchPlatformResponse);
+}
+
+message Platform {
+  SignInSettings sign_in = 1;
+  ServicesSettings services = 2;
+  HostnameSettings hostname = 3;
+  string wizard_step = 4;
+  PlatformStatus status = 5;
+}
+
+message OIDCProviderSettings {
+  string name = 1;
+  string display_name = 2;
+  string issuer = 3;
+  string client_id = 4;
+  // Write-only: set to change the client secret; never returned.
+  string client_secret = 5;
+  bool client_secret_set = 6;
+  string groups_claim = 7;
+  repeated string scopes = 8;
+  // Redirect URL to register at the provider (read-only).
+  string redirect_url = 9;
+}
+
+message SAMLProviderSettings {
+  string name = 1;
+  string display_name = 2;
+  string metadata_url = 3;
+  // IdP metadata XML pasted in; stored in a ConfigMap reference (read-only here).
+  string metadata_xml = 4;
+  string groups_attribute = 5;
+  // Our SP metadata URL and ACS URL (read-only).
+  string sp_metadata_url = 6;
+  string acs_url = 7;
+}
+
+message RoleMapping {
+  string group = 1;
+  Role role = 2;
+}
+
+message SignInSettings {
+  bool local_enabled = 1;
+  repeated OIDCProviderSettings oidc = 2;
+  repeated SAMLProviderSettings saml = 3;
+  repeated RoleMapping role_mappings = 4;
+  // ROLE_UNSPECIFIED refuses users no mapping matches.
+  Role default_role = 5;
+}
+
+message ModelProviderSettings {
+  string name = 1;
+  // anthropic, openai or openaiCompatible.
+  string kind = 2;
+  string base_url = 3;
+  repeated string models = 4;
+  // Write-only. Stored in Secret gateway-provider-<name> in the system namespace.
+  string api_key = 5;
+  bool api_key_set = 6;
+}
+
+message ServicesSettings {
+  // Storage sizes as Kubernetes quantities ("20Gi"); empty keeps the default.
+  string postgres_storage = 1;
+  string forgejo_storage = 2;
+  bool forgejo_oidc_login = 3;
+  int32 messaging_replicas = 4;
+  string messaging_storage = 5;
+  repeated ModelProviderSettings providers = 6;
+  string registry_cache_storage = 7;
+  repeated string registry_upstreams = 8;
+  bool ntfy_enabled = 9;
+  // Starts deploying the services.
+  bool approved = 10;
+}
+
+message HostnameSettings {
+  string hostname = 1;
+  // selfSigned or certManager.
+  string tls_mode = 2;
+  string issuer_name = 3;
+  string issuer_kind = 4;
+}
+
+message Condition {
+  string type = 1;
+  // True, False or Unknown.
+  string status = 2;
+  string reason = 3;
+  string message = 4;
+  google.protobuf.Timestamp last_transition = 5;
+}
+
+message PreflightCheck {
+  string name = 1;
+  // pass, warn, fail or pending.
+  string result = 2;
+  string message = 3;
+  string fix = 4;
+}
+
+message PlatformStatus {
+  bool admin_claimed = 1;
+  string url = 2;
+  string ca_fingerprint = 3;
+  repeated PreflightCheck preflight = 4;
+  string tier = 5;
+  int32 room_estimate = 6;
+  bool preflight_done = 7;
+  // One per step and per service (PostgresReady, ForgejoReady, ...).
+  repeated Condition conditions = 8;
+  map<string, string> versions = 9;
+}
+
+message GetPlatformRequest {}
+message GetPlatformResponse {
+  Platform platform = 1;
+}
+
+message UpdateSignInRequest {
+  SignInSettings sign_in = 1;
+}
+message UpdateSignInResponse {
+  Platform platform = 1;
+}
+
+message UpdateServicesRequest {
+  ServicesSettings services = 1;
+}
+message UpdateServicesResponse {
+  Platform platform = 1;
+  // Provider key Secrets written in the system namespace; the operator copies
+  // them to the platform namespace for the gateway.
+  repeated string provider_secrets = 2;
+}
+
+message UpdateHostnameRequest {
+  HostnameSettings hostname = 1;
+}
+message UpdateHostnameResponse {
+  Platform platform = 1;
+}
+
+message SetWizardStepRequest {
+  string step = 1;
+}
+message SetWizardStepResponse {}
+
+message WatchPlatformRequest {}
+message WatchPlatformResponse {
+  Platform platform = 1;
+}
+
+// ---------------------------------------------------------------- Workspaces
+
+// WorkspaceService is the workspace wizard (§8.3). It only writes Workspace,
+// RoleTemplate, Room and RunnerPool resources.
+service WorkspaceService {
+  rpc ListWorkspaces(ListWorkspacesRequest) returns (ListWorkspacesResponse);
+  // GetWorkspace returns the workspace as a plan the wizard can edit and re-apply.
+  rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse);
+  // SuggestAgentNames picks names from the default pool (Greek gods) that are
+  // not used anywhere on the platform.
+  rpc SuggestAgentNames(SuggestAgentNamesRequest) returns (SuggestAgentNamesResponse);
+  rpc ListRoleTemplates(ListRoleTemplatesRequest) returns (ListRoleTemplatesResponse);
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+  // PreviewWorkspace returns what ApplyWorkspace would change.
+  rpc PreviewWorkspace(PreviewWorkspaceRequest) returns (PreviewWorkspaceResponse);
+  // ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
+  rpc ApplyWorkspace(ApplyWorkspaceRequest) returns (ApplyWorkspaceResponse);
+}
+
+message AgentPlan {
+  // Room name and agent name: lower case, [a-z][a-z0-9-]*.
+  string name = 1;
+  string display_name = 2;
+  // RoleTemplate name: coordinator, implementer, reviewer, ci, qa or a custom one.
+  string role = 3;
+  // claude or ore.
+  string cli = 4;
+  string model = 5;
+  string effort = 6;
+  string group = 7;
+  string cpu = 8;
+  string memory = 9;
+  string home_volume = 10;
+  string engine_volume = 11;
+  // owner/name in the forge.
+  repeated string repos = 12;
+  string work_dir = 13;
+  bool paused = 14;
+}
+
+message RepositoryPlan {
+  string name = 1;
+  string import_url = 2;
+  string group = 3;
+  string push_mirror = 4;
+  // Secret in the workspace namespace holding the mirror token (key token).
+  string mirror_secret_name = 5;
+  repeated string status_checks = 6;
+}
+
+message GroupPlan {
+  string name = 1;
+  string description = 2;
+}
+
+message LinkPlan {
+  string from = 1;
+  string to = 2;
+  // open, mediated or none.
+  string mode = 3;
+  repeated string senders = 4;
+  repeated string recipients = 5;
+  string require_prefix = 6;
+}
+
+message NotificationChannelPlan {
+  // webPush, ntfy, slack, discord or email.
+  string kind = 1;
+  string topic = 2;
+  string secret_name = 3;
+}
+
+message WorkspacePlan {
+  string name = 1;
+  string display_name = 2;
+  string org = 3;
+  repeated AgentPlan agents = 4;
+  repeated RepositoryPlan repositories = 5;
+  repeated GroupPlan groups = 6;
+  // withinGroup or none.
+  string default_links = 7;
+  repeated LinkPlan links = 8;
+  repeated NotificationChannelPlan notification_channels = 9;
+  repeated string notification_events = 10;
+  repeated string owners = 11;
+  string default_model = 12;
+  int32 budget_per_room_monthly_usd = 13;
+  // Go duration, e.g. "24h".
+  string approval_timeout = 14;
+  // whenIdle, manual or window.
+  string update_mode = 15;
+  string update_window = 16;
+  int32 required_approvals = 17;
+  bool internet = 18;
+  // Runner labels; empty: no RunnerPool.
+  repeated string runner_labels = 19;
+  int32 runner_max_concurrent = 20;
+}
+
+message WorkspaceSummary {
+  string name = 1;
+  string display_name = 2;
+  string org = 3;
+  int32 rooms = 4;
+  repeated string owners = 5;
+  repeated Condition conditions = 6;
+  string namespace = 7;
+}
+
+message ListWorkspacesRequest {}
+message ListWorkspacesResponse {
+  repeated WorkspaceSummary workspaces = 1;
+}
+
+message GetWorkspaceRequest {
+  string name = 1;
+}
+message GetWorkspaceResponse {
+  WorkspacePlan plan = 1;
+  WorkspaceSummary summary = 2;
+  // Per-room provisioning progress.
+  repeated RoomSummary rooms = 3;
+}
+
+message SuggestAgentNamesRequest {
+  int32 count = 1;
+  // Names already chosen in the wizard, to skip.
+  repeated string exclude = 2;
+}
+message SuggestAgentNamesResponse {
+  repeated string names = 1;
+}
+
+message RoleTemplateSummary {
+  string name = 1;
+  string title = 2;
+  string summary = 3;
+  bool built_in = 4;
+}
+
+message ListRoleTemplatesRequest {
+  // Empty: the built-in templates.
+  string workspace = 1;
+}
+message ListRoleTemplatesResponse {
+  repeated RoleTemplateSummary templates = 1;
+}
+
+message ListModelsRequest {}
+message ListModelsResponse {
+  // Models the gateway's providers serve.
+  repeated string models = 1;
+}
+
+enum ChangeAction {
+  CHANGE_ACTION_UNSPECIFIED = 0;
+  CHANGE_ACTION_CREATE = 1;
+  CHANGE_ACTION_UPDATE = 2;
+  CHANGE_ACTION_DELETE = 3;
+  CHANGE_ACTION_UNCHANGED = 4;
+}
+
+message Change {
+  // Workspace, RoleTemplate, Room or RunnerPool.
+  string kind = 1;
+  string name = 2;
+  ChangeAction action = 3;
+  // Spec as JSON, before and after.
+  string before = 4;
+  string after = 5;
+  // Short human description of the fields that change.
+  repeated string fields = 6;
+}
+
+message PreviewWorkspaceRequest {
+  WorkspacePlan plan = 1;
+  // Also delete rooms that are not in the plan.
+  bool prune_rooms = 2;
+}
+message PreviewWorkspaceResponse {
+  repeated Change changes = 1;
+  // Validation problems that would refuse the apply.
+  repeated string problems = 2;
+  // Whether the planned rooms fit the preflight estimate.
+  bool fits = 3;
+  string fit_note = 4;
+}
+
+message ApplyWorkspaceRequest {
+  WorkspacePlan plan = 1;
+  bool prune_rooms = 2;
+}
+message ApplyWorkspaceResponse {
+  repeated Change changes = 1;
+}
+
+// ---------------------------------------------------------------- Rooms
+
+enum Presence {
+  PRESENCE_UNSPECIFIED = 0;
+  PRESENCE_WORKING = 1;
+  PRESENCE_WAITING_ON_HUMAN = 2;
+  PRESENCE_IDLE = 3;
+  PRESENCE_OFFLINE = 4;
+}
+
+message VolumeUsage {
+  string name = 1;
+  int64 used_bytes = 2;
+  int64 capacity_bytes = 3;
+}
+
+// RoomSummary is one row of the fleet view, merged from the Room resource,
+// its pod and messaging presence.
+message RoomSummary {
+  string workspace = 1;
+  string name = 2;
+  string display_name = 3;
+  string role = 4;
+  string cli = 5;
+  string model = 6;
+  string group = 7;
+  // Provisioning, Running, Paused, Updating, Failed.
+  string phase = 8;
+  Presence presence = 9;
+  string current_task = 10;
+  double spend_usd = 11;
+  repeated VolumeUsage volumes = 12;
+  bool update_available = 13;
+  int32 crash_count = 14;
+  int32 pod_restarts = 15;
+  bool paused = 16;
+  repeated Condition conditions = 17;
+  int32 pending_approvals = 18;
+  google.protobuf.Timestamp presence_since = 19;
+  string address = 20;
+}
+
+service RoomService {
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse);
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc PauseRoom(PauseRoomRequest) returns (PauseRoomResponse);
+  rpc ResumeRoom(ResumeRoomRequest) returns (ResumeRoomResponse);
+  // RecreateRoom deletes the pod; with delete_home, also the home volume
+  // (confirm_name must repeat the room name).
+  rpc RecreateRoom(RecreateRoomRequest) returns (RecreateRoomResponse);
+  // RemoveRoom deletes the Room; volumes are kept for the retention period
+  // unless delete_data_now (confirm_name must repeat the room name).
+  rpc RemoveRoom(RemoveRoomRequest) returns (RemoveRoomResponse);
+  rpc RotateRoomCredentials(RotateRoomCredentialsRequest) returns (RotateRoomCredentialsResponse);
+  rpc UpdateRoomNow(UpdateRoomNowRequest) returns (UpdateRoomNowResponse);
+  rpc StreamRoomLogs(StreamRoomLogsRequest) returns (stream StreamRoomLogsResponse);
+  rpc GetRoomResources(GetRoomResourcesRequest) returns (GetRoomResourcesResponse);
+  rpc GetRoomStorage(GetRoomStorageRequest) returns (GetRoomStorageResponse);
+}
+
+message RoomRef {
+  string workspace = 1;
+  string name = 2;
+}
+
+message ListRoomsRequest {
+  // Empty: every workspace the caller may see.
+  string workspace = 1;
+}
+message ListRoomsResponse {
+  repeated RoomSummary rooms = 1;
+}
+
+message GetRoomRequest {
+  RoomRef room = 1;
+}
+message GetRoomResponse {
+  RoomSummary room = 1;
+  // Room spec as JSON.
+  string spec = 2;
+  string pod_name = 3;
+  string node = 4;
+  string image_version = 5;
+  string forge_user = 6;
+  google.protobuf.Timestamp credentials_rotated_at = 7;
+  int64 input_tokens = 8;
+  int64 output_tokens = 9;
+  int64 context_tokens = 10;
+  string cli_version = 11;
+}
+
+message PauseRoomRequest {
+  RoomRef room = 1;
+}
+message PauseRoomResponse {}
+
+message ResumeRoomRequest {
+  RoomRef room = 1;
+}
+message ResumeRoomResponse {}
+
+message RecreateRoomRequest {
+  RoomRef room = 1;
+  bool delete_home = 2;
+  string confirm_name = 3;
+}
+message RecreateRoomResponse {}
+
+message RemoveRoomRequest {
+  RoomRef room = 1;
+  bool delete_data_now = 2;
+  string confirm_name = 3;
+}
+message RemoveRoomResponse {}
+
+message RotateRoomCredentialsRequest {
+  RoomRef room = 1;
+}
+message RotateRoomCredentialsResponse {}
+
+message UpdateRoomNowRequest {
+  RoomRef room = 1;
+}
+message UpdateRoomNowResponse {}
+
+message StreamRoomLogsRequest {
+  RoomRef room = 1;
+  bool follow = 2;
+  int64 tail_lines = 3;
+  int64 since_seconds = 4;
+  // supervisor, cli, engine, janitor; empty: everything.
+  string component = 5;
+  bool previous = 6;
+}
+message StreamRoomLogsResponse {
+  string line = 1;
+}
+
+message GetRoomResourcesRequest {
+  RoomRef room = 1;
+}
+message GetRoomResourcesResponse {
+  // From metrics.k8s.io; zero when metrics-server is missing.
+  int64 cpu_millicores = 1;
+  int64 memory_bytes = 2;
+  int64 cpu_limit_millicores = 3;
+  int64 memory_limit_bytes = 4;
+  bool metrics_available = 5;
+  google.protobuf.Timestamp at = 6;
+}
+
+message GetRoomStorageRequest {
+  RoomRef room = 1;
+}
+
+message ClaimInfo {
+  string name = 1;
+  string storage_class = 2;
+  string requested = 3;
+  string capacity = 4;
+  string phase = 5;
+}
+
+message GetRoomStorageResponse {
+  // Use per volume, as the room last reported it.
+  repeated VolumeUsage volumes = 1;
+  repeated ClaimInfo claims = 2;
+  repeated string shared_dirs = 3;
+}
+
+// ---------------------------------------------------------------- Fleet
+
+service FleetService {
+  // WatchFleet sends a snapshot of every visible room, then changes.
+  rpc WatchFleet(WatchFleetRequest) returns (stream WatchFleetResponse);
+}
+
+message WatchFleetRequest {
+  repeated string workspaces = 1;
+}
+
+message WatchFleetResponse {
+  oneof event {
+    FleetSnapshot snapshot = 1;
+    RoomSummary updated = 2;
+    RoomRef removed = 3;
+  }
+}
+
+message FleetSnapshot {
+  repeated RoomSummary rooms = 1;
+}
+
+// ---------------------------------------------------------------- Inbox
+
+// InboxService is a person's messages with agents (§7.2). Sending goes
+// through messaging as the signed-in person.
+service InboxService {
+  rpc ListInbox(ListInboxRequest) returns (ListInboxResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc WatchInbox(WatchInboxRequest) returns (stream WatchInboxResponse);
+}
+
+message InboxMessage {
+  string id = 1;
+  string workspace = 2;
+  string from = 3;
+  string to = 4;
+  string body = 5;
+  string reply_to = 6;
+  google.protobuf.Timestamp sent_at = 7;
+  bool read = 8;
+  // in (to the person) or out (sent by the person).
+  string direction = 9;
+}
+
+message ListInboxRequest {
+  string workspace = 1;
+  int32 limit = 2;
+  // Page: messages sent before this time.
+  google.protobuf.Timestamp before = 3;
+  // Only the conversation with this address.
+  string peer = 4;
+}
+message ListInboxResponse {
+  repeated InboxMessage messages = 1;
+  int32 unread = 2;
+}
+
+message SendMessageRequest {
+  string workspace = 1;
+  // Agent name or address.
+  string to = 2;
+  string body = 3;
+  string reply_to = 4;
+}
+message SendMessageResponse {
+  InboxMessage message = 1;
+}
+
+message MarkReadRequest {
+  repeated string ids = 1;
+}
+message MarkReadResponse {}
+
+message WatchInboxRequest {
+  repeated string workspaces = 1;
+}
+message WatchInboxResponse {
+  InboxMessage message = 1;
+}
+
+// ---------------------------------------------------------------- Approvals
+
+service ApprovalService {
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  rpc AnswerApproval(AnswerApprovalRequest) returns (AnswerApprovalResponse);
+  rpc WatchApprovals(WatchApprovalsRequest) returns (stream WatchApprovalsResponse);
+  rpc ListApprovalHistory(ListApprovalHistoryRequest) returns (ListApprovalHistoryResponse);
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_ALLOW = 1;
+  DECISION_ALLOW_FOR_SESSION = 2;
+  DECISION_DENY = 3;
+}
+
+message Approval {
+  string id = 1;
+  string workspace = 2;
+  string room = 3;
+  string cli = 4;
+  string tool = 5;
+  string summary = 6;
+  string detail = 7;
+  string reason = 8;
+  bool session_scope_available = 9;
+  google.protobuf.Timestamp requested_at = 10;
+  google.protobuf.Timestamp expires_at = 11;
+  // The persona's autoApprove rules for this tool, for context.
+  repeated string matching_rules = 12;
+  // pending, answered, withdrawn or expired.
+  string state = 13;
+  Decision decision = 14;
+  string answered_by = 15;
+  string answer_message = 16;
+  google.protobuf.Timestamp answered_at = 17;
+}
+
+message ListApprovalsRequest {
+  repeated string workspaces = 1;
+}
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+}
+
+message AnswerApprovalRequest {
+  string id = 1;
+  Decision decision = 2;
+  string message = 3;
+}
+message AnswerApprovalResponse {
+  Approval approval = 1;
+}
+
+message WatchApprovalsRequest {
+  repeated string workspaces = 1;
+}
+message WatchApprovalsResponse {
+  // The approval in its new state; state "pending" is a new request.
+  Approval approval = 1;
+}
+
+message ListApprovalHistoryRequest {
+  string workspace = 1;
+  int32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+}
+message ListApprovalHistoryResponse {
+  repeated Approval approvals = 1;
+}
+
+// ---------------------------------------------------------------- Audit
+
+service AuditService {
+  rpc QueryAudit(QueryAuditRequest) returns (QueryAuditResponse);
+}
+
+enum AuditSource {
+  AUDIT_SOURCE_UNSPECIFIED = 0;
+  // Control center actions: sign-ins, wizard, lifecycle, terminals, approvals.
+  AUDIT_SOURCE_CONTROL_CENTER = 1;
+  // The messaging service: messages, crossings, refusals, presence.
+  AUDIT_SOURCE_MESSAGING = 2;
+}
+
+message AuditEntry {
+  AuditSource source = 1;
+  google.protobuf.Timestamp at = 2;
+  // Control center: the person, "rule:<persona>" or "system". Messaging: from.
+  string actor = 3;
+  // Control center: e.g. room.pause. Messaging: message, crossing, refusal, presence.
+  string action = 4;
+  // Control center: kind/name. Messaging: to.
+  string object = 5;
+  string workspace = 6;
+  string source_ip = 7;
+  // ok or the error.
+  string result = 8;
+  string before = 9;
+  string after = 10;
+  // Messaging: body, reason, link; control center: extra details as JSON.
+  string detail = 11;
+}
+
+message QueryAuditRequest {
+  AuditSource source = 1;
+  string workspace = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp until = 4;
+  string actor = 5;
+  // Action prefix (control center) or kinds (messaging).
+  repeated string actions = 6;
+  int32 limit = 7;
+}
+message QueryAuditResponse {
+  repeated AuditEntry entries = 1;
+}
+
+// ---------------------------------------------------------------- Notifications
+
+service NotificationService {
+  rpc GetVapidPublicKey(GetVapidPublicKeyRequest) returns (GetVapidPublicKeyResponse);
+  rpc SubscribeWebPush(SubscribeWebPushRequest) returns (SubscribeWebPushResponse);
+  rpc UnsubscribeWebPush(UnsubscribeWebPushRequest) returns (UnsubscribeWebPushResponse);
+  rpc GetNotificationPrefs(GetNotificationPrefsRequest) returns (GetNotificationPrefsResponse);
+  rpc SetNotificationPrefs(SetNotificationPrefsRequest) returns (SetNotificationPrefsResponse);
+  rpc SendTestNotification(SendTestNotificationRequest) returns (SendTestNotificationResponse);
+}
+
+message GetVapidPublicKeyRequest {}
+message GetVapidPublicKeyResponse {
+  // URL-safe base64, for PushManager.subscribe's applicationServerKey.
+  string public_key = 1;
+}
+
+message SubscribeWebPushRequest {
+  string endpoint = 1;
+  string p256dh = 2;
+  string auth = 3;
+  string user_agent = 4;
+}
+message SubscribeWebPushResponse {}
+
+message UnsubscribeWebPushRequest {
+  string endpoint = 1;
+}
+message UnsubscribeWebPushResponse {}
+
+message NotificationPref {
+  // Empty: every workspace.
+  string workspace = 1;
+  // approvalWaiting, idleWithOpenWork, ciRed, budget, diskLow, roomCrashed.
+  string event = 2;
+  // webPush, ntfy, slack, discord, email. Empty: off.
+  repeated string channels = 3;
+}
+
+message GetNotificationPrefsRequest {}
+message GetNotificationPrefsResponse {
+  repeated NotificationPref prefs = 1;
+  // Channels the person's workspaces have configured.
+  repeated string available_channels = 2;
+}
+
+message SetNotificationPrefsRequest {
+  repeated NotificationPref prefs = 1;
+}
+message SetNotificationPrefsResponse {}
+
+message SendTestNotificationRequest {
+  string channel = 1;
+}
+message SendTestNotificationResponse {}
+
+// ---------------------------------------------------------------- Spend
+
+service SpendService {
+  rpc GetSpend(GetSpendRequest) returns (GetSpendResponse);
+}
+
+message RoomSpend {
+  string workspace = 1;
+  string room = 2;
+  double spend_usd = 3;
+  double budget_usd = 4;
+  bool budget_exhausted = 5;
+}
+
+message ModelSpend {
+  string model = 1;
+  double spend_usd = 2;
+}
+
+message WorkspaceSpend {
+  string workspace = 1;
+  double spend_usd = 2;
+  repeated ModelSpend models = 3;
+}
+
+message GetSpendRequest {
+  // Empty: every visible workspace.
+  string workspace = 1;
+}
+message GetSpendResponse {
+  repeated RoomSpend rooms = 1;
+  repeated WorkspaceSpend workspaces = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  // False until the gateway is reachable.
+  bool available = 4;
+}
+
+// ---------------------------------------------------------------- Users
+
+// UserService is admin only; needs PostgreSQL.
+service UserService {
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  // SetUserRole overrides the identity provider's mapping; ROLE_UNSPECIFIED
+  // clears the override.
+  rpc SetUserRole(SetUserRoleRequest) returns (SetUserRoleResponse);
+  rpc SetUserWorkspaces(SetUserWorkspacesRequest) returns (SetUserWorkspacesResponse);
+  rpc SetUserDisabled(SetUserDisabledRequest) returns (SetUserDisabledResponse);
+}
+
+message ListUsersRequest {}
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
+message SetUserRoleRequest {
+  string user_id = 1;
+  Role role = 2;
+}
+message SetUserRoleResponse {
+  User user = 1;
+}
+
+message SetUserWorkspacesRequest {
+  string user_id = 1;
+  repeated string workspaces = 2;
+}
+message SetUserWorkspacesResponse {
+  User user = 1;
+}
+
+message SetUserDisabledRequest {
+  string user_id = 1;
+  bool disabled = 2;
+}
+message SetUserDisabledResponse {
+  User user = 1;
+}
