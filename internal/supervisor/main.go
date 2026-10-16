@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -147,7 +147,25 @@ func Main(ctx context.Context, log *slog.Logger) error {
 		wg.Add(1)
 		go func() { defer wg.Done(); proc.Supervise(ctx, s, log) }()
 	}
-	start(engine.Spec())
+	roomEnv, skipped := RoomEnv(room, roomcfg.IdentityDir)
+	if len(skipped) > 0 {
+		log.Warn("room variables skipped (invalid or reserved names, or unreadable)", "names", skipped)
+	}
+	proxyEnv, err := ProxyEnv(room, readSecret(KeyEgressAuth))
+	if err != nil {
+		log.Warn("egress proxy not configured", "err", err)
+	}
+	roomEnv = append(roomEnv, proxyEnv...)
+	if err := WriteShellEnv(user, roomEnv, "/"); err != nil {
+		log.Warn("writing the shell environment", "err", err)
+	}
+	if err := WritePodmanProxy(PodmanProxyConf, proxyEnv); err != nil {
+		log.Warn("writing the Podman proxy settings", "err", err)
+	}
+	runOnce(ctx, log, "/usr/local/libexec/podman-ulimits")
+	eng := engine.Spec()
+	eng.Env = append(eng.Env, proxyEnv...)
+	start(eng)
 	start(display.Xvfb(user, ""))
 	start(display.Openbox(user))
 	if pw := readSecret(KeyVNCPassword); pw != "" {
@@ -179,7 +197,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 		dedup, _ = msgclient.LoadDedup(filepath.Join(stateDir, "delivered.new"), 10000)
 	}
 	core.Dedup = dedup
-	core.Agent = newAgent(room, user, work, roleText, core, log)
+	core.Agent = newAgent(room, user, work, roleText, roomEnv, core, log)
 	core.Warden = NewWarden(room, core, readSecret(KeyWarden), roleText, work)
 	if room.Advisor.Model != "" {
 		core.Advisor = &advisor.Advisor{
@@ -210,6 +228,18 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	log.Info("room started", "cli", room.CLI, "work", work)
 	wg.Wait()
 	return nil
+}
+
+// runOnce runs a root setup program if it is installed, logging failures.
+func runOnce(ctx context.Context, log *slog.Logger, path string) {
+	if _, err := os.Stat(path); err != nil {
+		return
+	}
+	cctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if out, err := exec.CommandContext(cctx, path).CombinedOutput(); err != nil {
+		log.Warn("setup step failed", "path", path, "err", err, "out", strings.TrimSpace(string(out)))
+	}
 }
 
 func janitorConfig(s roomcfg.JanitorSettings) janitor.Config {
@@ -289,14 +319,11 @@ func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog
 	}
 }
 
-// newAgent builds the CLI driver for the room.
-func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, ev agent.Events, log *slog.Logger) agent.Agent {
+// newAgent builds the CLI driver for the room. roomEnv is RoomEnv plus the
+// proxy settings.
+func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, roomEnv []string, ev agent.Events, log *slog.Logger) agent.Agent {
 	key := readSecret(KeyGateway)
-	var roomEnv []string
-	for k, v := range room.Env {
-		roomEnv = append(roomEnv, k+"="+v)
-	}
-	sort.Strings(roomEnv)
+	roomEnv = slices.Clip(roomEnv)
 	if room.CLI == roomcfg.CLIOre {
 		p := ore.Policy{GatewayURL: room.OreBaseURL(), WireAPI: room.OreWireAPI()}
 		return &ore.Driver{

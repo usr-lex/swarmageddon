@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -76,8 +78,12 @@ type Room struct {
 	PermissionMode string `json:"permissionMode,omitempty"`
 	// ApprovalTimeoutSeconds bounds how long a PermissionRequest hook waits.
 	ApprovalTimeoutSeconds int64 `json:"approvalTimeoutSeconds,omitempty"`
-	// Env is the room's non-secret environment, set for the CLI.
+	// Env is the room's merged non-secret environment (design §6.6), set
+	// for the CLI and the agent's shells. Secret variables come from the
+	// identity Secret's env.<NAME> keys.
 	Env map[string]string `json:"env,omitempty"`
+	// Network is the room's network access (design §11.2).
+	Network NetworkSettings `json:"network,omitempty"`
 
 	// Janitor thresholds (design §12); not rendered by the operator yet,
 	// zero values mean the defaults.
@@ -86,6 +92,56 @@ type Room struct {
 	Storm   StormSettings   `json:"storm,omitempty"`
 	Advisor AdvisorSettings `json:"advisor,omitempty"`
 	Warden  WardenSettings  `json:"warden,omitempty"`
+}
+
+// Network modes (design §11.2).
+const (
+	NetworkNone    = "none"
+	NetworkLimited = "limited"
+	NetworkFull    = "full"
+)
+
+// NetworkSettings: in limited mode the CLI, shells and nested containers
+// use the egress proxy, authenticated with the identity Secret's egress_auth.
+type NetworkSettings struct {
+	// Mode is none, limited or full.
+	Mode string `json:"mode,omitempty"`
+	// Proxy is the egress proxy URL, e.g. http://egress.swarmageddon-platform.svc:3128.
+	Proxy string `json:"proxy,omitempty"`
+	// NoProxy adds hosts or domain suffixes reached directly (platform
+	// services); the cluster domains and the platform URLs' hosts are
+	// always included.
+	NoProxy []string `json:"noProxy,omitempty"`
+}
+
+// NoProxyHosts is NO_PROXY's list: loopback, cluster domains, the hosts of
+// the platform URLs, and network.noProxy.
+func (r *Room) NoProxyHosts() []string {
+	hosts := []string{"localhost", "127.0.0.1", "::1", ".svc", ".cluster.local"}
+	seen := map[string]bool{}
+	for _, h := range hosts {
+		seen[h] = true
+	}
+	add := func(h string) {
+		if h != "" && !seen[h] {
+			seen[h] = true
+			hosts = append(hosts, h)
+		}
+	}
+	for _, raw := range []string{r.ForgeURL, r.MessagingURL, r.GatewayURL} {
+		if u, err := url.Parse(raw); err == nil {
+			add(u.Hostname())
+		}
+	}
+	if h, _, err := net.SplitHostPort(r.ForgeSSHHost); err == nil {
+		add(h)
+	} else {
+		add(r.ForgeSSHHost)
+	}
+	for _, h := range r.Network.NoProxy {
+		add(strings.TrimSpace(h))
+	}
+	return hosts
 }
 
 // StormSettings: how pushed items are injected (§7.8).
@@ -187,6 +243,11 @@ func (r *Room) Validate() error {
 		if !repoRE.MatchString(strings.TrimSuffix(repo, ".git")) {
 			errs = append(errs, fmt.Errorf("repo %q is not owner/name", repo))
 		}
+	}
+	switch r.Network.Mode {
+	case "", NetworkNone, NetworkLimited, NetworkFull:
+	default:
+		errs = append(errs, fmt.Errorf("network.mode %q is not none, limited or full", r.Network.Mode))
 	}
 	if path.IsAbs(r.WorkDir) || strings.Contains(r.WorkDir, "..") {
 		errs = append(errs, fmt.Errorf("workDir %q must be relative to the home directory", r.WorkDir))

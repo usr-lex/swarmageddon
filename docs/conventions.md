@@ -38,7 +38,7 @@ Change them here first.
 | `forgejo-admin` | platform | `username`, `password`, `token` |
 | `gateway-master` | platform | `masterKey` |
 | `postgres-<service>` | platform | `username`, `password`, `database`, `url` |
-| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts` |
+| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (`user:password` for the egress proxy, limited network mode), and `env.<NAME>` per secret variable (value of `NAME`, design §6.6) |
 
 ## Identities (internal CA)
 
@@ -78,6 +78,24 @@ exclusive); `ore-requirements.toml`,
 `/etc/swarm/persona/`, and the supervisor copies the files into place at start
 (root-owned, read-only to the agent).
 
+room.json also carries, when set: `network` (`mode` none/limited/full,
+`proxy` the egress proxy URL, `noProxy` extra direct hosts), `storm`
+(`coalesceBytes`, default 4096), `advisor` (`model`, `effort`,
+`maxCallsPerHour`), `warden` (`mode` off/monitor/gate, `model`,
+`interruptOnHigh`, `reviewEveryToolCalls`, `rules`: `[{name, tool, match,
+action, reason}]`, where `tool` is a name, `a|b`, or empty for all, `match` a
+regular expression on the command or path, `action` allow/deny/escalate) and
+`janitor`. The Go form is `roomcfg.Room` in `internal/supervisor/roomcfg`.
+
+The supervisor sets room.json `env` plus the secret variables (`env.<NAME>`
+keys) for the CLI, writes them to `~/.swarm/env` (0600) for the agent's shells
+(sourced from `/etc/profile.d/swarm-env.sh` and `/etc/bash.bashrc`), and in
+`limited` mode adds `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (and lowercase)
+with `egress_auth` in the proxy URL, also in
+`/etc/containers/containers.conf.d/60-swarm-proxy.conf` for nested
+containers. Names the supervisor sets itself (`HOME`, `PATH`, the gateway and
+proxy variables) can't be overridden.
+
 Environment of the room container: `SWARM_ROOM`, `SWARM_WORKSPACE`,
 `ANTHROPIC_BASE_URL` (gateway), plus the room's `spec.env`. Keys are read from
 files, never env, except `ANTHROPIC_AUTH_TOKEN` and `SWARM_GATEWAY_KEY`, which
@@ -91,7 +109,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
 | `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
-| `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>` |
+| `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>`, `swarm post`, `swarm read`, `swarm get`, `swarm mark-read`, `swarm unread`, `swarm channels`, `swarm delivery`, `swarm advise` (see `swarm help`) |
 | `mockmodel` | `--listen :9999`, `--script <file>`; serves Anthropic `/v1/messages`, OpenAI `/v1/responses` and `/v1/chat/completions` |
 
 ## Images

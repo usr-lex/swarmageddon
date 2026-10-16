@@ -82,6 +82,14 @@ func ChannelGuide(r *roomcfg.Room) string {
 		b.WriteString("- **Advisor:** `advise` asks a stronger model for a second opinion. It sees your role, your question, your recent " +
 			"transcript and the files you name; the answer comes back only to you. Calls are limited per hour, so save it for decisions that matter.\n")
 	}
+	if r.Warden.Mode != "off" {
+		b.WriteString("- **Warden:** a small model and a set of rules watch for risky actions (force pushes, touching the platform's files, " +
+			"uploading data, drifting from your task). A blocked call says why; don't work around it. If you need it, explain why to a person.\n")
+	}
+	if r.Network.Mode == roomcfg.NetworkLimited {
+		b.WriteString("- **Network:** your room reaches the internet only through a proxy, for an allowlist of hosts (already set in your " +
+			"environment). A 403 from the proxy means the host isn't on the list; ask a person to add it rather than working around it.\n")
+	}
 	return b.String()
 }
 
