@@ -169,24 +169,12 @@ func desiredStatefulSet(r *v1.Room, ws, image, tier string, x podExtras) *appsv1
 				LocalObjectReference: corev1.LocalObjectReference{Name: CABundleConfigMap}, Optional: ptr.To(true)}}},
 		}}},
 	}
-	shared := map[string]bool{}
 	for _, m := range x.Shared {
 		vn := "shared-" + m.Name
-		shared[m.Name] = true
 		volumes = append(volumes, corev1.Volume{Name: vn, VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: SharedVolumeClaim(m.Name), ReadOnly: m.ReadOnly}}})
 		mounts = append(mounts, corev1.VolumeMount{Name: vn, MountPath: "/srv/shared/" + m.Name, ReadOnly: m.ReadOnly})
 	}
-	for _, d := range r.Spec.SharedDirs {
-		if shared[d.Name] {
-			continue
-		}
-		vn := "shared-" + d.Name
-		volumes = append(volumes, corev1.Volume{Name: vn, VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: d.Name, ReadOnly: d.ReadOnly}}})
-		mounts = append(mounts, corev1.VolumeMount{Name: vn, MountPath: "/srv/shared/" + d.Name, ReadOnly: d.ReadOnly})
-	}
-
 	c := corev1.Container{
 		Name:    "room",
 		Image:   image,

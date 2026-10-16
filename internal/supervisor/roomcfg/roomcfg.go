@@ -96,7 +96,7 @@ type Room struct {
 	Janitor JanitorSettings `json:"janitor,omitempty"`
 	// Storm control (§7.8), advisor (ADR 0010) and warden (ADR 0011).
 	Storm   StormSettings   `json:"storm,omitempty"`
-	Advisor AdvisorSettings `json:"advisor,omitempty"`
+	Advisor AdvisorSettings `json:"advisor,omitzero"`
 	Warden  WardenSettings  `json:"warden,omitempty"`
 }
 

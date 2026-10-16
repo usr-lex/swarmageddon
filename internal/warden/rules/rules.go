@@ -88,7 +88,7 @@ type Rule struct {
 // Tool sets of both CLIs: Claude Code's tools and ore's (Codex) tools.
 const (
 	ShellTools = "Bash|BashOutput|shell|local_shell|exec|exec_command|container.exec|unified_exec|write_stdin"
-	WriteTools = "Edit|MultiEdit|Write|NotebookEdit|apply_patch"
+	WriteTools = "Edit|MultiEdit|Write|NotebookEdit|apply_patch|patch"
 )
 
 func (r *Rule) appliesTo(tool string) bool {
@@ -258,10 +258,15 @@ func Builtin() []Rule {
 			Deny, High, "touches the room's identity (keys and tokens)"),
 		mk("managed-config-write", WriteTools, `^/etc/(claude-code|codex)(/|$)`,
 			Deny, Critical, "changes the managed CLI settings"),
-		mk("managed-config", ShellTools, `/etc/(claude-code|codex)\b`,
-			Escalate, Medium, "touches the managed CLI settings"),
-		mk("transcripts", ShellTools+"|"+WriteTools, `\.claude/projects/|\.(codex|ore)/(sessions|archived_sessions)/`,
-			Escalate, Medium, "touches the CLI's transcripts"),
+		mk("managed-config", ShellTools,
+			`(\b(rm|mv|cp|tee|chmod|chown|truncate|ln|install|vi|vim|nano|emacs)\b|\bsed\s+-i|>).*/etc/(claude-code|codex)\b`,
+			Deny, Critical, "changes the managed CLI settings"),
+		mk("transcripts", ShellTools, `\b(rm|shred|truncate|mv)\b.*(\.claude/projects|\.(codex|ore)/(sessions|archived_sessions))`,
+			Deny, High, "removes or changes the CLI's transcripts"),
+		mk("transcripts-write", WriteTools, `\.claude/projects/|\.(codex|ore)/(sessions|archived_sessions)/`,
+			Deny, High, "changes the CLI's transcripts"),
+		mk("settings-files", WriteTools, `\.claude/settings(\.local)?\.json|\.(ore|codex)/config\.toml`,
+			Escalate, Medium, "changes the CLI's own settings"),
 		mk("kill-supervisor", ShellTools,
 			`\b(pkill|killall)\b.*\b(supervisor|tini)\b|\bkill\b(\s+-\S+)*\s+1\b|\bkill\b.*\$\(\s*pidof\s+(supervisor|tini)|\bsystemctl\s+stop\b.*supervisor`,
 			Deny, Critical, "kills the room supervisor"),
@@ -273,7 +278,7 @@ func Builtin() []Rule {
 			Deny, High, "scans or reaches the cluster"),
 		upload,
 		mk("merge-pr", ShellTools,
-			`\b(tea\s+(pulls?|pr)\s+merge|gh\s+pr\s+merge)\b`,
+			`\b(tea\s+(pulls?|pr)\s+merge|gh\s+pr\s+merge)\b|/pulls/\d+/merge\b`,
 			Escalate, Medium, "merges a pull request; one's own must not be merged"),
 		mk("disable-hooks", "*",
 			`disableAllHooks|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|\bcore\.hooksPath\b|CLAUDE_CODE_DISABLE_ADVISOR_TOOL|allowManagedHooksOnly`,

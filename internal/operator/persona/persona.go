@@ -322,12 +322,14 @@ type hookGroup struct {
 func ourHooks(timeout time.Duration) map[string][]hookGroup {
 	cmd := func(ev string) []hookCmd { return []hookCmd{{Type: "command", Command: "swarm hook " + ev}} }
 	return map[string][]hookGroup{
-		"SessionStart":     {{Hooks: cmd("SessionStart")}},
-		"UserPromptSubmit": {{Hooks: cmd("UserPromptSubmit")}},
-		"PreToolUse":       {{Matcher: "*", Hooks: cmd("PreToolUse")}},
-		"PostToolUse":      {{Matcher: "*", Hooks: cmd("PostToolUse")}},
-		"Stop":             {{Hooks: cmd("Stop")}},
-		"Notification":     {{Matcher: "permission_prompt|idle_prompt", Hooks: cmd("Notification")}},
+		"SessionStart":       {{Hooks: cmd("SessionStart")}},
+		"UserPromptSubmit":   {{Hooks: cmd("UserPromptSubmit")}},
+		"PreToolUse":         {{Matcher: "*", Hooks: cmd("PreToolUse")}},
+		"PostToolUse":        {{Matcher: "*", Hooks: cmd("PostToolUse")}},
+		"PostToolUseFailure": {{Matcher: "*", Hooks: cmd("PostToolUseFailure")}},
+		"Stop":               {{Hooks: cmd("Stop")}},
+		"StopFailure":        {{Hooks: cmd("StopFailure")}},
+		"Notification":       {{Matcher: "permission_prompt|idle_prompt", Hooks: cmd("Notification")}},
 		"PermissionRequest": {{Matcher: "*", Hooks: []hookCmd{{
 			Type: "command", Command: "swarm hook PermissionRequest", Timeout: int64(timeout / time.Second),
 		}}}},
@@ -484,8 +486,8 @@ type oreMCPServer struct {
 	URL           string            `toml:"url,omitempty"`
 	HTTPHeaders   map[string]string `toml:"http_headers,omitempty"`
 	Required      bool              `toml:"required"`
-	EnabledTools  []string `toml:"enabled_tools,omitempty"`
-	DisabledTools []string `toml:"disabled_tools,omitempty"`
+	EnabledTools  []string          `toml:"enabled_tools,omitempty"`
+	DisabledTools []string          `toml:"disabled_tools,omitempty"`
 }
 
 type oreConfig struct {
@@ -536,7 +538,7 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 		req.AllowedSandboxModes = []string{sandbox}
 	}
 	swarm := oreMCPServer{Command: "swarm", Args: []string{"mcp"}, Required: true}
-	if tools, ok := o.MCPTools["swarm"]; ok && len(tools) > 0 && !(len(tools) == 1 && tools[0] == "*") {
+	if tools, ok := o.MCPTools["swarm"]; ok && len(tools) > 0 && (len(tools) != 1 || tools[0] != "*") {
 		swarm.EnabledTools = tools
 	}
 	cfg := oreConfig{

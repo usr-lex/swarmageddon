@@ -131,7 +131,7 @@ func RoomLevel(s v1alpha1.RoomSpec) v1alpha1.RoomDefaults {
 // internet: false to network mode none when no network is set.
 func WorkspaceLevel(w *v1alpha1.Workspace) v1alpha1.RoomDefaults {
 	d := w.Spec.RoomDefaults
-	if d.Network == nil && w.Spec.Internet != nil && !*w.Spec.Internet {
+	if d.Network == nil && w.Spec.Internet != nil && !*w.Spec.Internet { //nolint:staticcheck // the deprecated field still means mode none
 		d.Network = &v1alpha1.NetworkAccess{Mode: v1alpha1.NetworkNone}
 	}
 	return d

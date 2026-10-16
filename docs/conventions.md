@@ -14,10 +14,13 @@ Change them here first.
 | Messaging admin/health | port 8080 (`/healthz`, `/readyz`), cluster-internal |
 | Forgejo | Service `forgejo.swarmageddon-platform.svc`, HTTP port 3000; SSH Service `forgejo-ssh`, port 22 |
 | PostgreSQL | Service `postgres.swarmageddon-platform.svc:5432` |
-| LiteLLM | Service `gateway.swarmageddon-platform.svc:4000` |
+| Model gateway | Service `gateway.swarmageddon-platform.svc:4000`: the warden (Deployment `warden`, 2 replicas, ADR 0011), a pass-through proxy in front of LiteLLM; health on 8080 |
+| LiteLLM | Service `litellm.swarmageddon-platform.svc:4000` (Deployment `litellm`); reachable only from the warden and the system namespace (admin API) |
+| Egress proxy | Service `egress.swarmageddon-platform.svc:3128` (Deployment `egress`, 2 replicas; design §11.2); HTTP proxy with CONNECT, `Proxy-Authorization: Basic <room>:<egress_auth>`; health on 8080 |
+| Warden and egress tables | ConfigMaps `warden-keys` and `egress-allowlist` in the platform namespace, one data key `<workspace>.<room>` per room, written by the room controller (JSON: `keytable.Entry` in `internal/warden/keytable`, `egress.Entry` in `internal/egress`; keys and credentials as SHA-256 hex only) |
 | Registry cache | Service `registry-cache.swarmageddon-platform.svc:5000` (HTTP) |
 | ntfy | Service `ntfy.swarmageddon-platform.svc:80` |
-| Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
+| Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway` (the warden's pods), `litellm`, `egress`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
 | Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080 |
 | Operator | Deployment `swarmageddon-operator`; health on 8081, metrics 8080 |
 
@@ -37,6 +40,8 @@ Change them here first.
 | `messaging-tls` | platform | serving cert for messaging (`tls.crt`, `tls.key`, `ca.crt`), SANs for the Service and every pod |
 | `forgejo-admin` | platform | `username`, `password`, `token` |
 | `gateway-master` | platform | `masterKey` |
+| `warden-client` | platform | `tls.crt`, `tls.key`, `ca.crt`: client cert, CN `warden`, for ReportVerdict |
+| `warden-review` | platform | `key`: the gateway warden's own LiteLLM key for model reviews (monthly budget 100 USD) |
 | `postgres-<service>` | platform | `username`, `password`, `database`, `url` |
 | `room-secrets` | `ws-<ws>` | label `swarmageddon.dev/room-secret=true`; keys people enter in the control center for `secretEnv` and MCP `valueFrom` (design §6.6). The operator creates it empty and owns only its metadata; the control center writes the data and may get, update and patch this one Secret by name, nothing else in the namespace |
 | `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
@@ -101,7 +106,9 @@ containers. Names the supervisor sets itself (`HOME`, `PATH`, the gateway and
 proxy variables) can't be overridden.
 
 Environment of the room container: `SWARM_ROOM`, `SWARM_WORKSPACE`,
-`ANTHROPIC_BASE_URL` (gateway), plus the room's `spec.env`. Keys are read from
+`ANTHROPIC_BASE_URL` (gateway), plus the merged layered `env` (design §6.6;
+`internal/roomsettings` is the one merge, used by the operator and the control
+center). Shared volumes are claims `shared-<name>`, mounted at `/srv/shared/<name>`. Keys are read from
 files, never env, except `ANTHROPIC_AUTH_TOKEN` and `SWARM_GATEWAY_KEY`, which
 the supervisor sets for the CLI process only, from `gateway_key`.
 
@@ -112,6 +119,8 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 | `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version`; env `POD_NAMESPACE`. `operator welcome` (the chart's welcome Job): waits for Platform `default` `status.url` and Secret `setup-token`, prints the URL, the token, `status.caFingerprint` and the port-forward fallback, exits 0 |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
 | `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
+| `warden` | `--listen :4000`, `--health :8080`, `--upstream` (LiteLLM URL), `--namespace` (of `warden-keys`), `--messaging-url`, `--client-cert`, `--client-key`, `--ca` (defaults under `/etc/warden/tls/`), `--review-key-file /etc/warden/review/key`, `--review-every 1m`, `--max-body 8388608`. Needs get/list/watch on ConfigMap `warden-keys`, get/patch on `rooms` (quarantine: `spec.quarantined` and annotations `swarmageddon.dev/quarantine-reason`, `-quarantined-by`, `-quarantined-at`) |
+| `egress` | `--listen :3128`, `--health :8080`, `--namespace` (of `egress-allowlist`), `--log-connections`. Needs get/list/watch on ConfigMap `egress-allowlist` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
 | `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>`, `swarm post`, `swarm read`, `swarm get`, `swarm mark-read`, `swarm unread`, `swarm channels`, `swarm delivery`, `swarm advise` (see `swarm help`) |
 | `mockmodel` | `--listen :9999`, `--script <file>`; serves Anthropic `/v1/messages`, OpenAI `/v1/responses` and `/v1/chat/completions` |
@@ -119,7 +128,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 ## Images
 
 `ghcr.io/usr-lex/swarmageddon/<name>:<version>`: `operator`, `control-center`,
-`messaging`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
+`messaging`, `warden`, `egress`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
 the operator in `internal/operator/images/images.go`.
 
 Each image's ENTRYPOINT is its binary (`images/service/Dockerfile` is the

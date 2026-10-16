@@ -50,6 +50,17 @@
         ]
       }
     ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swarm hook PostToolUseFailure"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "*",
@@ -77,6 +88,16 @@
           {
             "type": "command",
             "command": "swarm hook Stop"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swarm hook StopFailure"
           }
         ]
       }

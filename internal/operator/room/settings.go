@@ -58,11 +58,11 @@ func (r *Reconciler) settings(ctx context.Context, room *v1.Room, ws *v1.Workspa
 			cache[ref.Name] = s
 		}
 		if s == nil {
-			return "", fmt.Errorf("Secret %s not found in %s", ref.Name, room.Namespace)
+			return "", fmt.Errorf("secret %s not found in %s", ref.Name, room.Namespace)
 		}
 		v, ok := s.Data[ref.Key]
 		if !ok {
-			return "", fmt.Errorf("Secret %s has no key %s", ref.Name, ref.Key)
+			return "", fmt.Errorf("secret %s has no key %s", ref.Name, ref.Key)
 		}
 		return string(v), nil
 	}

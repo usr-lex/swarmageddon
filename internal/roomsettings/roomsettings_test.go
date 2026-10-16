@@ -52,7 +52,7 @@ func TestMerge(t *testing.T) {
 	if d := Merge(v1.RoomDefaults{}, v1.RoomDefaults{}, v1.RoomDefaults{}); d.Settings.Network.Mode != v1.NetworkFull || d.Sources[0].Level != LevelDefault {
 		t.Errorf("default = %+v", d)
 	}
-	off := &v1.Workspace{Spec: v1.WorkspaceSpec{Internet: ptr.To(false)}}
+	off := &v1.Workspace{Spec: v1.WorkspaceSpec{Internet: ptr.To(false)}} //nolint:staticcheck // the deprecated field still means mode none
 	if WorkspaceLevel(off).Network.Mode != v1.NetworkNone {
 		t.Error("internet: false")
 	}

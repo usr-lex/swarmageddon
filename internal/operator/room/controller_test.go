@@ -242,7 +242,7 @@ func TestRoomIsolation(t *testing.T) {
 	var ws v1.Workspace
 	must(t, e.c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &ws))
 	ws.Spec.Models.Budgets.PerRoomMonthlyUSD = 500
-	ws.Spec.Internet = ptr.To(false)
+	ws.Spec.RoomDefaults.Network = &v1.NetworkAccess{Mode: v1.NetworkNone}
 	must(t, e.c.Update(context.Background(), &ws))
 	check("changing the workspace")
 	must(t, e.c.Delete(context.Background(), e.room("hermes")))
@@ -432,7 +432,9 @@ func TestTiers(t *testing.T) {
 	if u.HostUsers == nil || *u.HostUsers || u.Containers[0].SecurityContext.Privileged != nil {
 		t.Error("userns tier")
 	}
-	if TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template) != TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template) {
+	h1 := TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template)
+	h2 := TemplateHash(&desiredStatefulSet(r, "acme", "room:1", "userns", podExtras{}).Spec.Template)
+	if h1 != h2 {
 		t.Error("template hash unstable")
 	}
 }

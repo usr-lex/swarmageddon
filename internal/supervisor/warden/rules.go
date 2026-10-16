@@ -2,140 +2,70 @@ package warden
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 
+	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
+	"github.com/usr-lex/swarmageddon/internal/warden/rules"
 )
 
 // Rule actions.
 const (
-	ActionAllow    = "allow"
-	ActionDeny     = "deny"
-	ActionEscalate = "escalate"
+	ActionAllow    = string(rules.Allow)
+	ActionDeny     = string(rules.Deny)
+	ActionEscalate = string(rules.Escalate)
 )
 
-// RuleSet is layer 1 (ADR 0011). The built-in Table can be swapped for the
-// shared internal/warden/rules package once it exists.
+// RuleSet is layer 1 (ADR 0011).
 type RuleSet interface {
-	// Check returns the first rule matching the call.
+	// Check returns the strictest rule matching the call.
 	Check(call agent.ToolCall) (Rule, bool)
 }
 
-// Rule matches a tool call.
+// Rule is a matching rule as the warden acts on it.
 type Rule struct {
-	Name string
-	// Tools is a set of tool names; empty matches every tool.
-	Tools  map[string]bool
-	Match  *regexp.Regexp
+	Name   string
 	Action string
 	// Reason is fixed text shown to the agent on deny.
 	Reason string
 }
 
-// Table is a list of rules. The strictest matching rule wins (deny over
-// escalate over allow), so a persona's allow can't undo a built-in deny;
-// this matches internal/warden/rules, which can replace it.
-type Table []Rule
-
-var actionRank = map[string]int{ActionAllow: 1, ActionEscalate: 2, ActionDeny: 3}
+// Table is the shared rule table (internal/warden/rules), which the gateway
+// guard runs too: the built-ins plus the persona's rules. The strictest
+// matching rule wins (deny over escalate over allow), so a persona's allow
+// can't undo a built-in deny.
+type Table struct{ t *rules.Table }
 
 // Check implements RuleSet.
 func (t Table) Check(call agent.ToolCall) (Rule, bool) {
-	subject := call.Command
-	if subject == "" {
-		subject = call.Input
+	text := call.Command
+	if text == "" {
+		text = rules.Subject([]byte(call.Input))
 	}
-	var best *Rule
-	for i := range t {
-		r := &t[i]
-		if len(r.Tools) > 0 && !r.Tools[call.Tool] && !(r.Tools["mcp"] && strings.HasPrefix(call.Tool, "mcp__")) {
-			continue
-		}
-		if r.Match.MatchString(subject) && (best == nil || actionRank[r.Action] > actionRank[best.Action]) {
-			best = r
-		}
-	}
-	if best == nil {
+	h, ok := t.t.Check(rules.Call{Tool: call.Tool, Text: text})
+	if !ok {
 		return Rule{}, false
 	}
-	return *best, true
-}
-
-// Tool sets the built-in rules use. Claude Code's and ore's names.
-const (
-	shellTools = "Bash|exec"
-	writeTools = "Write|Edit|MultiEdit|NotebookEdit|patch"
-)
-
-func tools(s string) map[string]bool {
-	if s == "" || s == "*" {
-		return nil
+	reason := "The warden's rule " + h.Rule.Name + " stopped this call: it " + h.Rule.Reason + "."
+	if h.Rule.Action == rules.Escalate {
+		reason = "This call needs a person's approval: it " + h.Rule.Reason + "."
 	}
-	m := map[string]bool{}
-	for _, t := range strings.Split(s, "|") {
-		m[strings.TrimSpace(t)] = true
-	}
-	return m
-}
-
-// builtin is the fixed rule table (ADR 0011, layer 1). Deny rules come
-// before escalate rules for the same kind of call.
-var builtin = []struct{ name, tools, match, action, reason string }{
-	{"identity-files", "", `/run/swarm/identity`, ActionDeny,
-		"The room's identity files are off limits."},
-	{"policy-files", writeTools, `(/etc/claude-code|/etc/codex)\b`, ActionDeny,
-		"The platform's managed settings are off limits."},
-	{"policy-files", shellTools, `(\b(rm|mv|cp|tee|chmod|chown|truncate|ln|install)\b|\bsed\s+-i|>).*(/etc/claude-code|/etc/codex)\b`, ActionDeny,
-		"The platform's managed settings are off limits."},
-	{"transcripts", shellTools, `\b(rm|shred|truncate|mv)\b.*(\.claude/projects|\.ore/sessions)`, ActionDeny,
-		"Session transcripts must not be removed or changed."},
-	{"kill-supervisor", shellTools, `\b(pkill|killall)\b.*\bsupervisor\b|\bkill\s+(-\S+\s+)*1(\s|$)`, ActionDeny,
-		"The room supervisor must keep running."},
-	{"disable-hooks", "", `disableAllHooks|--dangerously-skip-permissions|--dangerously-bypass-approvals`, ActionDeny,
-		"Hooks and permission settings must not be disabled."},
-	{"cloud-metadata", shellTools + "|WebFetch|mcp", `169\.254\.169\.254|metadata\.google\.internal|fd00:ec2::254|100\.100\.100\.200`, ActionDeny,
-		"Cloud metadata addresses are off limits."},
-	{"force-push-protected", shellTools, `\bgit\s+push\b(.*\s(-f|--force|--force-with-lease)\b.*\b(main|master)\b|.*\b(main|master)\b.*\s(-f|--force|--force-with-lease)\b|.*\s\+(refs/heads/)?(main|master)\b)`, ActionDeny,
-		"Force-pushing a protected branch is not allowed."},
-	{"delete-protected", shellTools, `\bgit\s+push\b(.*(--delete|\s-d)\b.*\b(main|master)\b|.*\s:(refs/heads/)?(main|master)\b)`, ActionDeny,
-		"Deleting a protected branch is not allowed."},
-	{"force-push", shellTools, `\bgit\s+push\b.*(\s(-f|--force|--force-with-lease)\b|\s\+\S)`, ActionEscalate,
-		"Force pushes need a person's approval."},
-	{"pipe-to-shell", shellTools, `\b(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(ba|z|da)?sh\b`, ActionEscalate,
-		"Piping a download into a shell needs a person's approval."},
-	{"cluster-scan", shellTools, `\b(nmap|masscan|zmap)\b`, ActionEscalate,
-		"Network scanning needs a person's approval."},
-	{"upload-file", shellTools, `\bcurl\b.*(\s(-d|--data|--data-binary|--data-raw|-F|--form)\s+'?"?@|\s(-T|--upload-file)\s)`, ActionEscalate,
-		"Uploading files needs a person's approval."},
-	{"merge-own-pr", shellTools, `\btea\s+(pr|pulls)\s+merge\b|/pulls/\d+/merge\b`, ActionEscalate,
-		"Merging a pull request needs a person's approval."},
-	{"settings-files", writeTools, `\.claude/settings(\.local)?\.json|\.ore/config\.toml`, ActionEscalate,
-		"Changing the CLI's settings needs a person's approval."},
+	return Rule{Name: h.Rule.Name, Action: string(h.Rule.Action), Reason: reason}, true
 }
 
 // Compile builds the rule table: the built-ins and the persona's rules.
 func Compile(extra []roomcfg.WardenRule) (Table, error) {
-	var t Table
+	specs := make([]v1.WardenRule, 0, len(extra))
 	for _, r := range extra {
-		re, err := regexp.Compile(r.Match)
-		if err != nil {
-			return nil, fmt.Errorf("warden rule %q: %w", r.Name, err)
-		}
-		switch r.Action {
-		case ActionAllow, ActionDeny, ActionEscalate:
-		default:
-			return nil, fmt.Errorf("warden rule %q: action %q is not allow, deny or escalate", r.Name, r.Action)
-		}
 		reason := r.Reason
 		if reason == "" {
-			reason = "Blocked by the room's rule " + r.Name + "."
+			reason = "matches the room's rule " + r.Name
 		}
-		t = append(t, Rule{Name: r.Name, Tools: tools(r.Tool), Match: re, Action: r.Action, Reason: reason})
+		specs = append(specs, v1.WardenRule{Name: r.Name, Tool: r.Tool, Match: r.Match, Action: v1.WardenAction(r.Action), Reason: reason})
 	}
-	for _, b := range builtin {
-		t = append(t, Rule{Name: b.name, Tools: tools(b.tools), Match: regexp.MustCompile(b.match), Action: b.action, Reason: b.reason})
+	own, err := rules.FromSpec(specs)
+	if err != nil {
+		return Table{t: rules.Default()}, fmt.Errorf("persona rules: %w", err)
 	}
-	return t, nil
+	return Table{t: rules.Default(own...)}, nil
 }

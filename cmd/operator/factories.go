@@ -18,7 +18,7 @@ import (
 // Service URLs inside the cluster (docs/conventions.md).
 var (
 	forgejoURL = "http://forgejo." + v1alpha1.PlatformNamespace + ".svc:3000"
-	gatewayURL = "http://gateway." + v1alpha1.PlatformNamespace + ".svc:4000"
+	gatewayURL = "http://litellm." + v1alpha1.PlatformNamespace + ".svc:4000" // admin API, past the warden
 )
 
 // serviceReady fails with deps.ErrNotReady until the Platform reports the
