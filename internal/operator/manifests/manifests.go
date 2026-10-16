@@ -215,8 +215,8 @@ func LiteLLMConfig(providers []v1alpha1.ModelProvider) (string, []Provider) {
 			"database_url": "os.environ/DATABASE_URL",
 		},
 		"litellm_settings": map[string]any{
-			"drop_params":            true,
-			"telemetry":              false,
+			"drop_params":              true,
+			"telemetry":                false,
 			"turn_off_message_logging": true,
 		},
 	}

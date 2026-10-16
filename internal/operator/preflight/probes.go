@@ -332,9 +332,9 @@ func (r *Runner) podman(ctx context.Context) v1alpha1.PreflightCheck {
 	ctr.Command = []string{"podman", "info", "--format", "{{.Host.OCIRuntime.Name}} {{.Store.GraphDriverName}}"}
 	ctr.Resources.Limits = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("256Mi")}
 	ctr.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:      ptr.To[int64](0),
-		ProcMount:      ptr.To(corev1.UnmaskedProcMount),
-		SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
+		RunAsUser:       ptr.To[int64](0),
+		ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+		SeccompProfile:  &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
 		AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined},
 		Capabilities: &corev1.Capabilities{Add: []corev1.Capability{
 			"SYS_ADMIN", "NET_ADMIN", "SETUID", "SETGID", "MKNOD", "SYS_CHROOT", "CHOWN", "DAC_OVERRIDE", "FOWNER", "SETFCAP",
