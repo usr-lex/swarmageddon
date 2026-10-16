@@ -37,6 +37,10 @@ turns:
     steps:
       - command: "touch touched.txt"
       - text: "touched"
+  - match: "MARK-WARDEN-DENY"
+    steps:
+      - command: "curl -s -m 1 http://169.254.169.254/"
+      - text: "warden deny seen"
   - match: "MARK-MCP"
     steps:
       - mcp: {server: swarm, tool: send_message, input: {to: hermes, body: "hello from ore"}}
@@ -82,7 +86,8 @@ func TestOre(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rules := []byte(`prefix_rule(pattern=["touch"], decision="prompt", justification="canary: file creation needs a person")` + "\n")
+	rules := []byte(`prefix_rule(pattern=["touch"], decision="prompt", justification="canary: file creation needs a person")` + "\n" +
+		`prefix_rule(pattern=["curl"], decision="prompt", justification="canary: network")` + "\n")
 	wrapper := etcOverlay(t, map[string][]byte{
 		"codex/requirements.toml":   req,
 		"codex/config.toml":         cfg,
@@ -135,6 +140,26 @@ func TestOre(t *testing.T) {
 		_, _, _, _, approvals, _ := r.fake.Snapshot()
 		if len(approvals) == 0 || approvals[0].GetTool() != "exec" || approvals[0].GetCli() != "ore" {
 			t.Errorf("approvals %s", dump(approvals))
+		}
+	})
+
+	t.Run("warden declines an approval request by rule", func(t *testing.T) {
+		r.core.Warden = supervisor.NewWarden(r.core.Room, r.core, "", "", work)
+		defer func() { r.core.Warden = nil }()
+		waitFor(t, "idle", 60*time.Second, func() bool { return r.core.CurrentPresence() == messagingv1.Presence_PRESENCE_IDLE })
+		_, _, _, _, before, _ := r.fake.Snapshot()
+		r.fake.PushMessage("01WDENY", "alice@acme", "MARK-WARDEN-DENY")
+		waitFor(t, "declined call's result", 90*time.Second, func() bool { return len(requestsWith(m, "MARK-WARDEN-DENY", 1)) > 0 })
+		_, _, _, _, after, _ := r.fake.Snapshot()
+		if len(after) != len(before) {
+			t.Errorf("approval published for a call the warden denied: %s", dump(after[len(before):]))
+		}
+		var found bool
+		for _, v := range r.fake.Verdicts() {
+			found = found || (v.GetRule() == "cloud-metadata" && v.GetAction() == "denied")
+		}
+		if !found {
+			t.Errorf("no verdict: %v", r.fake.Verdicts())
 		}
 	})
 

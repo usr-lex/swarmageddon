@@ -34,6 +34,14 @@ turns:
     steps:
       - command: "touch touched.txt"
       - text: "touched"
+  - match: "MARK-WARDEN-DENY"
+    steps:
+      - command: "curl -s -m 1 http://169.254.169.254/ || true"
+      - text: "warden deny seen"
+  - match: "MARK-WARDEN-ASK"
+    steps:
+      - command: "git push -f origin canary-branch || true"
+      - text: "warden ask seen"
   - match: "MARK-MCP"
     steps:
       - mcp: {server: swarm, tool: send_message, input: {to: hermes, body: "hello from the canary"}}
@@ -218,6 +226,47 @@ func TestClaudeCode(t *testing.T) {
 		})
 	})
 
+	r.core.Warden = supervisor.NewWarden(r.core.Room, r.core, "", "", work)
+
+	t.Run("warden rule deny reaches the model", func(t *testing.T) {
+		waitFor(t, "idle", 60*time.Second, func() bool { return r.core.CurrentPresence() == messagingv1.Presence_PRESENCE_IDLE })
+		r.fake.PushMessage("01WDENY", "alice@acme", "MARK-WARDEN-DENY")
+		waitFor(t, "denied call's result", 90*time.Second, func() bool { return len(requestsWith(m, "MARK-WARDEN-DENY", 1)) > 0 })
+		if body := requestsWith(m, "MARK-WARDEN-DENY", 1)[0].Body; !strings.Contains(body, "Cloud metadata addresses are off limits") {
+			t.Errorf("deny reason not in the tool result: %.2000s", body)
+		}
+		waitFor(t, "verdict", 30*time.Second, func() bool {
+			for _, v := range r.fake.Verdicts() {
+				if v.GetRule() == "cloud-metadata" && v.GetAction() == "denied" {
+					return true
+				}
+			}
+			return false
+		})
+	})
+
+	wardenAsk := func(t *testing.T, id string) {
+		var reason string
+		r.fake.Answer = func(a *messagingv1.ApprovalRequest) *messagingv1.ApprovalAnswer {
+			if strings.Contains(a.GetSummary(), "git push -f") {
+				reason = a.GetReason()
+				return &messagingv1.ApprovalAnswer{ApprovalId: a.GetId(), Decision: messagingv1.Decision_DECISION_DENY, Message: "no force pushes"}
+			}
+			return nil
+		}
+		waitFor(t, "idle", 60*time.Second, func() bool { return r.core.CurrentPresence() == messagingv1.Presence_PRESENCE_IDLE })
+		before := len(requestsWith(m, "MARK-WARDEN-ASK", 1))
+		r.fake.PushMessage(id, "alice@acme", "MARK-WARDEN-ASK "+id)
+		waitFor(t, "escalated call's result", 90*time.Second, func() bool { return len(requestsWith(m, "MARK-WARDEN-ASK", 1)) > before })
+		if !strings.Contains(reason, "Escalated by the warden") {
+			t.Errorf("approval reason %q", reason)
+		}
+		if body := requestsWith(m, "MARK-WARDEN-ASK", 1)[before].Body; !strings.Contains(body, "no force pushes") {
+			t.Errorf("person's denial not in the tool result: %.2000s", body)
+		}
+	}
+	t.Run("warden escalation reaches the approvals route", func(t *testing.T) { wardenAsk(t, "01WASK") })
+
 	t.Run("resume after restart, no dialog", func(t *testing.T) {
 		stop()
 		<-done
@@ -233,6 +282,26 @@ func TestClaudeCode(t *testing.T) {
 			t.Errorf("resumed session %q, want %q", got, firstSession)
 		}
 		assertNoDialog(t, &drv.Session)
+	})
+
+	t.Run("warden escalation in bypassPermissions mode", func(t *testing.T) {
+		stop()
+		<-done
+		drv.PermissionMode = "bypassPermissions"
+		// Claude refuses bypass mode as root unless sandboxed; rooms run it as uid 1000.
+		drv.Env = append(drv.Env, "IS_SANDBOX=1")
+		before := len(requestsWith(m, "MARK-FIRST", 0))
+		runCtx, stop = context.WithCancel(ctx)
+		done = make(chan struct{})
+		go func() { drv.Run(runCtx); close(done) }()
+		waitFor(t, "first turn in bypass mode", 90*time.Second, func() bool { return len(requestsWith(m, "MARK-FIRST", 0)) > before })
+		defer func() {
+			if t.Failed() {
+				pane, _ := drv.Session.Capture()
+				t.Logf("pane:\n%s", pane)
+			}
+		}()
+		wardenAsk(t, "01WASK2")
 	})
 	stop()
 	<-done
