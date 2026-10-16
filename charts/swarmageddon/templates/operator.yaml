@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swarmageddon-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+    app.kubernetes.io/name: swarmageddon-operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: swarmageddon-operator
+  template:
+    metadata:
+      labels:
+        {{- include "swarmageddon.labels" . | nindent 8 }}
+        app.kubernetes.io/name: swarmageddon-operator
+    spec:
+      serviceAccountName: swarmageddon-operator
+      enableServiceLinks: false
+      {{- with .Values.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "swarmageddon.podSecurity" . | nindent 8 }}
+      containers:
+        - name: operator
+          image: {{ include "swarmageddon.image" (list . "operator") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8080
+            - --room-image={{ default (include "swarmageddon.image" (list . "room")) .Values.operator.roomImage }}
+            {{- range .Values.operator.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: IMAGE_REGISTRY
+              value: {{ .Values.image.registry | quote }}
+            - name: IMAGE_TAG
+              value: {{ default .Chart.AppVersion .Values.image.tag | quote }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}
+          securityContext:
+            {{- include "swarmageddon.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Caps the ulimits Podman and Buildah give nested containers at this
+# container's own hard limits. Without it, `podman build` (as root) asks for
+# nofile=1048576 and fails with "setrlimit RLIMIT_NOFILE: Operation not
+# permitted" wherever the pod's hard limit is lower. Run once at start, as
+# root, before Podman (the supervisor and runner-entrypoint do).
+set -eu
+
+hard() {
+	# /proc/self/limits: "Max open files  <soft>  <hard>  files"
+	v=$(awk -v name="$1" 'index($0, name) == 1 { print $(NF - 1) }' /proc/self/limits)
+	[ "$v" = unlimited ] && v=-1
+	printf '%s' "$v"
+}
+
+nofile=$(hard "Max open files")
+nproc=$(hard "Max processes")
+
+mkdir -p /etc/containers/containers.conf.d
+cat >/etc/containers/containers.conf.d/50-ulimits.conf <<EOF
+# Written by podman-ulimits at start: this pod's hard limits.
+[containers]
+default_ulimits = ["nofile=$nofile:$nofile", "nproc=$nproc:$nproc"]
+EOF

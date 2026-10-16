@@ -1,0 +1,28 @@
+#!/bin/sh
+# Starts Podman's Docker-compatible service, waits for its socket, then runs
+# the command given as arguments (normally `forgejo-runner one-job ...`).
+set -eu
+
+/usr/local/libexec/podman-ulimits
+
+sock=/var/run/docker.sock
+rm -f "$sock"
+podman system service --time=0 "unix://$sock" &
+podman_pid=$!
+
+i=0
+until [ -S "$sock" ]; do
+	i=$((i + 1))
+	if [ "$i" -gt 100 ] || ! kill -0 "$podman_pid" 2>/dev/null; then
+		echo "runner-entrypoint: podman service did not start" >&2
+		exit 1
+	fi
+	sleep 0.1
+done
+
+set +e
+"$@"
+status=$?
+kill "$podman_pid" 2>/dev/null || true
+wait "$podman_pid" 2>/dev/null || true
+exit "$status"

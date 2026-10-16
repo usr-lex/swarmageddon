@@ -1,0 +1,128 @@
+# The control center. The operator creates its certificates at startup; the
+# Secret volumes are optional so the pod starts first, and kubelet fills them
+# in once they exist. The control center waits for its files.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-center
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+    app.kubernetes.io/name: control-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: control-center
+  template:
+    metadata:
+      labels:
+        {{- include "swarmageddon.labels" . | nindent 8 }}
+        app.kubernetes.io/name: control-center
+    spec:
+      serviceAccountName: control-center
+      enableServiceLinks: false
+      {{- with .Values.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "swarmageddon.podSecurity" . | nindent 8 }}
+      containers:
+        - name: control-center
+          image: {{ include "swarmageddon.image" (list . "control-center") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --listen=:8443
+            - --health=:8080
+            {{- if .Values.controlCenter.dev }}
+            - --dev
+            {{- else }}
+            - --tls-cert=/etc/swarm/tls/tls.crt
+            - --tls-key=/etc/swarm/tls/tls.key
+            {{- end }}
+            - --messaging-url=https://messaging.swarmageddon-platform.svc:8443
+            - --client-cert=/etc/swarm/client/tls.crt
+            - --client-key=/etc/swarm/client/tls.key
+            - --ca=/etc/swarm/ca/ca.crt
+            {{- range .Values.controlCenter.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: https
+              containerPort: 8443
+            - name: health
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.controlCenter.resources | nindent 12 }}
+          securityContext:
+            {{- include "swarmageddon.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/swarm/tls
+              readOnly: true
+            - name: client
+              mountPath: /etc/swarm/client
+              readOnly: true
+            - name: ca
+              mountPath: /etc/swarm/ca
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tls
+          secret:
+            secretName: control-center-tls
+            optional: true
+        - name: client
+          secret:
+            secretName: control-center-client
+            optional: true
+        - name: ca
+          configMap:
+            name: platform-ca-bundle
+            optional: true
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.controlCenter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlCenter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+# ClusterIP by default; the operator creates an Ingress, or switches this to
+# NodePort when there's no default IngressClass (docs/design.md §3.2).
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-center
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+    app.kubernetes.io/name: control-center
+spec:
+  selector:
+    app.kubernetes.io/name: control-center
+  ports:
+    - name: https
+      port: 443
+      targetPort: https

@@ -1,0 +1,20 @@
+swarmageddon {{ default .Chart.AppVersion .Values.image.tag }} is installed in {{ .Release.Namespace }}.
+
+The operator now creates its certificates, the setup token and the way in.
+To print the URL and the setup token once they're ready:
+
+  kubectl -n {{ .Release.Namespace }} logs -f job/welcome
+
+Or look them up yourself:
+
+  kubectl get platform default -o jsonpath='{.status.url}{"\n"}'
+  kubectl get platform default -o jsonpath='{.status.caFingerprint}{"\n"}'
+  kubectl -n {{ .Release.Namespace }} get secret setup-token -o jsonpath='{.data.token}' | base64 -d; echo
+
+Check that the certificate fingerprint your browser shows matches before you
+type the token.
+
+If the URL isn't reachable from your machine, forward a port and open
+https://localhost:8443/ :
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/control-center 8443:443
