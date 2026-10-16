@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "swarm": {
+      "type": "stdio",
+      "command": "swarm",
+      "args": ["mcp"]
+    }
+  }
+}
