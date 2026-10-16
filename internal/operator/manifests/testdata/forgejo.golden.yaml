@@ -1,0 +1,284 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    swarmageddon.dev/component: forgejo
+  name: forgejo
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  selector:
+    swarmageddon.dev/component: forgejo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    swarmageddon.dev/component: forgejo
+  name: forgejo-ssh
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: ssh
+    port: 22
+    targetPort: 2222
+  selector:
+    swarmageddon.dev/component: forgejo
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    swarmageddon.dev/component: forgejo
+  name: forgejo
+  namespace: swarmageddon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: forgejo
+  serviceName: forgejo
+  template:
+    metadata:
+      labels:
+        swarmageddon.dev/component: forgejo
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: forgejo-admin
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: forgejo-admin
+        - name: FORGEJO__database__DB_TYPE
+          value: postgres
+        - name: FORGEJO__database__HOST
+          value: postgres.swarmageddon-platform.svc:5432
+        - name: FORGEJO__database__NAME
+          value: forgejo
+        - name: FORGEJO__database__USER
+          value: forgejo
+        - name: FORGEJO__database__PASSWD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-forgejo
+        - name: FORGEJO__security__INSTALL_LOCK
+          value: "true"
+        - name: FORGEJO__security__SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secretKey
+              name: forgejo-secrets
+        - name: FORGEJO__security__INTERNAL_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: internalToken
+              name: forgejo-secrets
+        - name: FORGEJO__oauth2__JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: jwtSecret
+              name: forgejo-secrets
+        - name: FORGEJO__server__ROOT_URL
+          value: http://forgejo.swarmageddon-platform.svc:3000/
+        - name: FORGEJO__server__DOMAIN
+          value: forgejo.swarmageddon-platform.svc
+        - name: FORGEJO__server__HTTP_PORT
+          value: "3000"
+        - name: FORGEJO__server__START_SSH_SERVER
+          value: "true"
+        - name: FORGEJO__server__SSH_DOMAIN
+          value: forgejo-ssh.swarmageddon-platform.svc
+        - name: FORGEJO__server__SSH_PORT
+          value: "22"
+        - name: FORGEJO__server__SSH_LISTEN_PORT
+          value: "2222"
+        - name: FORGEJO__server__LFS_START_SERVER
+          value: "true"
+        - name: FORGEJO__admin__DEFAULT_EMAIL_NOTIFICATIONS
+          value: disabled
+        - name: FORGEJO__mailer__ENABLED
+          value: "false"
+        - name: FORGEJO__actions__ENABLED
+          value: "true"
+        - name: FORGEJO__packages__ENABLED
+          value: "true"
+        - name: FORGEJO__service__DISABLE_REGISTRATION
+          value: "true"
+        - name: FORGEJO__service__DEFAULT_ALLOW_CREATE_ORGANIZATION
+          value: "false"
+        - name: FORGEJO__service__REQUIRE_SIGNIN_VIEW
+          value: "true"
+        - name: FORGEJO__repository__DEFAULT_PRIVATE
+          value: private
+        - name: FORGEJO__webhook__ALLOWED_HOST_LIST
+          value: private
+        - name: FORGEJO__log__LEVEL
+          value: Info
+        image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
+        livenessProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        name: forgejo
+        ports:
+        - containerPort: 3000
+          name: http
+        - containerPort: 2222
+          name: ssh
+        readinessProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+          periodSeconds: 5
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /var/lib/gitea
+          name: data
+        - mountPath: /tmp/gitea
+          name: tmp
+      enableServiceLinks: false
+      initContainers:
+      - args:
+        - /bin/sh
+        - -ec
+        - |
+          forgejo migrate
+          if forgejo admin user list --admin | awk 'NR>1 {print $2}' | grep -qx "$ADMIN_USER"; then
+            forgejo admin user change-password --username "$ADMIN_USER" --password "$ADMIN_PASSWORD" --must-change-password=false
+          else
+            forgejo admin user create --admin --username "$ADMIN_USER" --password "$ADMIN_PASSWORD" --email "$ADMIN_USER@forge.invalid" --must-change-password=false
+          fi
+        command:
+        - /usr/local/bin/docker-entrypoint.sh
+        env:
+        - name: ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: forgejo-admin
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: forgejo-admin
+        - name: FORGEJO__database__DB_TYPE
+          value: postgres
+        - name: FORGEJO__database__HOST
+          value: postgres.swarmageddon-platform.svc:5432
+        - name: FORGEJO__database__NAME
+          value: forgejo
+        - name: FORGEJO__database__USER
+          value: forgejo
+        - name: FORGEJO__database__PASSWD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-forgejo
+        - name: FORGEJO__security__INSTALL_LOCK
+          value: "true"
+        - name: FORGEJO__security__SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secretKey
+              name: forgejo-secrets
+        - name: FORGEJO__security__INTERNAL_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: internalToken
+              name: forgejo-secrets
+        - name: FORGEJO__oauth2__JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: jwtSecret
+              name: forgejo-secrets
+        - name: FORGEJO__server__ROOT_URL
+          value: http://forgejo.swarmageddon-platform.svc:3000/
+        - name: FORGEJO__server__DOMAIN
+          value: forgejo.swarmageddon-platform.svc
+        - name: FORGEJO__server__HTTP_PORT
+          value: "3000"
+        - name: FORGEJO__server__START_SSH_SERVER
+          value: "true"
+        - name: FORGEJO__server__SSH_DOMAIN
+          value: forgejo-ssh.swarmageddon-platform.svc
+        - name: FORGEJO__server__SSH_PORT
+          value: "22"
+        - name: FORGEJO__server__SSH_LISTEN_PORT
+          value: "2222"
+        - name: FORGEJO__server__LFS_START_SERVER
+          value: "true"
+        - name: FORGEJO__admin__DEFAULT_EMAIL_NOTIFICATIONS
+          value: disabled
+        - name: FORGEJO__mailer__ENABLED
+          value: "false"
+        - name: FORGEJO__actions__ENABLED
+          value: "true"
+        - name: FORGEJO__packages__ENABLED
+          value: "true"
+        - name: FORGEJO__service__DISABLE_REGISTRATION
+          value: "true"
+        - name: FORGEJO__service__DEFAULT_ALLOW_CREATE_ORGANIZATION
+          value: "false"
+        - name: FORGEJO__service__REQUIRE_SIGNIN_VIEW
+          value: "true"
+        - name: FORGEJO__repository__DEFAULT_PRIVATE
+          value: private
+        - name: FORGEJO__webhook__ALLOWED_HOST_LIST
+          value: private
+        - name: FORGEJO__log__LEVEL
+          value: Info
+        image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
+        name: admin
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /var/lib/gitea
+          name: data
+        - mountPath: /tmp/gitea
+          name: tmp
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir: {}
+        name: tmp
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi

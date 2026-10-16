@@ -1,0 +1,21 @@
+# Applied only when Traefik's CRDs exist: lets Traefik verify the control
+# center's certificate against our CA when it re-encrypts to the backend.
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: control-center
+  namespace: {{ .SystemNamespace }}
+  labels: {swarmageddon.dev/component: control-center}
+spec:
+  serverName: control-center.{{ .SystemNamespace }}.svc
+  rootCAs:
+    - configMap: platform-ca-bundle
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-center
+  namespace: {{ .SystemNamespace }}
+  annotations:
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/service.serverstransport: {{ .SystemNamespace }}-control-center@kubernetescrd

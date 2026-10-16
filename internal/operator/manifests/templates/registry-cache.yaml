@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-cache-config
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: registry-cache}
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+    storage:
+      filesystem:
+        rootdirectory: /var/lib/registry
+      delete:
+        enabled: true
+    http:
+      addr: :5000
+    proxy:
+      remoteurl: {{ .Registry.RemoteURL }}
+      ttl: {{ .Registry.TTL }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-cache
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: registry-cache}
+spec:
+  selector: {swarmageddon.dev/component: registry-cache}
+  ports:
+    - {name: http, port: 5000, targetPort: 5000}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: registry-cache
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: registry-cache}
+spec:
+  replicas: 1
+  serviceName: registry-cache
+  selector:
+    matchLabels: {swarmageddon.dev/component: registry-cache}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: registry-cache}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: {fsGroup: 1000, runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: registry
+          image: {{ .Images.Registry }}
+          ports:
+            - {name: http, containerPort: 5000}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 512Mi}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/registry}
+            - {name: config, mountPath: /etc/distribution, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: registry-cache-config}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ .Registry.Storage }}}

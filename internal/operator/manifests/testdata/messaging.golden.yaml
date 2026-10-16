@@ -1,0 +1,196 @@
+---
+apiVersion: v1
+automountServiceAccountToken: true
+kind: ServiceAccount
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: messaging
+  namespace: swarmageddon-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: swarmageddon-messaging
+rules:
+- apiGroups:
+  - swarmageddon.dev
+  resources:
+  - workspaces
+  - rooms
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: swarmageddon-messaging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swarmageddon-messaging
+subjects:
+- kind: ServiceAccount
+  name: messaging
+  namespace: swarmageddon-platform
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: messaging
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: api
+    port: 8443
+    targetPort: 8443
+  selector:
+    swarmageddon.dev/component: messaging
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: messaging-headless
+  namespace: swarmageddon-platform
+spec:
+  clusterIP: None
+  ports:
+  - name: api
+    port: 8443
+    targetPort: 8443
+  - name: nats-route
+    port: 6222
+    targetPort: 6222
+  publishNotReadyAddresses: true
+  selector:
+    swarmageddon.dev/component: messaging
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: messaging
+  namespace: swarmageddon-platform
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: messaging
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    swarmageddon.dev/component: messaging
+  name: messaging
+  namespace: swarmageddon-platform
+spec:
+  podManagementPolicy: Parallel
+  replicas: 3
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: messaging
+  serviceName: messaging-headless
+  template:
+    metadata:
+      labels:
+        swarmageddon.dev/component: messaging
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  swarmageddon.dev/component: messaging
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+      - args:
+        - --listen=:8443
+        - --health=:8080
+        - --tls-cert=/etc/swarm/tls/tls.crt
+        - --tls-key=/etc/swarm/tls/tls.key
+        - --ca=/etc/swarm/tls/ca.crt
+        - --data=/data
+        - --nats-routes=nats://messaging-0.messaging-headless:6222
+        - --server-name=$(POD_NAME)
+        - --cluster-size=3
+        - --namespace=swarmageddon-platform
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: ghcr.io/usr-lex/swarmageddon/messaging:v0.1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        name: messaging
+        ports:
+        - containerPort: 8443
+          name: api
+        - containerPort: 6222
+          name: nats-route
+        - containerPort: 8080
+          name: health
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          periodSeconds: 5
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /etc/swarm/tls
+          name: tls
+          readOnly: true
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: messaging
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: tls
+        secret:
+          secretName: messaging-tls
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi

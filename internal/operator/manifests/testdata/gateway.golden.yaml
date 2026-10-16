@@ -1,0 +1,130 @@
+---
+apiVersion: v1
+data:
+  config.yaml: |-
+    general_settings:
+      database_url: os.environ/DATABASE_URL
+      master_key: os.environ/LITELLM_MASTER_KEY
+    litellm_settings:
+      drop_params: true
+      telemetry: false
+      turn_off_message_logging: true
+    model_list:
+    - litellm_params:
+        api_key: os.environ/PROVIDER_ANTHROPIC_API_KEY
+        model: anthropic/claude-opus-5-5
+      model_name: claude-opus-5-5
+    - litellm_params:
+        api_base: http://10.0.0.9:8000/v1
+        api_key: none
+        model: openai/qwen
+      model_name: qwen
+kind: ConfigMap
+metadata:
+  labels:
+    swarmageddon.dev/component: gateway
+  name: gateway-config
+  namespace: swarmageddon-platform
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    swarmageddon.dev/component: gateway
+  name: gateway
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: http
+    port: 4000
+    targetPort: 4000
+  selector:
+    swarmageddon.dev/component: gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    swarmageddon.dev/component: gateway
+  name: gateway
+  namespace: swarmageddon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: gateway
+  template:
+    metadata:
+      annotations:
+        swarmageddon.dev/config-hash: c9c5b2326b
+      labels:
+        swarmageddon.dev/component: gateway
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - --config
+        - /etc/litellm/config.yaml
+        - --port
+        - "4000"
+        env:
+        - name: LITELLM_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              key: masterKey
+              name: gateway-master
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: postgres-gateway
+        - name: LITELLM_LOG
+          value: INFO
+        - name: LITELLM_TELEMETRY
+          value: "False"
+        - name: PROVIDER_ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: apiKey
+              name: anthropic-key
+        image: ghcr.io/berriai/litellm-database:v1.105.1@sha256:2bcadb9905b692a5ca4dadd51bccaaa23a95dc8a0f9322d9c9787f0ac2aeb50e
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: litellm
+        ports:
+        - containerPort: 4000
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /etc/litellm
+          name: config
+          readOnly: true
+      enableServiceLinks: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - configMap:
+          name: gateway-config
+        name: config

@@ -1,0 +1,21 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  labels:
+    swarmageddon.dev/component: control-center
+  name: control-center
+  namespace: swarmageddon-system
+spec:
+  rootCAs:
+  - configMap: platform-ca-bundle
+  serverName: control-center.swarmageddon-system.svc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/service.serverstransport: swarmageddon-system-control-center@kubernetescrd
+  name: control-center
+  namespace: swarmageddon-system
