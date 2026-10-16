@@ -1,0 +1,287 @@
+package supervisor
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"connectrpc.com/connect"
+
+	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/claude"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/display"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/engine"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/identity"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/janitor"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/msgclient"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/ore"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
+)
+
+// personaFiles maps persona ConfigMap keys to where they go (docs/conventions.md).
+var personaFiles = map[string]string{
+	"room.json":                    roomcfg.RoomJSON,
+	"role.md":                      roomcfg.RoleFile,
+	"claude-managed-settings.json": filepath.Join(roomcfg.ClaudeEtc, "managed-settings.json"),
+	"claude-managed-mcp.json":      filepath.Join(roomcfg.ClaudeEtc, "managed-mcp.json"),
+	"ore-requirements.toml":        filepath.Join(roomcfg.CodexEtc, "requirements.toml"),
+	"ore-config.toml":              filepath.Join(roomcfg.CodexEtc, "config.toml"),
+	"ore-persona.rules":            filepath.Join(roomcfg.CodexEtc, "rules", "persona.rules"),
+}
+
+// installPersona copies the mounted persona files into place, root-owned and
+// read-only to the agent.
+func installPersona(dir string) error {
+	var errs []error
+	for key, dst := range personaFiles {
+		b, err := os.ReadFile(filepath.Join(dir, key))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err == nil {
+			err = os.MkdirAll(filepath.Dir(dst), 0o755)
+		}
+		if err == nil {
+			err = os.WriteFile(dst, b, 0o644)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("persona %s: %w", key, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func readSecret(name string) string {
+	b, _ := os.ReadFile(filepath.Join(roomcfg.IdentityDir, name))
+	return strings.TrimSpace(string(b))
+}
+
+// Main runs a room: PID 1 under tini, as root.
+func Main(ctx context.Context, log *slog.Logger) error {
+	if err := installPersona(roomcfg.PersonaDir); err != nil {
+		log.Warn("installing persona files", "err", err)
+	}
+	room, err := roomcfg.Load(roomcfg.RoomJSON)
+	if err != nil {
+		return err
+	}
+	log = log.With("room", room.Address())
+	home := room.Home()
+	user, err := identity.EnsureUser(room.Room, roomcfg.AgentUID, home, room.SudoEnabled())
+	if err != nil {
+		return fmt.Errorf("agent user: %w", err)
+	}
+	gitName, gitEmail := room.GitIdentity()
+	if err := identity.Install(identity.Setup{
+		User: user, SecretDir: roomcfg.IdentityDir, GitName: gitName, GitEmail: gitEmail,
+		ForgeURL: room.ForgeURL, ForgeSSH: room.ForgeSSH, ForgeUser: room.ForgeAccount(),
+	}); err != nil {
+		log.Warn("identity setup incomplete", "err", err)
+	}
+	// /run/swarm holds our socket and ore's, which the agent user creates.
+	if err := os.MkdirAll("/run/swarm", 0o770); err == nil {
+		_ = os.Chown("/run/swarm", 0, int(user.GID))
+		_ = os.Chmod("/run/swarm", 0o770)
+	}
+	stateDir := filepath.Join(home, ".swarm")
+	_ = os.MkdirAll(stateDir, 0o700)
+	_ = os.Chown(stateDir, int(user.UID), int(user.GID))
+
+	ca := roomcfg.CABundle
+	if _, err := os.Stat(ca); err != nil {
+		ca = filepath.Join(roomcfg.IdentityDir, "ca.crt")
+	}
+	msg, err := msgclient.New(room.MessagingURL, msgclient.TLSFiles{
+		Cert: filepath.Join(roomcfg.IdentityDir, "tls.crt"), Key: filepath.Join(roomcfg.IdentityDir, "tls.key"), CA: ca,
+	})
+	if err != nil {
+		return fmt.Errorf("messaging client: %w", err)
+	}
+	roleText := ""
+	if b, err := os.ReadFile(roomcfg.RoleFile); err == nil {
+		roleText = string(b)
+	}
+	var peers *messagingv1.ListPeersResponse
+	pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	if res, err := msg.ListPeers(pctx, connect.NewRequest(&messagingv1.ListPeersRequest{})); err == nil {
+		peers = res.Msg
+	} else {
+		log.Warn("team list unavailable; instructions without it", "err", err)
+	}
+	cancel()
+	instructions := Instructions(room, roleText, peers)
+	if err := writeInstructions(room, user, instructions); err != nil {
+		log.Warn("writing instructions", "err", err)
+	}
+
+	var wg sync.WaitGroup
+	start := func(s proc.Spec) {
+		if _, err := exec.LookPath(s.Path); err != nil {
+			log.Warn("service not installed; skipped", "service", s.Name, "path", s.Path)
+			return
+		}
+		wg.Add(1)
+		go func() { defer wg.Done(); proc.Supervise(ctx, s, log) }()
+	}
+	start(engine.Spec())
+	start(display.Xvfb(user, ""))
+	start(display.Openbox(user))
+	if pw := readSecret("vnc_password"); pw != "" {
+		file := "/run/swarm/vnc/passwd"
+		if err := display.WriteVNCPassword(user, pw, file); err != nil {
+			log.Warn("vnc password", "err", err)
+		} else {
+			start(display.X11VNC(user, file))
+		}
+	}
+
+	core := &Core{
+		Room: room, CLI: room.CLI, Messaging: msg, Log: log,
+		Volumes: []Volume{{Name: "home", Path: home}, {Name: "engine", Path: roomcfg.EngineDir}},
+	}
+	if !room.Janitor.Disabled {
+		j := &janitor.Janitor{Config: janitorConfig(room.Janitor), Log: log}
+		wg.Add(1)
+		go func() { defer wg.Done(); j.Run(ctx) }()
+	}
+	cloneRepos(ctx, room, user, log)
+	work := room.WorkPath(home)
+	if err := os.MkdirAll(work, 0o755); err == nil {
+		_ = os.Chown(work, int(user.UID), int(user.GID))
+	}
+	dedup, err := msgclient.LoadDedup(filepath.Join(stateDir, "delivered"), 10000)
+	if err != nil {
+		log.Warn("dedup set unreadable; starting empty", "err", err)
+		dedup, _ = msgclient.LoadDedup(filepath.Join(stateDir, "delivered.new"), 10000)
+	}
+	core.Dedup = dedup
+	core.Agent = newAgent(room, user, work, roleText, core, log)
+
+	api := &API{Core: core}
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		if err := ServeUnix(ctx, roomcfg.SupervisorSock, int(user.GID), api.Handler()); err != nil {
+			log.Error("room API", "err", err)
+		}
+	}()
+	go func() { defer wg.Done(); core.Run(ctx) }()
+	go func() {
+		defer wg.Done()
+		if err := core.Agent.Run(ctx); err != nil && ctx.Err() == nil {
+			log.Error("agent driver", "err", err)
+		}
+	}()
+	log.Info("room started", "cli", room.CLI, "work", work)
+	wg.Wait()
+	return nil
+}
+
+func janitorConfig(s roomcfg.JanitorSettings) janitor.Config {
+	return janitor.Config{
+		Interval:           time.Duration(s.IntervalMinutes) * time.Minute,
+		PruneAfter:         time.Duration(s.PruneAfterHours) * time.Hour,
+		ImagesAbovePercent: s.ImagesAbovePercent,
+		WarnPercent:        s.WarnPercent,
+		AggressivePercent:  s.AggressivePercent,
+		EngineDir:          roomcfg.EngineDir,
+		Env:                []string{"DOCKER_HOST=" + engine.DockerHost},
+	}
+}
+
+// writeInstructions puts the generated instructions where the CLI reads
+// them: the managed CLAUDE.md (followed by the persona's), or the generated
+// block of ~/.ore/AGENTS.md.
+func writeInstructions(room *roomcfg.Room, u *proc.User, text string) error {
+	if room.CLI == roomcfg.CLIClaude {
+		if extra, err := os.ReadFile(filepath.Join(roomcfg.PersonaDir, "claude-CLAUDE.md")); err == nil && len(strings.TrimSpace(string(extra))) > 0 {
+			text += "\n---\n\n" + string(extra)
+		}
+		if err := os.MkdirAll(roomcfg.ClaudeEtc, 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(roomcfg.ClaudeEtc, "CLAUDE.md"), []byte(text), 0o644)
+	}
+	dir := filepath.Join(u.Home, ".ore")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	_ = os.Chown(dir, int(u.UID), int(u.GID))
+	file := filepath.Join(dir, "AGENTS.md")
+	old, _ := os.ReadFile(file)
+	out := identity.ReplaceBlock(string(old), OreBlockBegin, OreBlockEnd, text)
+	if err := os.WriteFile(file, []byte(out), 0o644); err != nil {
+		return err
+	}
+	return os.Chown(file, int(u.UID), int(u.GID))
+}
+
+// cloneRepos clones spec.repos missing from ~/work over SSH, as the agent.
+func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog.Logger) {
+	if room.ForgeSSH == "" {
+		return
+	}
+	workDir := filepath.Join(u.Home, "work")
+	_ = os.MkdirAll(workDir, 0o755)
+	_ = os.Chown(workDir, int(u.UID), int(u.GID))
+	for _, repo := range room.Repos {
+		repo = strings.TrimSuffix(repo, ".git")
+		dest := filepath.Join(workDir, roomcfg.RepoName(repo))
+		if _, err := os.Stat(filepath.Join(dest, ".git")); err == nil {
+			continue
+		}
+		if entries, _ := os.ReadDir(dest); len(entries) > 0 {
+			log.Warn("work folder exists and is not a clone; not cloning", "repo", repo, "dest", dest)
+			continue
+		}
+		url := "ssh://git@" + room.ForgeSSH + "/" + repo + ".git"
+		cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		cmd := exec.CommandContext(cctx, "git", "clone", "--quiet", url, dest)
+		cmd.Env = proc.BaseEnv(u)
+		cmd.SysProcAttr = proc.SysProcAttr(u)
+		cmd.SysProcAttr.Setpgid = false
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			log.Warn("clone failed", "repo", repo, "err", err, "out", strings.TrimSpace(string(out)))
+			continue
+		}
+		log.Info("cloned", "repo", repo, "dest", dest)
+	}
+}
+
+// newAgent builds the CLI driver for the room.
+func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, ev agent.Events, log *slog.Logger) agent.Agent {
+	key := readSecret("gateway_key")
+	if room.CLI == roomcfg.CLIOre {
+		p := ore.Policy{GatewayURL: room.GatewayURL, WireAPI: room.OreWireAPI}
+		return &ore.Driver{
+			Home: u.Home, WorkDir: work, User: u, Socket: roomcfg.OreSock,
+			Env:                   []string{ore.GatewayKeyEnv + "=" + key},
+			Settings:              ore.UserSettings{Provider: p.Provider(), Model: room.Model, Effort: room.Effort},
+			DeveloperInstructions: roleText, FirstTurn: room.FirstTurnPrompt(),
+			Events: ev, Log: log,
+		}
+	}
+	env := []string{"ANTHROPIC_AUTH_TOKEN=" + key}
+	if base := room.GatewayURL; base != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+base)
+	} else if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+base)
+	}
+	return &claude.Driver{
+		Name: room.Room, Model: room.Model, Effort: room.Effort, PermissionMode: room.PermissionMode,
+		Home: u.Home, WorkDir: work, User: u, Env: env, FirstTurn: room.FirstTurnPrompt(),
+		Events: ev, Log: log,
+	}
+}
