@@ -41,11 +41,11 @@ type idleFunc func() bool
 func (f idleFunc) Idle(context.Context, string, string) (bool, error) { return f(), nil }
 
 func newEnv(t *testing.T) *env {
-	c, real := roomtest.Client(t)
+	c, op, real := roomtest.Client(t)
 	e := &env{t: t, c: c, real: real, forge: roomtest.NewForge(t, "reviewers", "implementers", "mergers", "group-clean"),
 		gw: roomtest.NewGateway(t), images: &roomtest.Images{RoomImage: "room:1", RunnerImage: "runner:1"},
 		now: time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)}
-	e.r = &Reconciler{Client: c, Idle: NeverIdle{}, Now: func() time.Time { return e.now }, Deps: deps.Deps{
+	e.r = &Reconciler{Client: op, Idle: NeverIdle{}, Now: func() time.Time { return e.now }, Deps: deps.Deps{
 		PKI: roomtest.NewPKI(), Images: e.images, Forge: e.forge.Client, Gateway: e.gw.Client,
 		PlatformTier: func(context.Context) (string, error) { return "userns", nil },
 	}}

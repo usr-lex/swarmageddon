@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+data:
+  config.yml: |-
+    version: 0.1
+    log:
+      level: info
+    storage:
+      filesystem:
+        rootdirectory: /var/lib/registry
+      delete:
+        enabled: true
+    http:
+      addr: :5000
+    proxy:
+      remoteurl: https://registry-1.docker.io
+      ttl: 168h
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: registry-cache
+    swarmageddon.dev/component: registry-cache
+  name: registry-cache-config
+  namespace: swarmageddon-platform
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: registry-cache
+    swarmageddon.dev/component: registry-cache
+  name: registry-cache
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+  selector:
+    swarmageddon.dev/component: registry-cache
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/name: registry-cache
+    swarmageddon.dev/component: registry-cache
+  name: registry-cache
+  namespace: swarmageddon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: registry-cache
+  serviceName: registry-cache
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: registry-cache
+        swarmageddon.dev/component: registry-cache
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: docker.io/library/registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
+        name: registry
+        ports:
+        - containerPort: 5000
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          periodSeconds: 10
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /var/lib/registry
+          name: data
+        - mountPath: /etc/distribution
+          name: config
+          readOnly: true
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - configMap:
+          name: registry-cache-config
+        name: config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi

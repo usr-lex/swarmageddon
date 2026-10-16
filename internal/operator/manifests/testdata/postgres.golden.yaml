@@ -1,0 +1,180 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: postgres
+    swarmageddon.dev/component: postgres
+  name: postgres
+  namespace: swarmageddon-platform
+spec:
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+  selector:
+    swarmageddon.dev/component: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/name: postgres
+    swarmageddon.dev/component: postgres
+  name: postgres
+  namespace: swarmageddon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      swarmageddon.dev/component: postgres
+  serviceName: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        swarmageddon.dev/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-superuser
+        image: docker.io/library/postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+            - -h
+            - 127.0.0.1
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        name: postgres
+        ports:
+        - containerPort: 5432
+          name: postgres
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+            - -h
+            - 127.0.0.1
+          periodSeconds: 5
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /var/lib/postgresql
+          name: data
+        - mountPath: /var/run/postgresql
+          name: run
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir: {}
+        name: run
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app.kubernetes.io/name: postgres-bootstrap
+    swarmageddon.dev/component: postgres-bootstrap
+  name: postgres-bootstrap-abc123
+  namespace: swarmageddon-platform
+spec:
+  backoffLimit: 20
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-bootstrap
+        swarmageddon.dev/component: postgres-bootstrap
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - |
+          until pg_isready -q; do sleep 2; done
+          ensure() {
+            psql -v ON_ERROR_STOP=1 -v name="$1" -v pw="$2" <<'SQL'
+          SELECT format('CREATE ROLE %I LOGIN', :'name') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'name')\gexec
+          SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'name', :'pw')\gexec
+          SELECT format('CREATE DATABASE %I OWNER %I', :'name', :'name') WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'name')\gexec
+          SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'name')\gexec
+          SQL
+          }
+          ensure forgejo "$PW_forgejo"
+          ensure litellm "$PW_litellm"
+        command:
+        - /bin/bash
+        - -ec
+        env:
+        - name: PGHOST
+          value: postgres.swarmageddon-platform.svc
+        - name: PGUSER
+          value: postgres
+        - name: PGDATABASE
+          value: postgres
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-superuser
+        - name: PW_forgejo
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-forgejo
+        - name: PW_litellm
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: postgres-gateway
+        image: docker.io/library/postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+        name: bootstrap
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+  ttlSecondsAfterFinished: 86400
