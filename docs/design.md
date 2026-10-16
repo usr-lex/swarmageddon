@@ -787,6 +787,71 @@ then crashed, then working, then idle.
 
 See §10.3.
 
+### 8.7 Swarm observatory
+
+A dashboard for the question "what is the swarm doing?", so nobody has to
+read a dozen transcripts to find out. It is the workspace's home page, and
+everything on it is built from data the platform already has.
+
+**Data.** The control center keeps an `activity_events` table in
+PostgreSQL. Each row holds a time, workspace, actor, kind, target, repository
+and a short summary. It is filled from three sources:
+
+| Source | Events |
+|---|---|
+| Messaging (`QueryAudit` stream, followed live) | message sent (from, to; never the body), mediated-link crossing, refusal |
+| Forgejo webhooks (§9.7) | commit pushed (per commit), PR opened, merged or closed, review submitted (approve, request changes, comment), issue opened or closed, comment, CI run failed or passed |
+| Supervisor status (`WatchPresence`) | presence changes, current task, tokens used |
+
+Retention follows the workspace's audit retention. The panels query
+aggregates (counts per actor, pair, kind and day) through a new
+`Observatory` Connect service. A live stream pushes new events to open
+pages.
+
+**Panels:**
+
+| Panel | Shows |
+|---|---|
+| Swarm status | The latest report from the workspace's chronicler (below), with its time and a "request an update now" button |
+| Who talks to whom | A chord diagram of message volume between agents (and people) over a chosen window. Edges are colored by kind: open link, mediated crossing, human. Clicking a pair lists those messages' metadata. Message bodies stay in the audit view, for roles allowed to see them |
+| Handoff graph | A force-directed graph of the same edges, plus forge handoffs (review requested, assigned, mentioned) as dashed edges. Nodes are sized by activity and colored by presence |
+| Now | One row per agent: presence, current task, the issue or PR it last touched, time in the current state. Waiting on a human sorts first, as in the fleet view |
+| Contribution heatmap | A GitHub-style calendar per agent and for the whole swarm: events per day |
+| Activity axes | Per agent, a four-axis chart (commits, pull requests, code review, issues), like GitHub's activity overview, with a fifth "messages" ring. It shows at a glance whether an agent leans to building, reviewing or coordinating, and whether that matches its role |
+| Timeline | A merged, filterable feed of the events above |
+| Throughput | Per day: PRs merged, review latency (PR opened to first review), CI failures, tokens and spend, stacked per agent |
+
+The look is an instrument panel: a light theme first, with a dark one. Labels
+are monospaced and quiet, there is one accent color for alerts, and charts
+are thin-lined, dense and readable at a glance. Charts are drawn with d3
+modules (`d3-chord`, `d3-force`, `d3-scale`, `d3-shape`) inside React, with
+no charting framework.
+
+**The chronicler.** A built-in role template, `chronicler`, whose whole job
+is to report on the swarm. The workspace wizard offers it, on by default
+from four agents up.
+
+- **Inputs:** `swarm agents` (presence and current task of every agent it
+  can reach), the forge through `tea` with read access to the workspace's
+  repositories, and its own messages from agents and people.
+- **Output:**
+  - **Every few hours** (default 4) and on request, a short report sent to
+    the system address `status@<workspace>`. It covers what shipped, what's
+    in flight and who owns it, what's blocked or waiting on a human, and
+    risks. The control center stores each report and shows the latest one
+    on the observatory. Every report is kept, so the reports also read as
+    a history.
+  - **"Request an update now"** sends the chronicler a message from the
+    person.
+- **Limits:** it's a normal room under normal policy. It sees only what its
+  group's links and forge permissions allow, so a wall stays a wall. In a
+  workspace with a wall, each side can have its own chronicler. It writes
+  no code; its persona denies edits outside its own notes.
+- **Messaging:** `status@<workspace>` is a second system address (after
+  `forge@`, §9.7). Agents may send to it; the control center consumes it.
+  The peer list (`ListPeers`) includes each agent's current task, so the
+  chronicler can see it without reading transcripts.
+
 ## 9. Forgejo integration
 
 Facts and field names come from Forgejo's `swagger.v1.json` (versions 13 to

@@ -35,6 +35,7 @@ message Agent {
   string group = 5;
   string presence = 6;
   string note = 7;
+  string current_task = 8;
 }
 message ListAgentsResponse {
   string self = 1;
