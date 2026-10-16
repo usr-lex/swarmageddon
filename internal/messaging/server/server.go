@@ -198,6 +198,16 @@ func controlCenter(ctx context.Context) (Caller, error) {
 	return c, nil
 }
 
+// watcher checks that the caller may watch presence and approvals: the
+// control center, or the operator (read-only, to roll idle rooms).
+func watcher(ctx context.Context) error {
+	if c, _ := CallerFrom(ctx); c.Operator {
+		return nil
+	}
+	_, err := controlCenter(ctx)
+	return err
+}
+
 func unavailable(err error) error {
 	if ce := new(connect.Error); errors.As(err, &ce) {
 		return err
