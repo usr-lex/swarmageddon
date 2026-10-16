@@ -527,6 +527,31 @@ spec:
               RoleTemplateSpec is a persona: role text plus CLI policy. Personas are
               guardrails, not security (docs/design.md §6.4).
             properties:
+              advisor:
+                description: 'Advisor the agent can consult with `swarm advise` (ADR
+                  0010). No model: no advisor.'
+                properties:
+                  effort:
+                    type: string
+                  maxCallsPerHour:
+                    default: 10
+                    format: int32
+                    type: integer
+                  model:
+                    description: Model, as the gateway names it.
+                    type: string
+                  monthlyUSD:
+                    description: 'Monthly budget of the advisor''s own gateway key
+                      in USD; 0: the workspace''s per-room budget.'
+                    format: int32
+                    type: integer
+                  native:
+                    description: Native also turns on Claude Code's built-in advisor
+                      tool (Claude rooms only; unauditable).
+                    type: boolean
+                required:
+                - model
+                type: object
               autoApprove:
                 description: AutoApprove rules the control center applies to approval
                   requests.
@@ -632,6 +657,41 @@ spec:
                 type: string
               title:
                 type: string
+              wardenRules:
+                description: WardenRules adds rules to the warden's rule table for
+                  rooms of this role (ADR 0011).
+                items:
+                  description: |-
+                    WardenRule matches a tool call by tool name and a regular expression over
+                    its command or path.
+                  properties:
+                    action:
+                      description: WardenAction is what a warden rule does with a
+                        matching tool call.
+                      enum:
+                      - allow
+                      - deny
+                      - escalate
+                      type: string
+                    match:
+                      description: Match is a regular expression against the command
+                        or file path.
+                      type: string
+                    name:
+                      type: string
+                    reason:
+                      type: string
+                    tool:
+                      description: 'Tool name (Claude: Bash, Edit, ...; ore: exec,
+                        patch); "*" for any.'
+                      type: string
+                  required:
+                  - action
+                  - match
+                  - name
+                  - tool
+                  type: object
+                type: array
             required:
             - roleText
             - title
@@ -702,6 +762,30 @@ spec:
               RoomSpec describes one worker's room. It lives in its workspace's namespace;
               the room's name is the agent's name.
             properties:
+              advisor:
+                description: Advisor overrides the role template's advisor.
+                properties:
+                  effort:
+                    type: string
+                  maxCallsPerHour:
+                    default: 10
+                    format: int32
+                    type: integer
+                  model:
+                    description: Model, as the gateway names it.
+                    type: string
+                  monthlyUSD:
+                    description: 'Monthly budget of the advisor''s own gateway key
+                      in USD; 0: the workspace''s per-room budget.'
+                    format: int32
+                    type: integer
+                  native:
+                    description: Native also turns on Claude Code's built-in advisor
+                      tool (Claude rooms only; unauditable).
+                    type: boolean
+                required:
+                - model
+                type: object
               cli:
                 default: claude
                 description: CLI is the agent CLI a room runs.
@@ -730,6 +814,12 @@ spec:
                 type: string
               paused:
                 description: Paused scales the room to zero; its volumes stay.
+                type: boolean
+              quarantined:
+                description: |-
+                  Quarantined cuts the room off: model requests are refused, its network
+                  shrinks to the gateway, its forge token is paused. Set by the warden or a
+                  person; only a person clears it.
                 type: boolean
               repos:
                 description: Repos (owner/name in the forge) cloned into ~/work on
@@ -789,6 +879,14 @@ spec:
                   storageClassName:
                     type: string
                 type: object
+              wardenMode:
+                description: WardenMode overrides the workspace's warden mode for
+                  this room.
+                enum:
+                - "off"
+                - monitor
+                - gate
+                type: string
               workDir:
                 description: WorkDir the agent starts in, relative to its home. Default
                   "work".
@@ -1183,6 +1281,22 @@ spec:
                 required:
                 - org
                 type: object
+              forgeNotifications:
+                description: |-
+                  ForgeNotifications lists the forge events delivered to agents as messages
+                  (docs/design.md §9.7). Empty: all of them.
+                items:
+                  description: ForgeEvent is a kind of forge activity delivered to
+                    agents.
+                  enum:
+                  - assigned
+                  - reviewRequested
+                  - mentioned
+                  - reviewSubmitted
+                  - commented
+                  - ciFailed
+                  type: string
+                type: array
               groups:
                 items:
                   properties:
@@ -1205,6 +1319,75 @@ spec:
                 type: string
               messaging:
                 properties:
+                  channels:
+                    description: Channels are the workspace's one-to-many conversations
+                      (docs/design.md §7.8).
+                    items:
+                      description: ChannelSpec is a named conversation and who may
+                        read and post in it.
+                      properties:
+                        allowedDelivery:
+                          description: 'AllowedDelivery lists the modes readers may
+                            switch to. Empty: all.'
+                          items:
+                            description: DeliveryMode is how a channel's posts reach
+                              a reader's session.
+                            enum:
+                            - push
+                            - digest
+                            - pull
+                            type: string
+                          type: array
+                        defaultDelivery:
+                          default: digest
+                          description: DeliveryMode is how a channel's posts reach
+                            a reader's session.
+                          enum:
+                          - push
+                          - digest
+                          - pull
+                          type: string
+                        description:
+                          type: string
+                        members:
+                          items:
+                            description: ChannelMember selects members and gives them
+                              access.
+                            properties:
+                              access:
+                                description: ChannelAccess is what a channel member
+                                  may do.
+                                enum:
+                                - read
+                                - write
+                                - readWrite
+                                type: string
+                              select:
+                                description: |-
+                                  Selector: everyone, people, role:<template>, team:<forge team>,
+                                  group:<group>, room:<name> or person:<handle>.
+                                pattern: ^(everyone|people|(role|team|group|room|person):[a-z0-9][a-z0-9_-]{0,62})$
+                                type: string
+                            required:
+                            - access
+                            - select
+                            type: object
+                          minItems: 1
+                          type: array
+                        name:
+                          description: 'Name without the leading #.'
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,62}$
+                          type: string
+                        postsPerMinute:
+                          description: PostsPerMinute across all posters. Default
+                            20.
+                          format: int32
+                          type: integer
+                      required:
+                      - members
+                      - name
+                      type: object
+                    type: array
                   defaultLinks:
                     default: withinGroup
                     description: DefaultLinks is how rooms in the same group reach
@@ -1284,6 +1467,30 @@ spec:
                       transcripts:
                         type: string
                     type: object
+                  storm:
+                    description: Storm keeps agents' sessions from being flooded (docs/design.md
+                      §7.8).
+                    properties:
+                      coalesceBytes:
+                        description: CoalesceBytes caps one coalesced injection. Default
+                          4096.
+                        format: int32
+                        type: integer
+                      digestInterval:
+                        description: DigestInterval between digest notices per channel.
+                          Default 15m.
+                        type: string
+                      fanoutPerMinute:
+                        description: FanoutPerMinute caps recipients a sender reaches
+                          per minute. Default 60.
+                        format: int32
+                        type: integer
+                      pushPerMinute:
+                        description: PushPerMinute is how many items may be pushed
+                          into a session per minute. Default 6.
+                        format: int32
+                        type: integer
+                    type: object
                 type: object
               models:
                 properties:
@@ -1333,6 +1540,7 @@ spec:
                       - budget
                       - diskLow
                       - roomCrashed
+                      - wardenFlag
                       type: string
                     type: array
                 type: object
@@ -1383,6 +1591,37 @@ spec:
                   window:
                     description: Window, for mode window, e.g. "Sat 02:00-06:00" (UTC).
                     type: string
+                type: object
+              warden:
+                description: Warden watches agents for drift and risky actions (ADR
+                  0011).
+                properties:
+                  interruptOnHigh:
+                    default: true
+                    description: InterruptOnHigh interrupts the agent's turn on a
+                      high-severity verdict.
+                    type: boolean
+                  mode:
+                    default: monitor
+                    description: WardenMode is how closely the warden watches.
+                    enum:
+                    - "off"
+                    - monitor
+                    - gate
+                    type: string
+                  model:
+                    description: 'Model the warden judges with: a small, fast model
+                      on the gateway. Empty: rules only.'
+                    type: string
+                  monthlyUSD:
+                    description: Monthly budget of each room's warden key in USD.
+                      Default 20.
+                    format: int32
+                    type: integer
+                  quarantineOnHigh:
+                    description: QuarantineOnHigh quarantines on high verdicts from
+                      the gateway guard, not only critical ones.
+                    type: boolean
                 type: object
             required:
             - forge

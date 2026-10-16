@@ -15,6 +15,7 @@ generate:
 	buf generate
 	controller-gen object paths=./api/...
 	controller-gen crd paths=./api/... output:crd:artifacts:config=config/crd
+	$(MAKE) -s chart-crds
 
 ## manifests: the operator's ClusterRole from the +kubebuilder:rbac markers
 manifests:
