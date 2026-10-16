@@ -1373,6 +1373,11 @@ func (in *WorkspaceSpec) DeepCopyInto(out *WorkspaceSpec) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.ForgeNotifications != nil {
+		in, out := &in.ForgeNotifications, &out.ForgeNotifications
+		*out = make([]ForgeEvent, len(*in))
+		copy(*out, *in)
+	}
 	if in.DeletedRoomRetention != nil {
 		in, out := &in.DeletedRoomRetention, &out.DeletedRoomRetention
 		*out = new(v1.Duration)
