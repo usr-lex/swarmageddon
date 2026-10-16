@@ -283,7 +283,7 @@ func (s *Server) ReadMessages(ctx context.Context, req *connect.Request[messagin
 		scans = append(scans, sc)
 	}
 	slices.SortFunc(all, byTime)
-	page := all
+	var page []*item
 	if unread {
 		page = all[:min(limit, len(all))]
 	} else {

@@ -79,8 +79,8 @@ func (r *Reconciler) reconcileForge(ctx context.Context, w *v1alpha1.Workspace) 
 		return err
 	}
 	failAll := func(err error) error {
-		fail(ConditionRepositoriesReady, err)
-		fail(ConditionForgeWebhookReady, err)
+		_ = fail(ConditionRepositoriesReady, err)
+		_ = fail(ConditionForgeWebhookReady, err)
 		return fail(v1alpha1.ConditionForgeOrgReady, err)
 	}
 	if r.Deps.Forge == nil {
@@ -122,7 +122,7 @@ func (r *Reconciler) reconcileForge(ctx context.Context, w *v1alpha1.Workspace) 
 	setCond(w, v1alpha1.ConditionForgeOrgReady, true, "Ready", fmt.Sprintf("org %s with %d teams", org, len(ids)))
 
 	if err := r.reconcileRepos(ctx, w, fc, ids); err != nil {
-		fail(ConditionRepositoriesReady, err)
+		_ = fail(ConditionRepositoriesReady, err)
 		// Carry on with the webhook; the repositories retry.
 	} else {
 		setCond(w, ConditionRepositoriesReady, true, "Ready", fmt.Sprintf("%d repositories protected", len(w.Spec.Repositories)))

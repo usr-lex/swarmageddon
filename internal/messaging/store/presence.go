@@ -76,12 +76,12 @@ func (s *Store) WatchPresence(ctx context.Context, workspaces []string, known []
 	if err != nil {
 		return err
 	}
-	defer pw.Stop()
+	defer func() { _ = pw.Stop() }()
 	sw, err := s.status.WatchFiltered(ctx, slices.Clone(keys))
 	if err != nil {
 		return err
 	}
-	defer sw.Stop()
+	defer func() { _ = sw.Stop() }()
 
 	type state struct {
 		presence messagingv1.Presence
