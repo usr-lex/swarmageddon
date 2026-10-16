@@ -41,7 +41,7 @@ func testValues() Values {
 
 func TestGolden(t *testing.T) {
 	v := testValues()
-	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik} {
+	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik} {
 		t.Run(name, func(t *testing.T) {
 			objs, err := Render(name, v)
 			if err != nil {
@@ -121,5 +121,29 @@ func TestDecodeSkipsEmpty(t *testing.T) {
 	objs, err := Decode([]byte("---\n# comment\n---\napiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\n---\n"))
 	if err != nil || len(objs) != 1 {
 		t.Fatalf("objs=%d err=%v", len(objs), err)
+	}
+}
+
+func TestGatewayIsTheWarden(t *testing.T) {
+	objs, err := Render(Gateway, testValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel := map[string]map[string]any{}
+	labels := map[string]map[string]any{}
+	for _, o := range objs {
+		switch o.GetKind() {
+		case "Service":
+			sel[o.GetName()] = o.Object["spec"].(map[string]any)["selector"].(map[string]any)
+		case "Deployment":
+			tmpl := o.Object["spec"].(map[string]any)["template"].(map[string]any)
+			labels[o.GetName()] = tmpl["metadata"].(map[string]any)["labels"].(map[string]any)
+		}
+	}
+	if sel["gateway"]["swarmageddon.dev/component"] != "warden" || labels["warden"]["app.kubernetes.io/name"] != "gateway" {
+		t.Errorf("gateway selector %v, warden labels %v", sel["gateway"], labels["warden"])
+	}
+	if sel["litellm"]["swarmageddon.dev/component"] != "litellm" || labels["litellm"]["app.kubernetes.io/name"] != "litellm" {
+		t.Errorf("litellm selector %v, labels %v", sel["litellm"], labels["litellm"])
 	}
 }

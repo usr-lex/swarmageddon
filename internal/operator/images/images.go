@@ -28,6 +28,8 @@ type Images struct {
 	Operator      string `json:"operator"`
 	ControlCenter string `json:"controlCenter"`
 	Messaging     string `json:"messaging"`
+	Warden        string `json:"warden"`
+	Egress        string `json:"egress"`
 	Room          string `json:"room"`
 	Runner        string `json:"runner"`
 }
@@ -63,6 +65,8 @@ func Defaults(v string) Images {
 		Operator:      own("operator"),
 		ControlCenter: own("control-center"),
 		Messaging:     own("messaging"),
+		Warden:        own("warden"),
+		Egress:        own("egress"),
 		Room:          own("room"),
 		Runner:        own("runner"),
 	}
@@ -103,6 +107,8 @@ func (i *Images) merge(o Images) {
 	set(&i.Operator, o.Operator)
 	set(&i.ControlCenter, o.ControlCenter)
 	set(&i.Messaging, o.Messaging)
+	set(&i.Warden, o.Warden)
+	set(&i.Egress, o.Egress)
 	set(&i.Room, o.Room)
 	set(&i.Runner, o.Runner)
 }
@@ -118,6 +124,8 @@ func (i Images) Versions(operator string) map[string]string {
 		"registryCache": i.Registry,
 		"ntfy":          i.Ntfy,
 		"messaging":     i.Messaging,
+		"warden":        i.Warden,
+		"egress":        i.Egress,
 		"controlCenter": i.ControlCenter,
 	}
 }

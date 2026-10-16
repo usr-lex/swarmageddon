@@ -33,6 +33,7 @@ const (
 	RegistryCache        = "registry-cache"
 	Ntfy                 = "ntfy"
 	NetworkPolicies      = "networkpolicies"
+	Egress               = "egress"
 	ControlCenterIngress = "control-center-ingress"
 	ControlCenterTraefik = "control-center-traefik"
 )

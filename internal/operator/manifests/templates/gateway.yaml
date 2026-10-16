@@ -3,35 +3,36 @@ kind: ConfigMap
 metadata:
   name: gateway-config
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
+  labels: {swarmageddon.dev/component: litellm, app.kubernetes.io/name: litellm}
 data:
   config.yaml: |
 {{ indent 4 .Gateway.Config }}
 ---
+# LiteLLM, reached only by the warden and the system namespace's admin callers.
 apiVersion: v1
 kind: Service
 metadata:
-  name: gateway
+  name: litellm
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
+  labels: {swarmageddon.dev/component: litellm, app.kubernetes.io/name: litellm}
 spec:
-  selector: {swarmageddon.dev/component: gateway}
+  selector: {swarmageddon.dev/component: litellm}
   ports:
     - {name: http, port: 4000, targetPort: 4000}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gateway
+  name: litellm
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
+  labels: {swarmageddon.dev/component: litellm, app.kubernetes.io/name: litellm}
 spec:
   replicas: 1
   selector:
-    matchLabels: {swarmageddon.dev/component: gateway}
+    matchLabels: {swarmageddon.dev/component: litellm}
   template:
     metadata:
-      labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
+      labels: {swarmageddon.dev/component: litellm, app.kubernetes.io/name: litellm}
       annotations:
         swarmageddon.dev/config-hash: {{ .Gateway.ConfigHash }}
     spec:
@@ -75,3 +76,141 @@ spec:
       volumes:
         - name: config
           configMap: {name: gateway-config}
+---
+# The warden (ADR 0011): the gateway guard in front of LiteLLM. Service
+# gateway selects its pods, which carry app.kubernetes.io/name=gateway so
+# room NetworkPolicies reach them.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: warden
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+automountServiceAccountToken: true
+---
+# Quarantine only: set Room.spec.quarantined and its annotations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-warden
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+rules:
+  - apiGroups: [swarmageddon.dev]
+    resources: [rooms]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-warden
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: swarmageddon-warden}
+subjects:
+  - {kind: ServiceAccount, name: warden, namespace: {{ .Namespace }}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: warden
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [warden-keys]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: warden
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: warden}
+subjects:
+  - {kind: ServiceAccount, name: warden, namespace: {{ .Namespace }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+spec:
+  selector: {swarmageddon.dev/component: warden}
+  # A room's requests reach one replica, which keeps its scoring state.
+  sessionAffinity: ClientIP
+  ports:
+    - {name: http, port: 4000, targetPort: 4000}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: warden
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {swarmageddon.dev/component: warden}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warden
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {swarmageddon.dev/component: warden}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+    spec:
+      serviceAccountName: warden
+      enableServiceLinks: false
+      securityContext: {runAsUser: 65532, runAsGroup: 65532, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {swarmageddon.dev/component: warden}
+      containers:
+        - name: warden
+          image: {{ .Images.Warden }}
+          args:
+            - --listen=:4000
+            - --health=:8080
+            - --upstream=http://litellm.{{ .Namespace }}.svc:4000
+            - --namespace={{ .Namespace }}
+            - --messaging-url=https://messaging.{{ .Namespace }}.svc:8443
+            - --client-cert=/etc/warden/tls/tls.crt
+            - --client-key=/etc/warden/tls/tls.key
+            - --ca=/etc/warden/tls/ca.crt
+            - --review-key-file=/etc/warden/review/key
+          ports:
+            - {name: http, containerPort: 4000}
+            - {name: health, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: tls, mountPath: /etc/warden/tls, readOnly: true}
+            - {name: review, mountPath: /etc/warden/review, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: warden-client}
+        - name: review
+          secret: {secretName: warden-review, optional: true}

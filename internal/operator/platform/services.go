@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/gateway"
 	"github.com/usr-lex/swarmageddon/internal/operator/manifests"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
@@ -31,6 +32,7 @@ var services = []service{
 	{condition: v1alpha1.ConditionForgejoReady, apply: (*Reconciler).applyForgejo},
 	{condition: v1alpha1.ConditionMessagingReady, apply: (*Reconciler).applyMessaging},
 	{condition: v1alpha1.ConditionGatewayReady, apply: (*Reconciler).applyGateway},
+	{condition: ConditionEgressReady, apply: (*Reconciler).applyEgress},
 	{condition: v1alpha1.ConditionRegistryReady, apply: (*Reconciler).applyRegistry},
 	{condition: v1alpha1.ConditionNtfyReady, apply: (*Reconciler).applyNtfy,
 		enabled: func(p *v1alpha1.Platform) bool { return p.Spec.Services.Ntfy.Enabled }},
@@ -230,20 +232,93 @@ func (r *Reconciler) applyMessaging(ctx context.Context, p *v1alpha1.Platform, v
 	return r.statefulSetReady(ctx, "messaging", v.Messaging.Replicas/2+1)
 }
 
+// ConditionEgressReady reports the egress proxy (design §11.2).
+const ConditionEgressReady = "EgressReady"
+
+// wardenReviewBudgetUSD is the monthly budget of the gateway warden's
+// review key (ADR 0011).
+const wardenReviewBudgetUSD = 100
+
+func (r *Reconciler) deploymentAvailable(ctx context.Context, name string) (int32, int32, error) {
+	var d appsv1.Deployment
+	if err := r.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: name}, &d); err != nil {
+		return 0, 0, err
+	}
+	return d.Status.AvailableReplicas, ptrOr(d.Spec.Replicas, 1), nil
+}
+
+// applyGateway deploys LiteLLM (Service litellm) and the warden in front of
+// it (Service gateway, ADR 0011).
 func (r *Reconciler) applyGateway(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {
-	if _, err := r.ensureSecret(ctx, p, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "gateway-master"}, "gateway",
+	ns := v1alpha1.PlatformNamespace
+	if _, err := r.ensureSecret(ctx, p, types.NamespacedName{Namespace: ns, Name: "gateway-master"}, "gateway",
 		staticData(map[string]string{"masterKey": "sk-" + randomHex(24)})); err != nil {
+		return false, "", err
+	}
+	ca, err := r.Deps.CAStore.CA(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	req := pki.Request{CommonName: "warden", URIs: []string{"spiffe://swarmageddon/platform/warden"}, Usage: pki.Client}
+	if _, err := pki.EnsureTLSSecret(ctx, r.Client, ca, types.NamespacedName{Namespace: ns, Name: "warden-client"}, req, r.now(), r.ownedBy(p, "warden")); err != nil {
 		return false, "", err
 	}
 	if err := r.render(ctx, p, manifests.Gateway, v); err != nil {
 		return false, "", err
 	}
-	var d appsv1.Deployment
-	if err := r.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "gateway"}, &d); err != nil {
+	// Before the warden, LiteLLM ran as Deployment gateway.
+	old := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: "gateway"}, old); err == nil {
+		if err := r.Delete(ctx, old); err != nil && !apierrors.IsNotFound(err) {
+			return false, "", err
+		}
+	}
+	lAvail, lWant, err := r.deploymentAvailable(ctx, "litellm")
+	if err != nil {
 		return false, "", err
 	}
-	msg := fmt.Sprintf("%d/%d replicas available; %d providers", d.Status.AvailableReplicas, ptrOr(d.Spec.Replicas, 1), len(v.Gateway.Providers))
-	return d.Status.AvailableReplicas >= 1, msg, nil
+	wAvail, wWant, err := r.deploymentAvailable(ctx, "warden")
+	if err != nil {
+		return false, "", err
+	}
+	msg := fmt.Sprintf("LiteLLM %d/%d, warden %d/%d replicas available; %d providers", lAvail, lWant, wAvail, wWant, len(v.Gateway.Providers))
+	ready := lAvail >= 1 && wAvail >= 1
+	if ready {
+		r.ensureWardenReviewKey(ctx, p)
+	}
+	return ready, msg, nil
+}
+
+// ensureWardenReviewKey issues the gateway warden's own key for its model
+// reviews (Secret warden-review, key "key"), once LiteLLM is up. Failures are
+// retried on the next reconcile; until then the warden runs rules only.
+func (r *Reconciler) ensureWardenReviewKey(ctx context.Context, p *v1alpha1.Platform) {
+	nn := types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "warden-review"}
+	if err := r.Get(ctx, nn, &corev1.Secret{}); !apierrors.IsNotFound(err) || r.Deps.Gateway == nil {
+		return
+	}
+	gc, err := r.Deps.Gateway(ctx)
+	if err != nil {
+		return
+	}
+	b := float64(wardenReviewBudgetUSD)
+	k, err := gc.GenerateKey(ctx, gateway.KeyRequest{KeyAlias: fmt.Sprintf("warden-review-%d", r.now().Unix()), MaxBudget: &b,
+		BudgetDuration: "1mo", Metadata: map[string]string{"purpose": "warden"}})
+	if err != nil {
+		return
+	}
+	_, _ = r.ensureSecret(ctx, p, nn, "warden", staticData(map[string]string{"key": k.Key}))
+}
+
+func (r *Reconciler) applyEgress(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {
+	if err := r.render(ctx, p, manifests.Egress, v); err != nil {
+		return false, "", err
+	}
+	avail, want, err := r.deploymentAvailable(ctx, "egress")
+	if err != nil {
+		return false, "", err
+	}
+	return avail >= 1, fmt.Sprintf("%d/%d replicas available", avail, want), nil
 }
 
 func (r *Reconciler) applyRegistry(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {

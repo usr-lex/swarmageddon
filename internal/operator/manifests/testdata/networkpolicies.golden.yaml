@@ -23,7 +23,7 @@ spec:
           operator: In
           values:
           - forgejo
-          - gateway
+          - litellm
           - postgres-bootstrap
     - namespaceSelector:
         matchLabels:
@@ -123,7 +123,7 @@ spec:
       protocol: TCP
   podSelector:
     matchLabels:
-      swarmageddon.dev/component: gateway
+      swarmageddon.dev/component: warden
   policyTypes:
   - Ingress
 ---
@@ -150,6 +150,87 @@ spec:
       swarmageddon.dev/component: registry-cache
   policyTypes:
   - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm
+  namespace: swarmageddon-platform
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          swarmageddon.dev/component: warden
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: swarmageddon-system
+    ports:
+    - port: 4000
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      swarmageddon.dev/component: litellm
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress
+  namespace: swarmageddon-platform
+spec:
+  egress:
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  - ports:
+    - port: 443
+      protocol: TCP
+    - port: 6443
+      protocol: TCP
+    to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 127.0.0.0/8
+    - ipBlock:
+        cidr: ::/0
+        except:
+        - fc00::/7
+        - fe80::/10
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchExpressions:
+        - key: swarmageddon.dev/workspace
+          operator: Exists
+    ports:
+    - port: 3128
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      swarmageddon.dev/component: egress
+  policyTypes:
+  - Ingress
+  - Egress
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

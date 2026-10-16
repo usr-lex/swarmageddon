@@ -265,10 +265,26 @@ func TestPlatformReconcile(t *testing.T) {
 	}
 	markReady("messaging")
 	reconcileOnce()
-	var gw appsv1.Deployment
-	must(c.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "gateway"}, &gw))
-	gw.Status.Replicas, gw.Status.ReadyReplicas, gw.Status.AvailableReplicas, gw.Status.UpdatedReplicas = 1, 1, 1, 1
-	must(c.Status().Update(ctx, &gw))
+	deployReady := func(name string) {
+		t.Helper()
+		var d appsv1.Deployment
+		must(c.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: name}, &d))
+		d.Status.Replicas, d.Status.ReadyReplicas, d.Status.AvailableReplicas, d.Status.UpdatedReplicas = 1, 1, 1, 1
+		must(c.Status().Update(ctx, &d))
+	}
+	// LiteLLM behind the warden, which has its client certificate (CN=warden).
+	deployReady("litellm")
+	deployReady("warden")
+	if s := secret(v1alpha1.PlatformNamespace, "warden-client"); s == nil || len(s.Data["tls.crt"]) == 0 {
+		t.Fatal("warden-client missing")
+	}
+	var gwSvc corev1.Service
+	must(c.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "gateway"}, &gwSvc))
+	if gwSvc.Spec.Selector["swarmageddon.dev/component"] != "warden" {
+		t.Fatalf("gateway selects %v", gwSvc.Spec.Selector)
+	}
+	reconcileOnce()
+	deployReady("egress")
 	reconcileOnce()
 	markReady("registry-cache")
 	reconcileOnce()
@@ -283,7 +299,7 @@ func TestPlatformReconcile(t *testing.T) {
 	}
 	var np networkingv1.NetworkPolicyList
 	must(c.List(ctx, &np, client.InNamespace(v1alpha1.PlatformNamespace)))
-	if len(np.Items) != 7 {
+	if len(np.Items) != 9 {
 		t.Fatalf("%d platform NetworkPolicies", len(np.Items))
 	}
 }

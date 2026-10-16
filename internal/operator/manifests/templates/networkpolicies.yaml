@@ -24,7 +24,7 @@ spec:
       from:
         - podSelector:
             matchExpressions:
-              - {key: swarmageddon.dev/component, operator: In, values: [forgejo, gateway, postgres-bootstrap]}
+              - {key: swarmageddon.dev/component, operator: In, values: [forgejo, litellm, postgres-bootstrap]}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
 ---
@@ -77,7 +77,7 @@ metadata:
   namespace: {{ .Namespace }}
 spec:
   podSelector:
-    matchLabels: {swarmageddon.dev/component: gateway}
+    matchLabels: {swarmageddon.dev/component: warden}
   policyTypes: [Ingress]
   ingress:
     - ports: [{port: 4000, protocol: TCP}]
@@ -103,6 +103,54 @@ spec:
             matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+# LiteLLM: only the warden and the system namespace (operator, control center).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: litellm}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 4000, protocol: TCP}]
+      from:
+        - podSelector:
+            matchLabels: {swarmageddon.dev/component: warden}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: egress}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports: [{port: 3128, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
+  # The proxy reaches DNS, the API server (its allowlist) and the public
+  # internet only; it also refuses private addresses itself.
+  egress:
+    - ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+      to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+    - ports: [{port: 443, protocol: TCP}, {port: 6443, protocol: TCP}]
+      to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]}
+        - ipBlock: {cidr: "::/0", except: ["fc00::/7", "fe80::/10"]}
 ---
 # ntfy is reached by phones through an ingress controller, wherever that runs.
 apiVersion: networking.k8s.io/v1

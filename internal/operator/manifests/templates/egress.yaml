@@ -1,0 +1,97 @@
+# The egress proxy (design §11.2): rooms in network mode limited reach the
+# internet only through it.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [egress-allowlist]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: egress}
+subjects:
+  - {kind: ServiceAccount, name: egress, namespace: {{ .Namespace }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+spec:
+  selector: {swarmageddon.dev/component: egress}
+  ports:
+    - {name: proxy, port: 3128, targetPort: 3128}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {swarmageddon.dev/component: egress}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {swarmageddon.dev/component: egress}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+    spec:
+      serviceAccountName: egress
+      enableServiceLinks: false
+      securityContext: {runAsUser: 65532, runAsGroup: 65532, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {swarmageddon.dev/component: egress}
+      containers:
+        - name: egress
+          image: {{ .Images.Egress }}
+          args: [--listen=:3128, --health=:8080, --namespace={{ .Namespace }}]
+          ports:
+            - {name: proxy, containerPort: 3128}
+            - {name: health, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {memory: 512Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
