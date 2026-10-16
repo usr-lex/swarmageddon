@@ -5,6 +5,7 @@ package msgclient
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1/messagingv1connect"
 )
 
@@ -111,7 +113,41 @@ func New(baseURL string, files TLSFiles) (messagingv1connect.MessagingServiceCli
 		}
 		tr.TLSClientConfig = cfg
 	}
-	return messagingv1connect.NewMessagingServiceClient(&http.Client{Transport: tr}, strings.TrimRight(baseURL, "/")), nil
+	return messagingv1connect.NewMessagingServiceClient(&http.Client{Transport: tr}, strings.TrimRight(baseURL, "/"),
+		connect.WithInterceptors(retryUnavailable{})), nil
+}
+
+// retryUnavailable retries a unary call that failed as Unavailable, such as
+// one sent on a pooled connection the server had just closed (a messaging
+// replica restarting). Every unary call in the messaging API is idempotent:
+// sends and approval requests carry their own ids, and acks and reports can
+// be repeated. Streams are left alone; their callers reconnect.
+type retryUnavailable struct{}
+
+func (retryUnavailable) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		delay := 50 * time.Millisecond
+		for attempt := 0; ; attempt++ {
+			res, err := next(ctx, req)
+			if attempt == 2 || connect.CodeOf(err) != connect.CodeUnavailable {
+				return res, err
+			}
+			select {
+			case <-ctx.Done():
+				return nil, err
+			case <-time.After(delay):
+			}
+			delay *= 4
+		}
+	}
+}
+
+func (retryUnavailable) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+func (retryUnavailable) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return next
 }
 
 // Dedup remembers the last Max delivered message IDs on disk.
