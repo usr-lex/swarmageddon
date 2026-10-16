@@ -13,8 +13,8 @@ func TestLoadAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Address() != "athena@acme" {
-		t.Errorf("address %q", r.Address())
+	if r.AddressOrDefault() != "athena@acme" {
+		t.Errorf("address %q", r.AddressOrDefault())
 	}
 	if got := r.WorkPath("/home/athena"); got != "/home/athena/work/api" {
 		t.Errorf("work path %q", got)

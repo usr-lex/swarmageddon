@@ -30,7 +30,7 @@ func Instructions(r *roomcfg.Room, roleText string, peers *messagingv1.ListPeers
 	w("- **Your machine:** user `%s`, home `%s`%s. `docker` works (Podman behind the Docker API), ", r.Room, r.Home(), sudo)
 	w("there is a virtual display (`DISPLAY=:99`) with Firefox, and git, Node (nvm), Python (uv), ripgrep and jq are installed. ")
 	w("Your work folder is `%s`.\n", r.WorkPath(r.Home()))
-	w("- **Your address:** `%s`", r.Address())
+	w("- **Your address:** `%s`", r.AddressOrDefault())
 	if r.Group != "" {
 		w(", in the group `%s`", r.Group)
 	}
@@ -62,6 +62,14 @@ func Instructions(r *roomcfg.Room, roleText string, peers *messagingv1.ListPeers
 		}
 		w("\n## Your role: %s\n\n%s\n", title, strings.TrimSpace(roleText))
 	}
+	b.WriteString(TeamSection(peers))
+	return b.String()
+}
+
+// TeamSection lists the team from ListPeers; empty without peers.
+func TeamSection(peers *messagingv1.ListPeersResponse) string {
+	var b strings.Builder
+	w := func(format string, a ...any) { fmt.Fprintf(&b, format, a...) }
 	if peers != nil && len(peers.GetPeers()) > 0 {
 		w("\n## The team\n\n")
 		for _, p := range peers.GetPeers() {

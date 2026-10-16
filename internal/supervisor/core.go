@@ -181,7 +181,7 @@ func (c *Core) Approve(ctx context.Context, a agent.Approval) (agent.Decision, e
 		c.mu.Unlock()
 	}()
 	req := &messagingv1.ApprovalRequest{
-		Id: id, Room: c.Room.Address(), Cli: c.CLI, Tool: a.Tool, Summary: a.Summary,
+		Id: id, Room: c.Room.AddressOrDefault(), Cli: c.CLI, Tool: a.Tool, Summary: a.Summary,
 		Detail: a.Detail, Reason: a.Reason, SessionScopeAvailable: a.SessionScope,
 		RequestedAt: timestamppb.Now(),
 	}

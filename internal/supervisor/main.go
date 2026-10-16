@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -75,7 +76,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	log = log.With("room", room.Address())
+	log = log.With("room", room.AddressOrDefault())
 	home := room.Home()
 	user, err := identity.EnsureUser(room.Room, roomcfg.AgentUID, home, room.SudoEnabled())
 	if err != nil {
@@ -84,7 +85,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	gitName, gitEmail := room.GitIdentity()
 	if err := identity.Install(identity.Setup{
 		User: user, SecretDir: roomcfg.IdentityDir, GitName: gitName, GitEmail: gitEmail,
-		ForgeURL: room.ForgeURL, ForgeSSH: room.ForgeSSH, ForgeUser: room.ForgeAccount(),
+		ForgeURL: room.ForgeURL, ForgeSSH: room.ForgeSSHHost, ForgeUser: room.ForgeAccount(),
 	}); err != nil {
 		log.Warn("identity setup incomplete", "err", err)
 	}
@@ -119,8 +120,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 		log.Warn("team list unavailable; instructions without it", "err", err)
 	}
 	cancel()
-	instructions := Instructions(room, roleText, peers)
-	if err := writeInstructions(room, user, instructions); err != nil {
+	if err := writeInstructions(room, user, roleText, peers); err != nil {
 		log.Warn("writing instructions", "err", err)
 	}
 
@@ -200,18 +200,22 @@ func janitorConfig(s roomcfg.JanitorSettings) janitor.Config {
 }
 
 // writeInstructions puts the generated instructions where the CLI reads
-// them: the managed CLAUDE.md (followed by the persona's), or the generated
-// block of ~/.ore/AGENTS.md.
-func writeInstructions(room *roomcfg.Room, u *proc.User, text string) error {
+// them. Claude: the managed CLAUDE.md, which is the operator's rendered
+// claude-CLAUDE.md (identity, tools, role) plus the team from ListPeers, or
+// our own full text if the persona has none. ore: the generated block of
+// ~/.ore/AGENTS.md.
+func writeInstructions(room *roomcfg.Room, u *proc.User, roleText string, peers *messagingv1.ListPeersResponse) error {
 	if room.CLI == roomcfg.CLIClaude {
-		if extra, err := os.ReadFile(filepath.Join(roomcfg.PersonaDir, "claude-CLAUDE.md")); err == nil && len(strings.TrimSpace(string(extra))) > 0 {
-			text += "\n---\n\n" + string(extra)
+		text := Instructions(room, roleText, peers)
+		if persona, err := os.ReadFile(filepath.Join(roomcfg.PersonaDir, "claude-CLAUDE.md")); err == nil && len(strings.TrimSpace(string(persona))) > 0 {
+			text = strings.TrimRight(string(persona), "\n") + "\n" + TeamSection(peers)
 		}
 		if err := os.MkdirAll(roomcfg.ClaudeEtc, 0o755); err != nil {
 			return err
 		}
 		return os.WriteFile(filepath.Join(roomcfg.ClaudeEtc, "CLAUDE.md"), []byte(text), 0o644)
 	}
+	text := Instructions(room, roleText, peers)
 	dir := filepath.Join(u.Home, ".ore")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -228,7 +232,7 @@ func writeInstructions(room *roomcfg.Room, u *proc.User, text string) error {
 
 // cloneRepos clones spec.repos missing from ~/work over SSH, as the agent.
 func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog.Logger) {
-	if room.ForgeSSH == "" {
+	if room.ForgeSSHHost == "" {
 		return
 	}
 	workDir := filepath.Join(u.Home, "work")
@@ -244,7 +248,7 @@ func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog
 			log.Warn("work folder exists and is not a clone; not cloning", "repo", repo, "dest", dest)
 			continue
 		}
-		url := "ssh://git@" + room.ForgeSSH + "/" + repo + ".git"
+		url := "ssh://git@" + room.ForgeSSHHost + "/" + repo + ".git"
 		cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 		cmd := exec.CommandContext(cctx, "git", "clone", "--quiet", url, dest)
 		cmd.Env = proc.BaseEnv(u)
@@ -263,17 +267,22 @@ func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog
 // newAgent builds the CLI driver for the room.
 func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, ev agent.Events, log *slog.Logger) agent.Agent {
 	key := readSecret("gateway_key")
+	var roomEnv []string
+	for k, v := range room.Env {
+		roomEnv = append(roomEnv, k+"="+v)
+	}
+	sort.Strings(roomEnv)
 	if room.CLI == roomcfg.CLIOre {
-		p := ore.Policy{GatewayURL: room.GatewayURL, WireAPI: room.OreWireAPI}
+		p := ore.Policy{GatewayURL: room.OreBaseURL(), WireAPI: room.OreWireAPI()}
 		return &ore.Driver{
 			Home: u.Home, WorkDir: work, User: u, Socket: roomcfg.OreSock,
-			Env:                   []string{ore.GatewayKeyEnv + "=" + key},
+			Env:                   append(roomEnv, ore.GatewayKeyEnv+"="+key),
 			Settings:              ore.UserSettings{Provider: p.Provider(), Model: room.Model, Effort: room.Effort},
 			DeveloperInstructions: roleText, FirstTurn: room.FirstTurnPrompt(),
 			Events: ev, Log: log,
 		}
 	}
-	env := []string{"ANTHROPIC_AUTH_TOKEN=" + key}
+	env := append(roomEnv, "ANTHROPIC_AUTH_TOKEN="+key)
 	if base := room.GatewayURL; base != "" {
 		env = append(env, "ANTHROPIC_BASE_URL="+base)
 	} else if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {

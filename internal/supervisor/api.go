@@ -72,7 +72,7 @@ func (a *API) ListAgents(ctx context.Context, _ *connect.Request[roomv1.ListAgen
 func (a *API) WhoAmI(context.Context, *connect.Request[roomv1.WhoAmIRequest]) (*connect.Response[roomv1.WhoAmIResponse], error) {
 	r := a.Core.Room
 	return connect.NewResponse(&roomv1.WhoAmIResponse{
-		Address: r.Address(), Workspace: r.Workspace, Group: r.Group, Role: r.RoleTitle,
+		Address: r.AddressOrDefault(), Workspace: r.Workspace, Group: r.Group, Role: r.RoleTitle,
 		ForgeUser: r.ForgeAccount(), ForgeUrl: r.ForgeURL,
 	}), nil
 }
