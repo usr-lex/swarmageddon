@@ -174,6 +174,7 @@ type Agent struct {
 	Group         string                 `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
 	Presence      string                 `protobuf:"bytes,6,opt,name=presence,proto3" json:"presence,omitempty"`
 	Note          string                 `protobuf:"bytes,7,opt,name=note,proto3" json:"note,omitempty"`
+	CurrentTask   string                 `protobuf:"bytes,8,opt,name=current_task,json=currentTask,proto3" json:"current_task,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -253,6 +254,13 @@ func (x *Agent) GetPresence() string {
 func (x *Agent) GetNote() string {
 	if x != nil {
 		return x.Note
+	}
+	return ""
+}
+
+func (x *Agent) GetCurrentTask() string {
+	if x != nil {
+		return x.CurrentTask
 	}
 	return ""
 }
@@ -628,7 +636,7 @@ const file_swarm_room_v1_room_proto_rawDesc = "" +
 	"\breply_to\x18\x03 \x01(\tR\areplyTo\"%\n" +
 	"\x13SendMessageResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x13\n" +
-	"\x11ListAgentsRequest\"\xab\x01\n" +
+	"\x11ListAgentsRequest\"\xce\x01\n" +
 	"\x05Agent\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x14\n" +
@@ -636,7 +644,8 @@ const file_swarm_room_v1_room_proto_rawDesc = "" +
 	"\asummary\x18\x04 \x01(\tR\asummary\x12\x14\n" +
 	"\x05group\x18\x05 \x01(\tR\x05group\x12\x1a\n" +
 	"\bpresence\x18\x06 \x01(\tR\bpresence\x12\x12\n" +
-	"\x04note\x18\a \x01(\tR\x04note\"V\n" +
+	"\x04note\x18\a \x01(\tR\x04note\x12!\n" +
+	"\fcurrent_task\x18\b \x01(\tR\vcurrentTask\"V\n" +
 	"\x12ListAgentsResponse\x12\x12\n" +
 	"\x04self\x18\x01 \x01(\tR\x04self\x12,\n" +
 	"\x06agents\x18\x02 \x03(\v2\x14.swarm.room.v1.AgentR\x06agents\"\x0f\n" +
