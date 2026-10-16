@@ -218,7 +218,7 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	latest := since
 	var evs []store.Activity
 	var crossings []store.Activity
@@ -333,7 +333,7 @@ func (r *Reports) Follow(ctx context.Context, ws string) error {
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	for stream.Receive() {
 		d := stream.Msg()
 		if m := d.GetMessage(); m != nil {

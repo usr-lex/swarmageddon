@@ -63,10 +63,14 @@ func (s channelSvc) ListChannels(ctx context.Context, req *connect.Request[ccv1.
 	return connect.NewResponse(out), nil
 }
 
-// PostToChannel posts as the person. Operators of the workspace may post to
-// any of its channels; messaging checks others against the channel's access.
+// PostToChannel posts as the person. Viewers are read-only (§8.1), so only
+// operators of the workspace (and admins) may post; messaging then checks
+// the channel's membership and access, which it alone knows.
 func (s channelSvc) PostToChannel(ctx context.Context, req *connect.Request[ccv1.PostToChannelRequest]) (*connect.Response[ccv1.PostToChannelResponse], error) {
 	ws := req.Msg.GetWorkspace()
+	if _, err := s.canOperate(ctx, ws); err != nil {
+		return nil, err
+	}
 	as, err := s.as(ctx, ws)
 	if err != nil {
 		return nil, err

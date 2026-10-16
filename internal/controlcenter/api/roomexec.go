@@ -76,7 +76,7 @@ func (s roomSvc) WatchTranscript(ctx context.Context, req *connect.Request[ccv1.
 	}()
 	stop := func() error {
 		cancel()
-		pr.Close()
+		_ = pr.Close()
 		return <-done
 	}
 	p := &transcript.Parser{CLI: cli}

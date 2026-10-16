@@ -65,7 +65,7 @@ func (s *Server) followInbox(ctx context.Context, u store.User, ws string) error
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	for stream.Receive() {
 		d := stream.Msg()
 		db := s.DB()
@@ -90,7 +90,7 @@ func (s *Server) followInbox(ctx context.Context, u store.User, ws string) error
 					if len(body) > 200 {
 						body = body[:200] + "…"
 					}
-					s.Notify.PushTo(ctx, subs, notify.Event{Kind: "message", Workspace: ws, Title: "Message from " + m.GetFrom(), Body: body, URL: "/inbox"})
+					_ = s.Notify.PushTo(ctx, subs, notify.Event{Kind: "message", Workspace: ws, Title: "Message from " + m.GetFrom(), Body: body, URL: "/inbox"})
 				}
 			}
 		} else if n := d.GetNotice(); n != nil {

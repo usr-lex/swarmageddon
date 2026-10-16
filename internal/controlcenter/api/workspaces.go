@@ -53,9 +53,7 @@ func (s workspaceSvc) GetWorkspace(ctx context.Context, req *connect.Request[ccv
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such workspace"))
 	}
 	out := &ccv1.GetWorkspaceResponse{Plan: wizard.FromCluster(cur), Summary: summary(cur.Workspace, len(cur.Rooms)), Effective: wizard.EffectiveCurrent(cur)}
-	for _, r := range s.Fleet.Rooms(func(ws string) bool { return ws == req.Msg.GetName() }) {
-		out.Rooms = append(out.Rooms, r)
-	}
+	out.Rooms = append(out.Rooms, s.Fleet.Rooms(func(ws string) bool { return ws == req.Msg.GetName() })...)
 	return connect.NewResponse(out), nil
 }
 

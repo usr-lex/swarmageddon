@@ -195,7 +195,7 @@ func (f *Fleet) WatchPresence(ctx context.Context, msg interface {
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	for stream.Receive() {
 		f.Presence(ctx, stream.Msg())
 	}

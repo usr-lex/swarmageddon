@@ -252,12 +252,12 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	if p.RoomDefaults != nil {
 		s.RoomDefaults = SettingsFromPlan(p.GetRoomDefaults())
 	}
-	if s.RoomDefaults.Network != nil {
-		s.Internet = nil // deprecated; the network setting decides
-	} else {
-		internet := p.GetInternet()
-		s.Internet = &internet
+	// The deprecated internet flag becomes roomDefaults.network; FromCluster
+	// already folded an old workspace's internet: false into the plan's network.
+	if s.RoomDefaults.Network == nil && !p.GetInternet() {
+		s.RoomDefaults.Network = &v1alpha1.NetworkAccess{Mode: v1alpha1.NetworkNone}
 	}
+	s.Internet = nil //nolint:staticcheck // cleared: roomDefaults.network now says the same
 	s.SharedVolumes = volumesFromPlan(p)
 	if d, err := time.ParseDuration(p.GetApprovalTimeout()); err == nil && p.GetApprovalTimeout() != "" {
 		s.ApprovalTimeout = &metav1.Duration{Duration: d}
@@ -356,7 +356,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Name: w.Name, DisplayName: s.DisplayName, Org: s.Forge.Org, DefaultLinks: string(s.Messaging.DefaultLinks),
 		Owners: s.Owners, DefaultModel: s.Models.Default, BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
 		UpdateMode: string(s.UpdatePolicy.Mode), UpdateWindow: s.UpdatePolicy.Window, RequiredApprovals: s.Forge.RequiredApprovals,
-		Internet:     s.Internet == nil || *s.Internet,
+		Internet:     s.Internet == nil || *s.Internet, //nolint:staticcheck // still read for workspaces written before roomDefaults.network
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
 		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{}, RoleAdvisors: map[string]*ccv1.AdvisorPlan{},
 	}

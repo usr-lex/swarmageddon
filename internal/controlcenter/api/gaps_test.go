@@ -312,4 +312,8 @@ func TestChannelStreamAndMentionables(t *testing.T) {
 	if _, err := ch.ListMentionables(ctx, connect.NewRequest(&ccv1.ListMentionablesRequest{Workspace: "beta"})); code(err) != connect.CodePermissionDenied {
 		t.Fatalf("other workspace: %v", err)
 	}
+	// Viewers read channels but don't post.
+	if _, err := ch.PostToChannel(ctx, connect.NewRequest(&ccv1.PostToChannelRequest{Workspace: "acme", Channel: "general", Body: "hi"})); code(err) != connect.CodePermissionDenied {
+		t.Fatalf("viewer posted: %v", err)
+	}
 }

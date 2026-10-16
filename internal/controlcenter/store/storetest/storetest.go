@@ -41,7 +41,7 @@ func URL(t testing.TB) string {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	if _, err := conn.Exec(ctx, "CREATE DATABASE "+name); err != nil {
 		t.Fatalf("create database: %v", err)
 	}
@@ -91,7 +91,7 @@ func start() {
 		if err == nil {
 			var one int
 			err = conn.QueryRow(context.Background(), "SELECT 1").Scan(&one)
-			conn.Close(context.Background())
+			_ = conn.Close(context.Background())
 			if err == nil {
 				return
 			}

@@ -169,7 +169,7 @@ func (s *Server) finishSignIn(w http.ResponseWriter, r *http.Request, pl *v1alph
 	// The first admin may come from the identity provider's groups (§8.1):
 	// signing in as one claims the installation if nobody has.
 	if role == auth.RoleAdmin {
-		if pl.Status.AdminClaimed == false {
+		if !pl.Status.AdminClaimed {
 			if err := s.K.SetAdminClaimed(r.Context()); err == nil {
 				s.Audit.Record(r.Context(), store.AuditEvent{Actor: p.Name(), Action: "setup.claim", Object: "provider/" + provider, SourceIP: ip})
 			}
@@ -368,7 +368,7 @@ func (s *Server) handleSAML(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
-		w.Write(md)
+		_, _ = w.Write(md)
 	case "login":
 		u, err := p.Begin(ctx, safeReturn(r.URL.Query().Get("return")))
 		if err != nil {

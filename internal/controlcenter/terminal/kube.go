@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream" //nolint:staticcheck // client-go's spdy dialer still returns these types
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -101,7 +101,7 @@ func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWr
 		return nil, err
 	}
 	if proto != portforward.PortForwardProtocolV1Name {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("port-forward protocol %q not supported", proto)
 	}
 	id := strconv.FormatInt(k.reqID.Add(1), 10)
@@ -111,19 +111,19 @@ func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWr
 	h.Set(corev1.PortForwardRequestIDHeader, id)
 	errStream, err := conn.CreateStream(h)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	errStream.Close()
 	h.Set(corev1.StreamType, corev1.StreamTypeData)
 	data, err := conn.CreateStream(h)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	go func() {
 		<-ctx.Done()
-		conn.Close()
+		_ = conn.Close()
 	}()
 	return &fwdConn{Stream: data, conn: conn}, nil
 }

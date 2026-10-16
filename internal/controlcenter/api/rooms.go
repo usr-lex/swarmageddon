@@ -347,7 +347,7 @@ func (s roomSvc) GetRoomStorage(ctx context.Context, req *connect.Request[ccv1.G
 		}
 		out.Claims = append(out.Claims, ci)
 	}
-	for _, d := range r.Spec.SharedDirs {
+	for _, d := range r.Spec.SharedDirs { //nolint:staticcheck // still shown for rooms that use the deprecated field
 		out.SharedDirs = append(out.SharedDirs, d.Name)
 	}
 	return connect.NewResponse(out), nil

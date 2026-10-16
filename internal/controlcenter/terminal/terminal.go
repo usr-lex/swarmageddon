@@ -176,7 +176,7 @@ func (h *Handler) ServeTerminal(w http.ResponseWriter, r *http.Request) {
 	resize := make(chan Size, 4)
 	// Browser → room.
 	go func() {
-		defer stdinW.Close()
+		defer func() { _ = stdinW.Close() }()
 		defer cancel()
 		for {
 			typ, data, err := c.Read(ctx)
@@ -211,7 +211,7 @@ func (h *Handler) ServeTerminal(w http.ResponseWriter, r *http.Request) {
 		_ = c.Write(wctx, websocket.MessageText, b)
 		wcancel()
 	}
-	c.Close(websocket.StatusNormalClosure, "")
+	_ = c.Close(websocket.StatusNormalClosure, "")
 	h.audit(r, p, "terminal.close", ws, room, result, fmt.Sprintf(`{"mode":%q,"durationSeconds":%d}`, mode, int(time.Since(start).Seconds())))
 }
 
@@ -263,6 +263,6 @@ func (h *Handler) ServeVNC(w http.ResponseWriter, r *http.Request) {
 	go func() { _, _ = io.Copy(nc, remote); done <- struct{}{} }()
 	<-done
 	cancel()
-	c.Close(websocket.StatusNormalClosure, "")
+	_ = c.Close(websocket.StatusNormalClosure, "")
 	h.audit(r, p, "vnc.close", ws, room, "ok", fmt.Sprintf(`{"durationSeconds":%d}`, int(time.Since(start).Seconds())))
 }
