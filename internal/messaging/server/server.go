@@ -22,6 +22,9 @@ import (
 
 // Server is the Connect handler.
 type Server struct {
+	// Answers Unimplemented for methods this server doesn't implement yet.
+	messagingv1connect.UnimplementedMessagingServiceHandler
+
 	dir directory.Directory
 	st  *store.Store
 	lim *policy.Limiter

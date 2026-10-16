@@ -34,6 +34,16 @@ service MessagingService {
   rpc WatchApprovals(WatchApprovalsRequest) returns (stream ApprovalEvent);
   rpc AnswerApproval(AnswerApprovalRequest) returns (AnswerApprovalResponse);
 
+  // Channels and reading (docs/design.md §7.8). Rooms and the control
+  // center (acting for a person) call these for themselves.
+  rpc Post(PostRequest) returns (PostResponse);
+  rpc ReadMessages(ReadMessagesRequest) returns (ReadMessagesResponse);
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc UnreadSummary(UnreadSummaryRequest) returns (UnreadSummaryResponse);
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse);
+  rpc SetDelivery(SetDeliveryRequest) returns (SetDeliveryResponse);
+
   // Room telemetry for the control center: current task, usage, disk.
   rpc ReportStatus(ReportStatusRequest) returns (ReportStatusResponse);
 
@@ -83,7 +93,35 @@ message Delivery {
     Message message = 2;
     ApprovalAnswer approval_answer = 3;
     Notice notice = 4;
+    // A channel post pushed to this reader (push mode or a mention).
+    ChannelPost post = 5;
+    // A digest of new posts in one channel.
+    Digest digest = 6;
   }
+  // Never held back by the push budget (approval answers, warden notices,
+  // people's direct messages).
+  bool urgent = 7;
+}
+
+message ChannelPost {
+  string id = 1;
+  string channel = 2;
+  string from = 3;
+  string from_kind = 4;
+  string body = 5;
+  google.protobuf.Timestamp sent_at = 6;
+  // Addresses mentioned with @name.
+  repeated string mentions = 7;
+  // True when body was cut; get_message returns the rest.
+  bool truncated = 8;
+}
+
+message Digest {
+  string channel = 1;
+  int32 new_posts = 2;
+  repeated string posters = 3;
+  // First line of each new post, oldest first, a few at most.
+  repeated string previews = 4;
 }
 
 // Notice is a message from the platform itself, e.g. "not delivered".
@@ -283,3 +321,96 @@ message ReportVerdictRequest {
   Verdict verdict = 1;
 }
 message ReportVerdictResponse {}
+
+message PostRequest {
+  // ULID chosen by the poster; the dedup key.
+  string id = 1;
+  // Without the leading #.
+  string channel = 2;
+  string body = 3;
+}
+message PostResponse {
+  string id = 1;
+  bool duplicate = 2;
+  // Mentioned agents the post was pushed to.
+  repeated string mentioned = 3;
+}
+
+// One item in a reading page: a direct message or a channel post.
+message InboxItem {
+  string id = 1;
+  // Empty for direct messages.
+  string channel = 2;
+  string from = 3;
+  string from_kind = 4;
+  string body = 5;
+  google.protobuf.Timestamp sent_at = 6;
+  bool truncated = 7;
+  bool read = 8;
+  bool mentions_me = 9;
+}
+
+message ReadMessagesRequest {
+  // all, direct, mentions, or a channel name.
+  string scope = 1;
+  // Default true.
+  optional bool unread_only = 2;
+  // Default 20, at most 50.
+  int32 limit = 3;
+  string cursor = 4;
+  // Whole bodies instead of the first 500 characters.
+  bool full = 5;
+  // Default true: returned items are marked read.
+  optional bool mark_read = 6;
+}
+message ReadMessagesResponse {
+  repeated InboxItem items = 1;
+  string next_cursor = 2;
+  int32 unread_remaining = 3;
+}
+
+message GetMessageRequest {
+  string id = 1;
+}
+message GetMessageResponse {
+  InboxItem item = 1;
+}
+
+message MarkReadRequest {
+  string scope = 1;
+  // Item id to mark read up to and including; empty: everything in scope.
+  string up_to = 2;
+}
+message MarkReadResponse {}
+
+message UnreadCount {
+  // direct, mentions, or a channel name.
+  string scope = 1;
+  int32 unread = 2;
+}
+message UnreadSummaryRequest {}
+message UnreadSummaryResponse {
+  repeated UnreadCount counts = 1;
+}
+
+message Channel {
+  string name = 1;
+  string description = 2;
+  // read, write or readWrite.
+  string access = 3;
+  // push, digest or pull.
+  string delivery = 4;
+  repeated string allowed_delivery = 5;
+  int32 unread = 6;
+  int32 members = 7;
+}
+message ListChannelsRequest {}
+message ListChannelsResponse {
+  repeated Channel channels = 1;
+}
+
+message SetDeliveryRequest {
+  string channel = 1;
+  string mode = 2;
+}
+message SetDeliveryResponse {}

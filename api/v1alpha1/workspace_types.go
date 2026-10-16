@@ -115,6 +115,12 @@ type MessagingPolicy struct {
 	Limits MessageLimits `json:"limits,omitempty"`
 	// +optional
 	Retention RetentionSettings `json:"retention,omitempty"`
+	// Channels are the workspace's one-to-many conversations (docs/design.md §7.8).
+	// +optional
+	Channels []ChannelSpec `json:"channels,omitempty"`
+	// Storm keeps agents' sessions from being flooded (docs/design.md §7.8).
+	// +optional
+	Storm StormControl `json:"storm,omitempty"`
 	// People with the operator role may message agents; agents may message people.
 	// +kubebuilder:default=true
 	// +optional
@@ -135,6 +141,71 @@ type GroupLink struct {
 	// RequirePrefix the message must start with; {recipient} is replaced by the recipient's name.
 	// +optional
 	RequirePrefix string `json:"requirePrefix,omitempty"`
+}
+
+// ChannelAccess is what a channel member may do.
+// +kubebuilder:validation:Enum=read;write;readWrite
+type ChannelAccess string
+
+const (
+	AccessRead      ChannelAccess = "read"
+	AccessWrite     ChannelAccess = "write"
+	AccessReadWrite ChannelAccess = "readWrite"
+)
+
+// DeliveryMode is how a channel's posts reach a reader's session.
+// +kubebuilder:validation:Enum=push;digest;pull
+type DeliveryMode string
+
+const (
+	DeliveryPush   DeliveryMode = "push"
+	DeliveryDigest DeliveryMode = "digest"
+	DeliveryPull   DeliveryMode = "pull"
+)
+
+// ChannelSpec is a named conversation and who may read and post in it.
+type ChannelSpec struct {
+	// Name without the leading #.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9][a-z0-9_-]{0,62}$`
+	Name string `json:"name"`
+	// +optional
+	Description string `json:"description,omitempty"`
+	// +kubebuilder:validation:MinItems=1
+	Members []ChannelMember `json:"members"`
+	// +kubebuilder:default=digest
+	// +optional
+	DefaultDelivery DeliveryMode `json:"defaultDelivery,omitempty"`
+	// AllowedDelivery lists the modes readers may switch to. Empty: all.
+	// +optional
+	AllowedDelivery []DeliveryMode `json:"allowedDelivery,omitempty"`
+	// PostsPerMinute across all posters. Default 20.
+	// +optional
+	PostsPerMinute int32 `json:"postsPerMinute,omitempty"`
+}
+
+// ChannelMember selects members and gives them access.
+type ChannelMember struct {
+	// Selector: everyone, people, role:<template>, team:<forge team>,
+	// group:<group>, room:<name> or person:<handle>.
+	// +kubebuilder:validation:Pattern=`^(everyone|people|(role|team|group|room|person):[a-z0-9][a-z0-9_-]{0,62})$`
+	Select string        `json:"select"`
+	Access ChannelAccess `json:"access"`
+}
+
+// StormControl limits what reaches an agent's session (docs/design.md §7.8).
+type StormControl struct {
+	// PushPerMinute is how many items may be pushed into a session per minute. Default 6.
+	// +optional
+	PushPerMinute int32 `json:"pushPerMinute,omitempty"`
+	// CoalesceBytes caps one coalesced injection. Default 4096.
+	// +optional
+	CoalesceBytes int32 `json:"coalesceBytes,omitempty"`
+	// DigestInterval between digest notices per channel. Default 15m.
+	// +optional
+	DigestInterval *metav1.Duration `json:"digestInterval,omitempty"`
+	// FanoutPerMinute caps recipients a sender reaches per minute. Default 60.
+	// +optional
+	FanoutPerMinute int32 `json:"fanoutPerMinute,omitempty"`
 }
 
 type MessageLimits struct {
