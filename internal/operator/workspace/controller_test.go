@@ -151,7 +151,7 @@ func TestWorkspaceReconcile(t *testing.T) {
 
 	ca, err := pki.NewCA("test", metav1.Now().Time)
 	must(err)
-	r := &Reconciler{Client: c, Scheme: env.Scheme, Deps: deps.Deps{
+	r := &Reconciler{Client: env.OperatorClient(t), Scheme: env.Scheme, Deps: deps.Deps{
 		PKI:     ca,
 		Version: "v0.1.0",
 		Forge:   func(context.Context) (*forgejo.Client, error) { return forgejo.New(forgeSrv.URL, "admin"), nil },
@@ -276,7 +276,7 @@ func TestForgeNotReadyKeepsNamespace(t *testing.T) {
 	ctx := context.Background()
 	_ = c.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.SystemNamespace}})
 	ca, _ := pki.NewCA("test", metav1.Now().Time)
-	r := &Reconciler{Client: c, Scheme: env.Scheme, Deps: deps.Deps{
+	r := &Reconciler{Client: env.OperatorClient(t), Scheme: env.Scheme, Deps: deps.Deps{
 		PKI: ca,
 		Forge: func(context.Context) (*forgejo.Client, error) {
 			return nil, fmt.Errorf("forgejo: %w", deps.ErrNotReady)

@@ -224,8 +224,9 @@ func controlCenterRole(ns string) *rbacv1.Role {
 		Rules: []rbacv1.PolicyRule{
 			{APIGroups: []string{v1alpha1.GroupVersion.Group}, Resources: []string{"rooms", "roletemplates", "runnerpools"}, Verbs: rw},
 			{APIGroups: []string{v1alpha1.GroupVersion.Group}, Resources: []string{"rooms/status", "runnerpools/status"}, Verbs: read},
-			{APIGroups: []string{""}, Resources: []string{"pods", "pods/log", "persistentvolumeclaims", "events"}, Verbs: read},
-			{APIGroups: []string{""}, Resources: []string{"pods/exec", "pods/portforward"}, Verbs: []string{"create", "get"}},
+			{APIGroups: []string{""}, Resources: []string{"pods", "persistentvolumeclaims", "events"}, Verbs: read},
+			{APIGroups: []string{""}, Resources: []string{"pods/log"}, Verbs: []string{"get"}},
+			{APIGroups: []string{""}, Resources: []string{"pods/exec", "pods/portforward"}, Verbs: []string{"create"}},
 			{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
 		},
 	}

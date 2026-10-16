@@ -80,10 +80,12 @@ func TestPlatformReconcile(t *testing.T) {
 	imgs := images.Defaults("v0.1.0")
 	dc := discovery.NewDiscoveryClientForConfigOrDie(env.Config)
 	var out bytes.Buffer
+	// The reconciler runs with exactly the generated operator ClusterRole.
+	oc := env.OperatorClient(t)
 	r := &Reconciler{
-		Client: c, Scheme: env.Scheme, Out: &out,
-		Deps:      deps.Deps{CAStore: &pki.Store{Client: c, Namespace: sys}, Pinned: imgs, Version: "v0.1.0"},
-		Preflight: &preflight.Runner{Client: c, Images: imgs, ServerVersion: dc.ServerVersion},
+		Client: oc, Scheme: env.Scheme, Out: &out,
+		Deps:      deps.Deps{CAStore: &pki.Store{Client: oc, Namespace: sys}, Pinned: imgs, Version: "v0.1.0"},
+		Preflight: &preflight.Runner{Client: oc, Images: imgs, ServerVersion: dc.ServerVersion},
 	}
 	must(EnsurePlatform(ctx, c))
 	reconcileOnce := func() {
@@ -202,7 +204,9 @@ func TestPlatformReconcile(t *testing.T) {
 		s.Status.ObservedGeneration = s.Generation
 		must(c.Status().Update(ctx, &s))
 	}
-	cond := func(typ string) *metav1.Condition { return meta.FindStatusCondition(getPlatform().Status.Conditions, typ) }
+	cond := func(typ string) *metav1.Condition {
+		return meta.FindStatusCondition(getPlatform().Status.Conditions, typ)
+	}
 
 	if !stsExists("postgres") || stsExists("forgejo") {
 		t.Fatal("postgres must be applied first and forgejo wait for it")
