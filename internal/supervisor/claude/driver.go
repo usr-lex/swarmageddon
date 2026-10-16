@@ -46,13 +46,14 @@ type Driver struct {
 	// MinBackoff between restarts (default 2 s).
 	MinBackoff time.Duration
 
-	mu      sync.Mutex
-	socket  string
-	token   string
-	ready   chan struct{} // closed when the inbox socket is known
-	runSeq  int           // increments per CLI start
-	firstAt int           // runSeq for which the first turn was sent
-	pending map[*context.CancelFunc]string
+	mu         sync.Mutex
+	socket     string
+	token      string
+	ready      chan struct{} // closed when the inbox socket is known
+	runSeq     int           // increments per CLI start
+	firstAt    int           // runSeq for which the first turn was sent
+	pending    map[*context.CancelFunc]string
+	transcript string
 }
 
 func (d *Driver) init() {
@@ -230,6 +231,12 @@ type FrameMessage struct {
 // WriteFrame connects to a session's inbox socket, authenticates with the
 // session token, and writes one user frame with priority "next".
 func WriteFrame(socket, token, msgID, text string) error {
+	return writeFrame(socket, token, msgID, text, "next")
+}
+
+// writeFrame writes one frame with a priority: next (between tool calls),
+// now (interrupts the turn) or later.
+func writeFrame(socket, token, msgID, text, priority string) error {
 	if socket == "" {
 		return errors.New("no inbox socket")
 	}
@@ -247,7 +254,7 @@ func WriteFrame(socket, token, msgID, text string) error {
 		b, _ := json.Marshal(map[string]string{"type": "auth", "token": token})
 		buf = append(append(buf, b...), '\n')
 	}
-	b, err := json.Marshal(Frame{Type: "user", Message: FrameMessage{Role: "user", Content: text}, MsgID: msgID, Priority: "next"})
+	b, err := json.Marshal(Frame{Type: "user", Message: FrameMessage{Role: "user", Content: text}, MsgID: msgID, Priority: priority})
 	if err != nil {
 		return err
 	}
@@ -335,6 +342,11 @@ func (d *Driver) Hook(ctx context.Context, event string, payload []byte, env map
 
 func (d *Driver) sessionStart(in HookInput, env map[string]string) {
 	sock, tok := env["CLAUDE_CODE_MESSAGING_SOCKET"], env["CLAUDE_CODE_MESSAGING_TOKEN"]
+	if in.TranscriptPath != "" {
+		d.mu.Lock()
+		d.transcript = in.TranscriptPath
+		d.mu.Unlock()
+	}
 	if in.SessionID != "" {
 		d.Events.Session(in.SessionID)
 		_ = os.WriteFile(filepath.Join(d.StateDir, "claude-session"), []byte(in.SessionID+"\n"), 0o600)
