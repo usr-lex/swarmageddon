@@ -1,0 +1,47 @@
+# Defaults work on a plain k3s cluster with no flags (docs/design.md §3.1).
+
+image:
+  # Images are <registry>/<name>:<tag>, e.g. ghcr.io/usr-lex/swarmageddon/operator:0.1.0.
+  registry: ghcr.io/usr-lex/swarmageddon
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+pullSecrets: []
+
+# Render a Namespace object. Off for `helm install --create-namespace`; on
+# when rendering install.yaml.
+namespace:
+  create: false
+
+operator:
+  # Extra operator flags, e.g. ["--zap-log-level=debug"].
+  extraArgs: []
+  # Room image; defaults to <registry>/room:<tag>.
+  roomImage: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+
+controlCenter:
+  extraArgs: []
+  # Plain HTTP, no TLS (local development only).
+  dev: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+
+welcome:
+  # The Job that prints the URL and setup token for `kubectl apply` users.
+  enabled: true
+  # Seconds the finished Job (and its log) is kept.
+  ttlSecondsAfterFinished: 3600

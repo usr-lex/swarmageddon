@@ -1,0 +1,83 @@
+# The control center's own RBAC (docs/design.md §11.3). Its access inside
+# workspace namespaces comes from RoleBindings the operator creates there.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: control-center
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-control-center
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms, workspaces]
+    verbs: [get, list, watch, create, update, patch]
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms/status, workspaces/status]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-control-center
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swarmageddon-control-center
+subjects:
+  - kind: ServiceAccount
+    name: control-center
+    namespace: {{ .Release.Namespace }}
+---
+# Its own Secrets in the system namespace, by name. `create` can't be limited
+# by name in RBAC, so it may create Secrets here but read and change only these.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: control-center
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      - setup-token
+      - control-center-tls
+      - control-center-client
+      - control-center-session
+      - control-center-db
+      - local-admin
+      - vapid
+    verbs: [get, list, watch, update, patch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [platform-ca-bundle]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: control-center
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: control-center
+subjects:
+  - kind: ServiceAccount
+    name: control-center
+    namespace: {{ .Release.Namespace }}
