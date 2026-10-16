@@ -31,6 +31,7 @@ import type {
   WorkspaceDraft,
   WorkspaceSummary,
 } from "./types";
+import type { ObservatoryApi } from "./observatory";
 
 /** Error with a Connect-like code, so pages can react to "unauthenticated". */
 export class ApiError extends Error {
@@ -47,6 +48,9 @@ export class ApiError extends Error {
  * that end when the signal aborts.
  */
 export interface Api {
+  /** The workspace home page (§8.7). */
+  observatory: ObservatoryApi;
+
   // Setup (§3.3)
   getSetupState(): Promise<SetupState>;
   /** Checks the setup token; returns a short-lived claim the next call needs. */

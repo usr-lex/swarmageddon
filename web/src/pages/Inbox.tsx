@@ -34,7 +34,7 @@ export function InboxPage({ address }: { address?: string }) {
           {convs.isPending && <Spinner label="Loading" />}
           <ErrorText error={convs.error} />
           {convs.data?.length === 0 && <Empty>No agents yet.</Empty>}
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-xs border border-border bg-surface">
             {convs.data?.map((c) => (
               <li key={c.address}>
                 <Link
@@ -75,7 +75,7 @@ function Conversation({ address }: { address: string }) {
   useEffect(() => end.current?.scrollIntoView?.({ block: "end" }), [msgs.data?.length]);
   const canSend = me.data?.role !== "viewer";
   return (
-    <section aria-label={`Conversation with ${address}`} className="flex min-h-[60vh] flex-col rounded-lg border border-border bg-surface">
+    <section aria-label={`Conversation with ${address}`} className="flex min-h-[60vh] flex-col rounded-xs border border-border bg-surface">
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
         <Link to="/inbox" className="min-h-10 content-center px-1 md:hidden" aria-label="Back to conversations">
           ←
@@ -88,7 +88,7 @@ function Conversation({ address }: { address: string }) {
         {msgs.data?.map((m) => {
           const mine = m.fromKind === "human";
           return (
-            <div key={m.id} className={cx("max-w-[85%] rounded-lg px-3 py-2 text-sm", mine ? "ml-auto bg-accent text-accent-fg" : "bg-surface-2")}>
+            <div key={m.id} className={cx("max-w-[85%] rounded-xs px-3 py-2 text-sm", mine ? "ml-auto bg-accent text-accent-fg" : "bg-surface-2")}>
               <p className="whitespace-pre-wrap break-words">{m.body}</p>
               <p className={cx("mt-1 text-[11px]", mine ? "opacity-80" : "text-muted")}>
                 {mine ? m.from.split("@")[0] : m.from} · {ago(m.at)}

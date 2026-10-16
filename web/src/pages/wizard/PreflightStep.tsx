@@ -79,7 +79,7 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
           ))}
         </fieldset>
         {needsAccept && (
-          <div role="alert" className="mt-3 rounded-md border border-bad/40 bg-bad/10 p-3 text-sm">
+          <div role="alert" className="mt-3 rounded-xs border border-bad/40 bg-bad/10 p-3 text-sm">
             <p className="font-semibold text-bad">Privileged rooms are not isolated from the node.</p>
             <p className="mt-1">
               An agent in a privileged room can take over the node and everything running on it, including other rooms and the platform's

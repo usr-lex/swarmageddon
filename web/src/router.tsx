@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { ApiError } from "./api";
 import { Shell } from "./components/Shell";
 import { SetupPage } from "./pages/Setup";
@@ -15,6 +15,7 @@ import { SpendPage } from "./pages/Spend";
 import { UsersPage } from "./pages/Users";
 import { NotificationsPage } from "./pages/Notifications";
 import { WorkspacesPage } from "./pages/Workspaces";
+import { HomeRedirect, ObservatoryPage } from "./pages/observatory/ObservatoryPage";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,13 +31,9 @@ const rootRoute = createRootRoute({ component: Shell });
 const r = <P extends string>(path: P, component: () => React.ReactNode) =>
   createRoute({ getParentRoute: () => rootRoute, path, component });
 
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/",
-  beforeLoad: () => {
-    throw redirect({ to: "/fleet" });
-  },
-});
+const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomeRedirect });
+
+const observatoryRoute = createRoute({ getParentRoute: () => rootRoute, path: "/w/$workspace", component: ObservatoryPage });
 
 const signinRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -92,6 +89,7 @@ const conversationRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  observatoryRoute,
   r("/setup", SetupPage),
   signinRoute,
   r("/wizard", PlatformWizard),

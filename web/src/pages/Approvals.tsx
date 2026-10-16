@@ -52,7 +52,7 @@ function Detail({ text }: { text: string }) {
   }
   const diff = looksLikeDiff(shown);
   return (
-    <pre className="max-h-80 overflow-auto rounded-md bg-surface-2 p-2 text-xs whitespace-pre-wrap break-all" aria-label="Request detail">
+    <pre className="max-h-80 overflow-auto rounded-xs bg-surface-2 p-2 text-xs whitespace-pre-wrap break-all" aria-label="Request detail">
       {diff
         ? shown.split("\n").map((l, i) => (
             <span key={i} className={cx("block", l.startsWith("+") && !l.startsWith("+++") && "bg-ok/15 text-ok", l.startsWith("-") && !l.startsWith("---") && "bg-bad/15 text-bad", l.startsWith("@@") && "text-info")}>

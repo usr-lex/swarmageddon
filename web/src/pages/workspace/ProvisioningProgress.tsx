@@ -47,7 +47,7 @@ export function ProvisioningProgress({ workspace }: { workspace: string }) {
           ))}
         </ul>
       </Card>
-      <Link to="/fleet" className="inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-accent-fg">
+      <Link to="/fleet" className="inline-flex min-h-10 items-center rounded-xs bg-accent px-4 text-sm font-medium text-accent-fg">
         {done ? "Go to the fleet" : "Go to the fleet now"}
       </Link>
     </div>

@@ -73,7 +73,7 @@ export function ServicesStep({ platform, save, saving }: StepProps) {
         <p className="mb-3 text-sm text-muted">Keys are stored in a Secret only the model gateway mounts. They never enter rooms.</p>
         {svc.providers.length === 0 && <p className="text-sm text-bad">Add at least one provider so agents can reach a model.</p>}
         {svc.providers.map((p, i) => (
-          <fieldset key={i} className="mb-3 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+          <fieldset key={i} className="mb-3 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
             <legend className="px-1 text-sm font-medium">Provider {i + 1}</legend>
             <Field label="Kind">
               {(id) => (

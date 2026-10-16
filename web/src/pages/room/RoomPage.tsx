@@ -42,7 +42,7 @@ export function RoomPage() {
   if (detail.error) return <ErrorText error={detail.error} />;
   const s = live!;
   return (
-    <div className="space-y-4">
+    <div className="gridded -m-4 min-h-full space-y-4 p-4">
       <nav aria-label="Breadcrumb" className="text-sm text-muted">
         <Link to="/fleet" className="hover:underline">
           Fleet

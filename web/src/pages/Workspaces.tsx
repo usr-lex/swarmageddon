@@ -14,7 +14,7 @@ export function WorkspacesPage() {
         title="Workspaces"
         actions={
           canCreate && (
-            <Link to="/workspaces/new" className="inline-flex min-h-10 items-center rounded-md bg-accent px-3 text-sm font-medium text-accent-fg">
+            <Link to="/workspaces/new" className="inline-flex min-h-10 items-center rounded-xs bg-accent px-3 text-sm font-medium text-accent-fg">
               New workspace
             </Link>
           )
@@ -30,6 +30,9 @@ export function WorkspacesPage() {
               <p className="text-sm text-muted">
                 {w.name} · {w.rooms} rooms
               </p>
+              <Link to="/w/$workspace" params={{ workspace: w.name }} className="mt-2 mr-3 inline-block text-sm underline">
+                Observatory
+              </Link>
               {canCreate && (
                 <Link to="/workspaces/$workspace/edit" params={{ workspace: w.name }} className="mt-2 inline-block text-sm text-accent underline">
                   Change

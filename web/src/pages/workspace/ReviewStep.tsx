@@ -17,7 +17,7 @@ export function ReviewStep({ draft, errors, onApplied }: DraftProps & { errors: 
   return (
     <div className="space-y-4">
       {errors.length > 0 && (
-        <div role="alert" className="rounded-md border border-bad/40 bg-bad/10 p-3 text-sm">
+        <div role="alert" className="rounded-xs border border-bad/40 bg-bad/10 p-3 text-sm">
           <p className="font-medium text-bad">Fix these first:</p>
           <ul className="list-disc pl-5">
             {errors.map((e) => (

@@ -97,7 +97,7 @@ export function GroupsStep({ draft, set }: DraftProps) {
           )}
         </Field>
         {draft.links.map((l, i) => (
-          <fieldset key={i} className="mb-3 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
+          <fieldset key={i} className="mb-3 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-3">
             <legend className="px-1 text-sm font-medium">Link {i + 1}</legend>
             <Field label="From">
               {(id) => (

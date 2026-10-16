@@ -30,7 +30,7 @@ export function SignInPage() {
               <li key={`${p.kind}/${p.name}`}>
                 <a
                   href={providerLoginURL(p, safeNext(next))}
-                  className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-surface-2 px-3 text-sm font-medium hover:bg-border/50"
+                  className="flex min-h-10 w-full items-center justify-center rounded-xs border border-border bg-surface-2 px-3 text-sm font-medium hover:bg-border/50"
                 >
                   Continue with {p.displayName}
                 </a>

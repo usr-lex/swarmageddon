@@ -93,7 +93,7 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
         data-testid={`terminal-${mode}`}
         role="application"
         aria-label={`${mode === "agent" ? "Agent session" : "Shell"} terminal for ${room}${readOnly ? ", read-only" : ""}`}
-        className="h-[60vh] min-h-64 overflow-hidden rounded-md border border-border bg-white dark:bg-[#0b0d12]"
+        className="h-[60vh] min-h-64 overflow-hidden rounded-xs border border-border bg-white dark:bg-[#0b0d12]"
       />
     </div>
   );

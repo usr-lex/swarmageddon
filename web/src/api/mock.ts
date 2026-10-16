@@ -24,7 +24,8 @@ import type {
   User,
   WorkspaceDraft,
 } from "./types";
-import { defaultRoles, defaultRoom } from "@/lib/workspace";
+import { defaultRoom } from "@/lib/workspace";
+import { createMockObservatory, demoLinks, demoSwarm } from "./mockObservatory";
 
 export const MOCK_SETUP_TOKEN = "MOCKTOKENMOCKTOKENMOCKTOKENMOCKTO";
 const STORE_KEY = "swarm-mock-state";
@@ -169,35 +170,47 @@ function demoState(): State {
   s.platform.conditions.push(
     ...serviceConditions.map((t) => ({ type: t, status: "True" as const, reason: "Ready", message: "" })),
   );
-  const names = ["athena", "hermes", "metis", "apollo", "artemis", "hephaestus"];
-  const roles = defaultRoles(names.length);
   const draft: WorkspaceDraft = {
     name: "acme",
     displayName: "Acme",
     org: "acme",
     defaultModel: "claude-opus-5-5",
     perRoomMonthlyUSD: 200,
-    rooms: names.map((n, i) => ({ ...defaultRoom(n, roles[i], "claude-opus-5-5"), cli: i % 3 === 2 ? "ore" : "claude" })),
-    groups: [],
+    rooms: demoSwarm.map((a, i) => ({ ...defaultRoom(a.name, a.role, "claude-opus-5-5"), group: a.group, cli: i % 3 === 2 ? "ore" : "claude" })),
+    groups: ["clean", "dirty"],
     defaultLinks: "withinGroup",
-    links: [],
-    repositories: [{ name: "api", importURL: "", importCredential: "", group: "", pushMirror: "", mirrorToken: "" }],
+    links: demoLinks.map((l) => ({ ...l, mode: "mediated" as const, requirePrefix: l.from === "dirty" ? "to {recipient}:" : "" })),
+    repositories: [{ name: "api", importURL: "", importCredential: "", group: "clean", pushMirror: "", mirrorToken: "" }],
     channels: [{ kind: "webPush", target: "" }],
     events: ["approvalWaiting", "roomCrashed"],
   };
   s.workspaces.acme = draft;
-  const presences = ["working", "waitingOnHuman", "idle", "working", "crashed", "offline"] as const;
-  s.rooms = draft.rooms.map((r, i) => ({
-    ...summaryFromDraft("acme", r, 200),
-    presence: presences[i],
-    phase: presences[i] === "offline" ? "Paused" : "Running",
-    paused: presences[i] === "offline",
-    currentTask: ["Implement /v1/orders pagination", "Waiting for approval: npm install", "", "Fix flaky CI test", "CLI exited 3 times", ""][i],
-    spendUSD: [42.1, 12.5, 3.2, 88.4, 7.7, 0][i],
-    diskUsedBytes: [12, 8, 4, 30, 70, 2][i] * GiB,
-    pendingApprovals: i === 1 ? 1 : 0,
-    ticks: 99,
-  }));
+  const demo: Record<string, [RoomSummary["presence"], string, number, number]> = {
+    athena: ["working", "Splitting the billing epic into task cards", 42.1, 12],
+    hermes: ["waitingOnHuman", "Waiting for approval: npm install", 61.5, 18],
+    proteus: ["working", "Port invoice renderer to streaming", 55.0, 22],
+    apollo: ["working", "Reviewing #142 (orders pagination)", 30.4, 9],
+    artemis: ["idle", "", 12.2, 14],
+    iris: ["idle", "", 4.1, 3],
+    metis: ["waitingOnHuman", "Waiting for approval: patch src/server.go", 22.8, 10],
+    hecate: ["working", "Dedup crawled pages", 48.9, 31],
+    hephaestus: ["crashed", "CLI exited 3 times", 7.7, 70],
+    nyx: ["offline", "", 0, 2],
+  };
+  s.rooms = draft.rooms.map((r) => {
+    const [presence, currentTask, spendUSD, diskGi] = demo[r.name];
+    return {
+      ...summaryFromDraft("acme", r, 200),
+      presence,
+      phase: presence === "offline" ? "Paused" : "Running",
+      paused: presence === "offline",
+      currentTask,
+      spendUSD,
+      diskUsedBytes: diskGi * GiB,
+      pendingApprovals: presence === "waitingOnHuman" ? 1 : 0,
+      ticks: 99,
+    };
+  });
   s.rooms[3].updateAvailable = true;
   s.approvals = [
     {
@@ -383,6 +396,7 @@ export function createMockApi(mode: string): Api {
   setInterval(tick, 250);
 
   const api: Api = {
+    observatory: createMockObservatory(() => s.rooms),
     async getSetupState() {
       return { adminClaimed: s.adminClaimed, caFingerprint: s.platform.caFingerprint, url: s.platform.url };
     },

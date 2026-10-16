@@ -82,7 +82,7 @@ export function AgentsStep({ draft, set, existing, models }: DraftProps & { mode
               ? "Used twice."
               : undefined;
           return (
-            <li key={i} className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-6" data-testid="agent-row">
+            <li key={i} className="grid gap-2 rounded-xs border border-border p-3 sm:grid-cols-6" data-testid="agent-row">
               <Field label="Name" error={clash}>
                 {(id, d) => <Input id={id} aria-describedby={d} value={r.name} required pattern={dnsLabel} onChange={(e) => setRoom(i, { name: e.target.value })} />}
               </Field>
@@ -154,7 +154,7 @@ export function ResourcesStep({ draft, set }: DraftProps) {
         <div
           role="status"
           data-testid="fit"
-          className={`rounded-lg border p-3 text-sm ${fit.fits ? "border-ok/40 bg-ok/10" : "border-bad/40 bg-bad/10"}`}
+          className={`rounded-xs border p-3 text-sm ${fit.fits ? "border-ok/40 bg-ok/10" : "border-bad/40 bg-bad/10"}`}
         >
           <Badge tone={fit.fits ? "ok" : "bad"}>{fit.fits ? "Fits" : "Doesn't fit"}</Badge>{" "}
           {fit.cpu} of {cap.data.cpu} CPU, {fit.memoryGi} of {cap.data.memoryGi} GiB memory, {fit.diskGi} of {cap.data.diskGi} GiB disk.
@@ -194,7 +194,7 @@ export function ReposStep({ draft, set }: DraftProps) {
     <Card title="Repositories" actions={<Button onClick={() => set({ ...draft, repositories: [...draft.repositories, emptyRepo()] })}>Add repository</Button>}>
       {draft.repositories.length === 0 && <p className="text-sm text-muted">Optional. Agents can also create repositories later.</p>}
       {draft.repositories.map((r, i) => (
-        <fieldset key={i} className="mb-3 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+        <fieldset key={i} className="mb-3 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-medium">
             {draft.org || "org"}/{r.name || "…"}
           </legend>

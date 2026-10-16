@@ -43,10 +43,10 @@ export function AuditPage() {
       <ErrorText error={q.error} />
       {q.data?.length === 0 && <Empty>No entries match.</Empty>}
       {!!q.data?.length && (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="overflow-x-auto rounded-xs border border-border bg-surface">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Audit entries</caption>
-            <thead className="bg-surface-2 text-xs text-muted">
+            <thead className="bg-surface-2 font-mono text-[10.5px] tracking-wider text-muted uppercase">
               <tr>
                 {["When", "Who", "Action", "Object", "Detail", "From"].map((h) => (
                   <th key={h} scope="col" className="px-3 py-2 font-medium">

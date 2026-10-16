@@ -17,7 +17,7 @@ export function AgentTab({ workspace, room, canOperate }: { workspace: string; r
     <div className="space-y-3">
       {canOperate && (
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Agent view" className="flex rounded-md border border-border">
+          <div role="group" aria-label="Agent view" className="flex rounded-xs border border-border">
             {(["terminal", "transcript"] as const).map((v) => (
               <button
                 key={v}
@@ -71,11 +71,11 @@ function Transcript({ workspace, room }: { workspace: string; room: string }) {
   }, [workspace, room]);
   useEffect(() => end.current?.scrollIntoView?.({ block: "end" }), [entries.length]);
   return (
-    <div className="h-[60vh] min-h-64 overflow-y-auto rounded-md border border-border p-2" aria-label="Transcript" aria-live="polite" role="log">
+    <div className="h-[60vh] min-h-64 overflow-y-auto rounded-xs border border-border p-2" aria-label="Transcript" aria-live="polite" role="log">
       {entries.length === 0 && <Spinner label="Waiting for the transcript" />}
       <ol className="space-y-2">
         {entries.map((e) => (
-          <li key={e.id} className={cx("rounded-md border p-2 text-sm whitespace-pre-wrap break-words", kindStyle[e.kind])}>
+          <li key={e.id} className={cx("rounded-xs border p-2 text-sm whitespace-pre-wrap break-words", kindStyle[e.kind])}>
             <span className="sr-only">{e.kind}: </span>
             {e.text}
           </li>
@@ -240,7 +240,7 @@ export function StorageTab({ workspace, room, canOperate }: { workspace: string;
   return (
     <div className="space-y-4">
       {!s.quotaEnforced && (
-        <p className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm">
+        <p className="rounded-xs border border-warn/40 bg-warn/10 p-3 text-sm">
           This StorageClass doesn't enforce volume sizes. Quotas are soft: the janitor prunes and you get warnings at 80% and 90%.
         </p>
       )}
@@ -346,7 +346,7 @@ export function LogsTab({ workspace, room }: { workspace: string; room: string }
         </Select>
         <Checkbox label="Follow" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
       </div>
-      <div ref={box} role="log" aria-label="Logs" className="h-[60vh] min-h-64 overflow-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-xs">
+      <div ref={box} role="log" aria-label="Logs" className="h-[60vh] min-h-64 overflow-auto rounded-xs border border-border bg-surface-2 p-2 font-mono text-xs">
         {shown.length === 0 && <Empty>No log lines yet.</Empty>}
         {shown.map((l, i) => (
           <div key={i} className="whitespace-pre-wrap break-all">

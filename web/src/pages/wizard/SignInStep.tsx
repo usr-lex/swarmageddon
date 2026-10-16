@@ -62,7 +62,7 @@ export function SignInStep({ platform, save, saving }: StepProps) {
       <Card title="OIDC providers" actions={<Button onClick={() => setOIDC([...oidc, newOIDC()])}>Add OIDC provider</Button>}>
         {oidc.length === 0 && <p className="text-sm text-muted">None. Keycloak, Entra ID, Google, Okta and Authentik all work.</p>}
         {oidc.map((p, i) => (
-          <fieldset key={i} className="mb-4 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+          <fieldset key={i} className="mb-4 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
             <legend className="px-1 text-sm font-medium">OIDC provider {i + 1}</legend>
             <Field label="Name (in URLs)">{(id) => <Input id={id} value={p.name} pattern={namePattern} required onChange={(e) => setOIDC(update(oidc, i, { name: e.target.value }))} />}</Field>
             <Field label="Display name">{(id) => <Input id={id} value={p.displayName} onChange={(e) => setOIDC(update(oidc, i, { displayName: e.target.value }))} />}</Field>
@@ -106,7 +106,7 @@ export function SignInStep({ platform, save, saving }: StepProps) {
           </p>
         )}
         {saml.map((p, i) => (
-          <fieldset key={i} className="mb-4 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+          <fieldset key={i} className="mb-4 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
             <legend className="px-1 text-sm font-medium">SAML provider {i + 1}</legend>
             <Field label="Name (in URLs)">{(id) => <Input id={id} value={p.name} pattern={namePattern} required onChange={(e) => setSAML(update(saml, i, { name: e.target.value }))} />}</Field>
             <Field label="Display name">{(id) => <Input id={id} value={p.displayName} onChange={(e) => setSAML(update(saml, i, { displayName: e.target.value }))} />}</Field>

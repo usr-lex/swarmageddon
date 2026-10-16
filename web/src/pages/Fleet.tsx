@@ -41,12 +41,12 @@ export function FleetPage() {
   const counts = (rooms ?? []).reduce<Partial<Record<Presence, number>>>((a, r) => ({ ...a, [r.presence]: (a[r.presence] ?? 0) + 1 }), {});
 
   return (
-    <div>
+    <div className="gridded -m-4 min-h-full p-4">
       <PageHeader
         title="Fleet"
         subtitle={rooms ? `${rooms.length} rooms` + (counts.waitingOnHuman ? `, ${counts.waitingOnHuman} waiting on you` : "") : undefined}
         actions={
-          <div role="group" aria-label="View" className="flex rounded-md border border-border">
+          <div role="group" aria-label="View" className="flex rounded-xs border border-border">
             {(["cards", "table"] as const).map((v) => (
               <button
                 key={v}
@@ -116,7 +116,7 @@ function RoomCard({ r }: { r: RoomSummary }) {
       data-testid="room-card"
       data-room={r.name}
       data-presence={r.presence}
-      className={cx("rounded-lg border bg-surface p-3", r.presence === "waitingOnHuman" ? "border-warn" : r.presence === "crashed" ? "border-bad" : "border-border")}
+      className={cx("panel p-3", r.presence === "waitingOnHuman" ? "!border-alert" : r.presence === "crashed" ? "!border-bad" : "")}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -165,10 +165,10 @@ function RoomCard({ r }: { r: RoomSummary }) {
 
 function RoomTable({ rooms }: { rooms: RoomSummary[] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+    <div className="panel overflow-x-auto">
       <table className="w-full text-left text-sm">
         <caption className="sr-only">Rooms</caption>
-        <thead className="bg-surface-2 text-xs text-muted">
+        <thead className="bg-surface-2 font-mono text-[10.5px] tracking-wider text-muted uppercase">
           <tr>
             {["Room", "Presence", "CLI", "Model", "Current task", "Spend", "Disk"].map((h) => (
               <th key={h} scope="col" className="px-3 py-2 font-medium">

@@ -2,9 +2,9 @@ import type { Presence } from "@/api/types";
 import { Badge, type Tone } from "./ui";
 
 export const presenceInfo: Record<Presence, { label: string; tone: Tone; icon: string }> = {
-  waitingOnHuman: { label: "Waiting on you", tone: "warn", icon: "●" },
+  waitingOnHuman: { label: "Waiting on you", tone: "alert", icon: "●" },
   crashed: { label: "Crashed", tone: "bad", icon: "✕" },
-  working: { label: "Working", tone: "ok", icon: "▶" },
+  working: { label: "Working", tone: "ok", icon: "▸" },
   idle: { label: "Idle", tone: "info", icon: "◌" },
   offline: { label: "Offline", tone: "muted", icon: "○" },
 };

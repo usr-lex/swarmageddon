@@ -71,7 +71,7 @@ export function DisplayView({ workspace, room }: { workspace: string; room: stri
           </Button>
         </form>
       )}
-      <div ref={ref} data-testid="display" aria-label={`Display of ${room}`} className="h-[60vh] min-h-64 overflow-hidden rounded-md border border-border bg-black" />
+      <div ref={ref} data-testid="display" aria-label={`Display of ${room}`} className="h-[60vh] min-h-64 overflow-hidden rounded-xs border border-border bg-black" />
     </div>
   );
 }

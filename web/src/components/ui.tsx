@@ -28,7 +28,7 @@ export function Button({
       disabled={rest.disabled || busy}
       aria-busy={busy || undefined}
       className={cx(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex min-h-10 items-center justify-center gap-2 rounded-xs px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         className,
       )}
@@ -49,7 +49,7 @@ export function Spinner({ label }: { label?: string }) {
 }
 
 const fieldClass =
-  "w-full min-h-10 rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent";
+  "w-full min-h-10 rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent";
 
 /** A labelled control. Pass a render function to get the generated id. */
 export function Field({
@@ -105,10 +105,10 @@ export function Checkbox({ label, className, ...p }: InputHTMLAttributes<HTMLInp
 
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("rounded-lg border border-border bg-surface p-4", className)}>
+    <section className={cx("panel p-4", className)}>
       {(title || actions) && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {title && <h2 className="text-base font-semibold">{title}</h2>}
+          {title && <h2 className="label !text-fg">{title}</h2>}
           {actions}
         </header>
       )}
@@ -117,7 +117,7 @@ export function Card({ title, actions, children, className }: { title?: ReactNod
   );
 }
 
-export type Tone = "ok" | "warn" | "bad" | "info" | "muted";
+export type Tone = "ok" | "warn" | "bad" | "info" | "muted" | "alert";
 
 const tones: Record<Tone, string> = {
   ok: "bg-ok/15 text-ok border-ok/30",
@@ -125,11 +125,12 @@ const tones: Record<Tone, string> = {
   bad: "bg-bad/15 text-bad border-bad/30",
   info: "bg-info/15 text-info border-info/30",
   muted: "bg-surface-2 text-muted border-border",
+  alert: "bg-alert text-white border-alert",
 };
 
 export function Badge({ tone = "muted", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap", tones[tone], className)}>
+    <span className={cx("inline-flex items-center gap-1 rounded-xs border px-1.5 py-px font-mono text-[10.5px] tracking-wider uppercase whitespace-nowrap", tones[tone], className)}>
       {children}
     </span>
   );
@@ -139,7 +140,7 @@ export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
   const msg = error instanceof Error ? error.message : String(error);
   return (
-    <p role="alert" className="rounded-md border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
+    <p role="alert" className="rounded-xs border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
       {msg}
     </p>
   );
@@ -149,7 +150,7 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -174,7 +175,7 @@ export function Dialog({
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
         <RDialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
-        <RDialog.Content className="fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-border bg-surface p-5 shadow-xl">
+        <RDialog.Content className="fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-xs border border-border bg-surface p-5 shadow-xl">
           <RDialog.Title className="text-lg font-semibold">{title}</RDialog.Title>
           {description ? (
             <RDialog.Description className="mt-1 text-sm text-muted">{description}</RDialog.Description>
@@ -190,14 +191,14 @@ export function Dialog({
 
 export function Meter({ value, max, label }: { value: number; max: number; label: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  const tone = pct >= 90 ? "bg-bad" : pct >= 80 ? "bg-warn" : "bg-ok";
+  const tone = pct >= 90 ? "bg-alert" : pct >= 80 ? "bg-warn" : "bg-fg/60";
   return (
-    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-      <div className={cx("h-full rounded-full", tone)} style={{ width: `${pct}%` }} />
+    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} className="h-1 w-full overflow-hidden bg-surface-2">
+      <div className={cx("h-full", tone)} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted">{children}</p>;
+  return <p className="rounded-xs border border-dashed border-border p-6 text-center text-sm text-muted">{children}</p>;
 }

@@ -86,7 +86,10 @@ function AppHeader() {
       void navigate({ to: "/signin" });
     },
   });
+  const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => api().listWorkspaces() });
+  const firstWs = workspaces.data?.[0]?.name;
   const links: { to: string; label: string; badge?: number; admin?: boolean }[] = [
+    ...(firstWs ? [{ to: `/w/${firstWs}`, label: "Observatory" }] : []),
     { to: "/fleet", label: "Fleet" },
     { to: "/approvals", label: "Approvals", badge: pending },
     { to: "/inbox", label: "Inbox" },
@@ -99,7 +102,7 @@ function AppHeader() {
   return (
     <>
       <div className="flex items-center justify-between gap-2 px-4 py-2">
-        <Link to="/fleet" aria-label="swarmageddon home">
+        <Link to="/" aria-label="swarmageddon home">
           <Brand />
         </Link>
         <div className="flex items-center gap-2">
@@ -107,7 +110,7 @@ function AppHeader() {
           <span className="hidden text-sm text-muted sm:inline" data-testid="whoami">
             {me.data?.displayName} ({me.data?.role})
           </span>
-          <button type="button" onClick={() => logout.mutate()} className="min-h-10 rounded-md px-2 text-sm hover:bg-surface-2">
+          <button type="button" onClick={() => logout.mutate()} className="min-h-10 rounded-xs px-2 text-sm hover:bg-surface-2">
             Sign out
           </button>
         </div>
@@ -120,7 +123,7 @@ function AppHeader() {
               <li key={l.to}>
                 <Link
                   to={l.to}
-                  className="flex min-h-10 items-center gap-1 rounded-md px-3 text-sm whitespace-nowrap text-muted hover:bg-surface-2 hover:text-fg"
+                  className="flex min-h-10 items-center gap-1 rounded-xs px-3 text-sm whitespace-nowrap text-muted hover:bg-surface-2 hover:text-fg"
                   activeProps={{ className: "bg-surface-2 !text-fg font-medium", "aria-current": "page" }}
                 >
                   {l.label}
@@ -147,7 +150,7 @@ function ThemeSwitch() {
     <button
       type="button"
       onClick={() => setTheme(next)}
-      className="min-h-10 min-w-10 rounded-md px-2 text-sm hover:bg-surface-2"
+      className="min-h-10 min-w-10 rounded-xs px-2 text-sm hover:bg-surface-2"
       aria-label={`Theme: ${theme}. Switch to ${next}`}
       title={`Theme: ${theme}`}
     >
