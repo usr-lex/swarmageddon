@@ -59,6 +59,8 @@ if ! "$K3D" cluster list -o json | grep -q "\"name\":\"$CLUSTER\""; then
 		--registry-use "$IN_CLUSTER_REGISTRY" \
 		--port "8443:443@loadbalancer" \
 		--wait --timeout 300s \
+		--k3s-arg="--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@server:*" \
+		--k3s-arg="--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@server:*" \
 		$cgroup_args $preload_args ${DEV_K3D_ARGS:-}
 fi
 
@@ -74,17 +76,22 @@ kc -n "$PLATFORM_NS" create configmap keycloak-realm \
 sed "s|REGISTRY/|$IN_CLUSTER_REGISTRY/|" hack/dev/extras.yaml | kc apply -f -
 
 info "Installing the chart"
+upgrade=false
+"$HELM" --kube-context "$CONTEXT" status swarmageddon -n "$SYSTEM_NS" >/dev/null 2>&1 && upgrade=true
 # The welcome Job's pod template is immutable; start it afresh.
 kc -n "$SYSTEM_NS" delete job welcome --ignore-not-found
 "$HELM" --kube-context "$CONTEXT" upgrade --install swarmageddon charts/swarmageddon \
 	--namespace "$SYSTEM_NS" --create-namespace -f hack/dev/values.yaml
-# Same :dev tags with new content: restart to pull them.
-kc -n "$SYSTEM_NS" rollout restart deployment/swarmageddon-operator deployment/control-center
-kc -n "$PLATFORM_NS" rollout restart deployment/mockmodel
+if [ "$upgrade" = true ]; then
+	# Same :dev tags with new content: restart to pull them.
+	kc -n "$SYSTEM_NS" rollout restart deployment/swarmageddon-operator deployment/control-center
+	kc -n "$PLATFORM_NS" rollout restart deployment/mockmodel
+fi
 
 info "Waiting for the welcome Job (the URL and setup token)"
 i=0
-until kc -n "$SYSTEM_NS" logs -f job/welcome 2>/dev/null; do
+until kc -n "$SYSTEM_NS" get pods -l job-name=welcome \
+	-o jsonpath='{.items[*].status.phase}' 2>/dev/null | grep -qE 'Running|Succeeded|Failed'; do
 	i=$((i + 1))
 	if [ "$i" -gt 60 ]; then
 		info "The welcome Job hasn't started; check: $KUBECTL --context $CONTEXT -n $SYSTEM_NS get pods"
@@ -92,6 +99,7 @@ until kc -n "$SYSTEM_NS" logs -f job/welcome 2>/dev/null; do
 	fi
 	sleep 5
 done
+[ "$i" -gt 60 ] || kc -n "$SYSTEM_NS" logs -f job/welcome || true
 
 cat <<EOF
 

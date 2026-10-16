@@ -3,7 +3,5 @@ image:
   registry: k3d-swarm-registry.localhost:5005
   tag: dev
   pullPolicy: Always
-operator:
-  extraArgs: ["--zap-log-level=debug"]
 welcome:
   ttlSecondsAfterFinished: 600
