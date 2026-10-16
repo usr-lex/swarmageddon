@@ -19,6 +19,7 @@ import (
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/egress"
+	"github.com/usr-lex/swarmageddon/internal/messaging/revoked"
 	"github.com/usr-lex/swarmageddon/internal/operator/persona"
 	"github.com/usr-lex/swarmageddon/internal/roomsettings"
 	"github.com/usr-lex/swarmageddon/internal/warden/keytable"
@@ -156,6 +157,34 @@ func (r *Reconciler) syncTables(ctx context.Context, room *v1.Room, ws *v1.Works
 	row = e.Marshal()
 	if err := r.patchTable(ctx, egress.ConfigMapName, egress.DataKey(ws.Name, room.Name), &row); err != nil {
 		return fmt.Errorf("egress allowlist: %w", err)
+	}
+	return nil
+}
+
+// revokeCert puts a room's client certificate on messaging's deny list
+// until it expires, and drops entries that have expired.
+func (r *Reconciler) revokeCert(ctx context.Context, certPEM []byte) error {
+	if len(certPEM) == 0 {
+		return nil
+	}
+	key, value, err := revoked.Entry(certPEM)
+	if err != nil {
+		return nil // nothing usable to refuse
+	}
+	if t, ok := revoked.Expiry(value); ok && r.now().After(t) {
+		return nil
+	}
+	if err := r.patchTable(ctx, revoked.ConfigMapName, key, &value); err != nil {
+		return err
+	}
+	var cm corev1.ConfigMap
+	if err := r.Get(ctx, types.NamespacedName{Namespace: v1.PlatformNamespace, Name: revoked.ConfigMapName}, &cm); err != nil {
+		return err
+	}
+	for _, k := range revoked.Expired(cm.Data, r.now()) {
+		if err := r.patchTable(ctx, revoked.ConfigMapName, k, nil); err != nil {
+			return err
+		}
 	}
 	return nil
 }

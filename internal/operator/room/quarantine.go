@@ -110,8 +110,8 @@ func purposeKeys(room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate) map[str
 
 func (k *purposeKey) spec() string { return fmt.Sprintf("%v/%d", k.models, k.budgetUSD) }
 
-// syncPurposeKeys issues, re-issues (on a new model or budget, or rotation)
-// and deletes the room's advisor and warden keys (ADRs 0010, 0011).
+// syncPurposeKeys issues, updates (on a new model or budget), re-issues (on
+// rotation) and deletes the room's advisor and warden keys (ADRs 0010, 0011).
 func (r *Reconciler) syncPurposeKeys(ctx context.Context, room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate, sec *corev1.Secret, rotating bool, st *v1.RoomStatus, revoke *[]func() error) bool {
 	var gc *gateway.Client
 	client := func() (*gateway.Client, error) {
@@ -151,7 +151,22 @@ func (r *Reconciler) syncPurposeKeys(ctx context.Context, room *v1.Room, ws *v1.
 			ok = false
 			continue
 		}
-		alias := fmt.Sprintf("room-%s-%s-%s-%d", ws.Name, room.Name, want.kind, r.now().Unix())
+		if !rotating && old != "" {
+			// A new model or budget updates the key in place.
+			u := gateway.RoomKeyUpdate(ws.Name, room.Name, want.budgetUSD, want.models)
+			u.Metadata["purpose"] = want.kind
+			err := c.UpdateKey(ctx, old, u)
+			if err == nil {
+				sec.Annotations[specAnn] = want.spec()
+				continue
+			}
+			if !gateway.IsNotFound(err) {
+				setCond(st, room.Generation, v1.ConditionGatewayKeyReady, false, "KeyUpdateFailed", want.kind+" key: "+err.Error())
+				ok = false
+				continue
+			}
+		}
+		alias :=fmt.Sprintf("room-%s-%s-%s-%d", ws.Name, room.Name, want.kind, r.now().Unix())
 		req := gateway.RoomKeyRequest(ws.Name, room.Name, alias, want.budgetUSD, want.models)
 		req.Metadata["purpose"] = want.kind
 		k, err := c.GenerateKey(ctx, req)

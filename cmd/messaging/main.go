@@ -41,6 +41,7 @@ func run() error {
 		tlsCert     = flag.String("tls-cert", "/etc/messaging/tls/tls.crt", "serving certificate")
 		tlsKey      = flag.String("tls-key", "/etc/messaging/tls/tls.key", "serving key")
 		caFile      = flag.String("ca", "/etc/messaging/tls/ca.crt", "CA bundle that client certificates must chain to")
+		revokedDir  = flag.String("revoked", "/etc/messaging/revoked", "certificate deny list directory (the messaging-revoked ConfigMap); missing means empty")
 		dataDir     = flag.String("data", "/data", "JetStream storage directory")
 		routes      = flag.String("nats-routes", "", "comma-separated NATS route URLs of every replica (host:6222 or nats://host:6222); empty runs a single node")
 		serverName  = flag.String("server-name", host, "NATS server name, unique and stable per replica (the pod name)")
@@ -143,7 +144,7 @@ func run() error {
 		api.Protocols.SetHTTP1(true)
 		api.Protocols.SetUnencryptedHTTP2(true)
 	} else {
-		tc, err := server.TLSConfig(*tlsCert, *tlsKey, *caFile)
+		tc, err := server.TLSConfigWithDenyList(*tlsCert, *tlsKey, *caFile, *revokedDir)
 		if err != nil {
 			return err
 		}

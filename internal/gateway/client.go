@@ -134,6 +134,42 @@ func RoomKeyRequest(workspace, room, alias string, monthlyUSD int32, models []st
 	return r
 }
 
+// KeyUpdate changes an existing key's limits in place (/key/update).
+// LiteLLM applies only the fields sent (it reads the body with
+// exclude_unset), so a nil MaxBudget is sent as null and clears the budget.
+type KeyUpdate struct {
+	// Models allowed; nil leaves them, empty allows all.
+	Models []string
+	// MaxBudget per BudgetDuration in USD; nil means none.
+	MaxBudget      *float64
+	BudgetDuration string
+	// Metadata is merged into the key's metadata.
+	Metadata map[string]string
+}
+
+// UpdateKey updates a key (by value) in place, so the room keeps its key.
+func (c *Client) UpdateKey(ctx context.Context, key string, u KeyUpdate) error {
+	body := map[string]any{"key": key, "max_budget": u.MaxBudget}
+	if u.MaxBudget != nil {
+		body["budget_duration"] = u.BudgetDuration
+	} else {
+		body["budget_duration"] = nil
+	}
+	if u.Models != nil {
+		body["models"] = u.Models
+	}
+	if u.Metadata != nil {
+		body["metadata"] = u.Metadata
+	}
+	return c.do(ctx, http.MethodPost, "/key/update", body, nil)
+}
+
+// RoomKeyUpdate is the update matching RoomKeyRequest.
+func RoomKeyUpdate(workspace, room string, monthlyUSD int32, models []string) KeyUpdate {
+	r := RoomKeyRequest(workspace, room, "", monthlyUSD, models)
+	return KeyUpdate{Models: models, MaxBudget: r.MaxBudget, BudgetDuration: r.BudgetDuration, Metadata: r.Metadata}
+}
+
 // DeleteKeys deletes keys by value (or hash).
 func (c *Client) DeleteKeys(ctx context.Context, keys ...string) error {
 	if len(keys) == 0 {

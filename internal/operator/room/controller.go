@@ -56,6 +56,7 @@ const (
 	annForgeSynced     = "swarmageddon.dev/forge-synced"
 	annForgeTokenName  = "swarmageddon.dev/forge-token-name"
 	annGatewayAlias    = "swarmageddon.dev/gateway-key-alias"
+	annGatewayKeySpec  = "swarmageddon.dev/gateway-key-spec"
 	annForgePaused     = "swarmageddon.dev/forge-paused"
 	annRoomSpecHash    = "swarmageddon.dev/room-spec-hash"
 
@@ -96,6 +97,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups="",resources=serviceaccounts;secrets;configmaps;services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // SetupWithManager registers the Room controller.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps) error {
@@ -274,6 +276,9 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 	if err != nil {
 		return retry, err
 	}
+	if err := r.resizeVolumes(ctx, room, st); err != nil {
+		return retry, err
+	}
 	if !ready && res.RequeueAfter == 0 {
 		res = retry
 	}
@@ -411,7 +416,9 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 	syncSecretEnv(sec, secretEnv)
 	setCond(st, gen, v1.ConditionKeysReady, true, "Generated", "SSH, GPG and VNC credentials are in "+sec.Name)
 
-	// Messaging identity.
+	// Messaging identity. A rotated certificate goes on messaging's deny
+	// list once the Secret holds the new one.
+	var revokeLater []func() error
 	if r.Deps.PKI == nil {
 		setCond(st, gen, v1.ConditionMessagingIdentityReady, false, "NoCA", "the internal CA is not available yet")
 	} else if rotating || certNeedsRenewal(sec.Data[KeyTLSCert], r.now()) {
@@ -420,6 +427,9 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 		if err != nil {
 			setCond(st, gen, v1.ConditionMessagingIdentityReady, false, "IssueFailed", err.Error())
 		} else {
+			if old := sec.Data[KeyTLSCert]; rotating && len(old) > 0 {
+				revokeLater = append(revokeLater, func() error { return r.revokeCert(ctx, old) })
+			}
 			sec.Data[KeyTLSCert], sec.Data[KeyTLSKey] = crt, key
 			setCond(st, gen, v1.ConditionMessagingIdentityReady, true, "Issued", "CN="+name+"@"+wsName)
 		}
@@ -443,7 +453,7 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 
 	// Remote accounts. Revocations of old credentials run after the Secret
 	// holds the new ones.
-	var revoke []func() error
+	revoke := revokeLater
 	var forgeOK bool
 	if room.Spec.Quarantined {
 		forgeOK = r.pauseForge(ctx, room, sec, st)
@@ -512,6 +522,18 @@ func forgeTeams(room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate) []string
 	return out
 }
 
+// BuiltinTeams are the teams every workspace's org has (design §9.1).
+var BuiltinTeams = []string{"implementers", "reviewers", "mergers", "ci", "observers"}
+
+// IsManagedTeam reports whether the operator manages the team: a built-in
+// team, a group's team (group-*) or one in Workspace.spec.forge.teams.
+func IsManagedTeam(ws *v1.Workspace, name string) bool {
+	if slices.Contains(BuiltinTeams, name) || strings.HasPrefix(name, "group-") {
+		return true
+	}
+	return slices.ContainsFunc(ws.Spec.Forge.Teams, func(t v1.TeamSpec) bool { return t.Name == name })
+}
+
 func (r *Reconciler) syncForge(ctx context.Context, room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate, sec *corev1.Secret, rotating bool, st *v1.RoomStatus, revoke *[]func() error) bool {
 	gen := room.Generation
 	fail := func(reason string, err error) bool {
@@ -563,17 +585,28 @@ func (r *Reconciler) syncForge(ctx context.Context, room *v1.Room, ws *v1.Worksp
 		sec.Annotations[annForgeTokenName] = tokName
 		*revoke = append(*revoke, func() error { return fc.DeleteTokensExcept(ctx, name, forgeTokenPrefix, tokName) })
 	}
+	orgTeams, err := fc.ListTeams(ctx, ws.Spec.Forge.Org)
+	if err != nil {
+		return fail("TeamsFailed", err)
+	}
 	var missing []string
 	for _, tn := range teams {
-		t, err := fc.FindTeam(ctx, ws.Spec.Forge.Org, tn)
-		if err != nil {
-			return fail("TeamsFailed", err)
-		}
-		if t == nil {
+		i := slices.IndexFunc(orgTeams, func(t forgejo.Team) bool { return t.Name == tn })
+		if i < 0 {
 			missing = append(missing, tn)
 			continue
 		}
-		if err := fc.AddTeamMember(ctx, t.ID, name); err != nil {
+		if err := fc.AddTeamMember(ctx, orgTeams[i].ID, name); err != nil {
+			return fail("TeamsFailed", err)
+		}
+	}
+	// Leave the managed teams the room no longer belongs to; teams people
+	// made by hand in Forgejo are theirs to manage.
+	for _, t := range orgTeams {
+		if slices.Contains(teams, t.Name) || !IsManagedTeam(ws, t.Name) {
+			continue
+		}
+		if err := fc.RemoveTeamMember(ctx, t.ID, name); err != nil {
 			return fail("TeamsFailed", err)
 		}
 	}
@@ -589,9 +622,20 @@ func (r *Reconciler) syncForge(ctx context.Context, room *v1.Room, ws *v1.Worksp
 	return true
 }
 
+// roomModel is the model a room runs: its own, else the workspace default.
+func roomModel(room *v1.Room, ws *v1.Workspace) string {
+	if room.Spec.Model != "" {
+		return room.Spec.Model
+	}
+	return ws.Spec.Models.Default
+}
+
 func (r *Reconciler) syncGatewayKey(ctx context.Context, room *v1.Room, ws *v1.Workspace, sec *corev1.Secret, rotating bool, st *v1.RoomStatus, revoke *[]func() error) bool {
 	gen := room.Generation
-	if !rotating && len(sec.Data[KeyGatewayKey]) > 0 {
+	budget := ws.Spec.Models.Budgets.PerRoomMonthlyUSD
+	want := fmt.Sprintf("%d/%s", budget, roomModel(room, ws))
+	old := string(sec.Data[KeyGatewayKey])
+	if !rotating && old != "" && sec.Annotations[annGatewayKeySpec] == want {
 		setCond(st, gen, v1.ConditionGatewayKeyReady, true, "Issued", "alias "+sec.Annotations[annGatewayAlias])
 		return true
 	}
@@ -604,17 +648,38 @@ func (r *Reconciler) syncGatewayKey(ctx context.Context, room *v1.Room, ws *v1.W
 		setCond(st, gen, v1.ConditionGatewayKeyReady, false, "GatewayUnavailable", err.Error())
 		return false
 	}
+	withModel := func(u gateway.KeyUpdate) gateway.KeyUpdate {
+		u.Metadata["model"] = roomModel(room, ws)
+		return u
+	}
+	// A new budget or model updates the key in place; the room keeps it.
+	if !rotating && old != "" {
+		err := gc.UpdateKey(ctx, old, withModel(gateway.RoomKeyUpdate(ws.Name, room.Name, budget, nil)))
+		if err == nil {
+			sec.Annotations[annGatewayKeySpec] = want
+			setCond(st, gen, v1.ConditionGatewayKeyReady, true, "Updated", "alias "+sec.Annotations[annGatewayAlias])
+			return true
+		}
+		if !gateway.IsNotFound(err) {
+			setCond(st, gen, v1.ConditionGatewayKeyReady, false, "KeyUpdateFailed", err.Error())
+			return false
+		}
+		// The key is gone from the gateway: issue a new one.
+	}
 	alias := fmt.Sprintf("room-%s-%s-%d", ws.Name, room.Name, r.now().Unix())
-	k, err := gc.GenerateKey(ctx, gateway.RoomKeyRequest(ws.Name, room.Name, alias, ws.Spec.Models.Budgets.PerRoomMonthlyUSD, nil))
+	req := gateway.RoomKeyRequest(ws.Name, room.Name, alias, budget, nil)
+	req.Metadata["model"] = roomModel(room, ws)
+	k, err := gc.GenerateKey(ctx, req)
 	if err != nil {
 		setCond(st, gen, v1.ConditionGatewayKeyReady, false, "KeyFailed", err.Error())
 		return false
 	}
-	if old := string(sec.Data[KeyGatewayKey]); old != "" {
+	if old != "" {
 		*revoke = append(*revoke, func() error { return gc.DeleteKeys(ctx, old) })
 	}
 	sec.Data[KeyGatewayKey] = []byte(k.Key)
 	sec.Annotations[annGatewayAlias] = alias
+	sec.Annotations[annGatewayKeySpec] = want
 	setCond(st, gen, v1.ConditionGatewayKeyReady, true, "Issued", "alias "+alias)
 	return true
 }
@@ -880,6 +945,10 @@ func (r *Reconciler) finalize(ctx context.Context, room *v1.Room, wsName string)
 	}
 	var sec corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: room.Namespace, Name: IdentitySecretName(room.Name)}, &sec); err == nil {
+		// Messaging refuses the removed room's certificate until it expires.
+		if err := r.revokeCert(ctx, sec.Data[KeyTLSCert]); err != nil {
+			return ctrl.Result{}, fmt.Errorf("revoke messaging certificate: %w", err)
+		}
 		var keys []string
 		for _, k := range []string{KeyGatewayKey, KeyAdvisorKey, KeyWardenKey} {
 			if v := string(sec.Data[k]); v != "" {

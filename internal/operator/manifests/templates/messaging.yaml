@@ -98,6 +98,7 @@ spec:
             - --tls-cert=/etc/swarm/tls/tls.crt
             - --tls-key=/etc/swarm/tls/tls.key
             - --ca=/etc/swarm/tls/ca.crt
+            - --revoked=/etc/swarm/revoked
             - --data=/data
             - --nats-routes={{ .Messaging.Routes }}
             - --server-name=$(POD_NAME)
@@ -124,9 +125,14 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /data}
             - {name: tls, mountPath: /etc/swarm/tls, readOnly: true}
+            - {name: revoked, mountPath: /etc/swarm/revoked, readOnly: true}
       volumes:
         - name: tls
           secret: {secretName: messaging-tls}
+        # Serials of removed rooms' certificates, refused until they expire
+        # (the operator writes it; kubelet updates the files in place).
+        - name: revoked
+          configMap: {name: messaging-revoked, optional: true}
   volumeClaimTemplates:
     - metadata:
         name: data
