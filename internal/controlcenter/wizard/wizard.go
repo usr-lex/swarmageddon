@@ -175,7 +175,7 @@ type Desired struct {
 
 // Current is what exists.
 type Current struct {
-	Workspace *v1alpha1.Workspace
+	Workspace     *v1alpha1.Workspace
 	Rooms         []v1alpha1.Room
 	Pool          *v1alpha1.RunnerPool
 	RoleTemplates []v1alpha1.RoleTemplate
@@ -343,7 +343,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Name: w.Name, DisplayName: s.DisplayName, Org: s.Forge.Org, DefaultLinks: string(s.Messaging.DefaultLinks),
 		Owners: s.Owners, DefaultModel: s.Models.Default, BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
 		UpdateMode: string(s.UpdatePolicy.Mode), UpdateWindow: s.UpdatePolicy.Window, RequiredApprovals: s.Forge.RequiredApprovals,
-		Internet: s.Internet == nil || *s.Internet,
+		Internet:     s.Internet == nil || *s.Internet,
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
 		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{},
 	}
