@@ -65,10 +65,35 @@ type rwc struct {
 
 func (rwc) Close() error { return nil }
 
-func setup(t *testing.T, p *auth.Principal) (*httptest.Server, *echoExec, *[]store.AuditEvent, *pipeFwd) {
+// auditLog collects audit events written from the server's goroutines.
+type auditLog struct {
+	mu  sync.Mutex
+	evs []store.AuditEvent
+}
+
+func (a *auditLog) add(ev store.AuditEvent) {
+	a.mu.Lock()
+	a.evs = append(a.evs, ev)
+	a.mu.Unlock()
+}
+
+// wait returns the events once there are at least n, or after 2 s.
+func (a *auditLog) wait(n int) []store.AuditEvent {
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		a.mu.Lock()
+		evs := append([]store.AuditEvent(nil), a.evs...)
+		a.mu.Unlock()
+		if len(evs) >= n || time.Now().After(deadline) {
+			return evs
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func setup(t *testing.T, p *auth.Principal) (*httptest.Server, *echoExec, *auditLog, *pipeFwd) {
 	ex := &echoExec{}
-	var mu sync.Mutex
-	var audits []store.AuditEvent
+	audits := &auditLog{}
 	fwd := &pipeFwd{}
 	h := &Handler{
 		Principal: func(http.ResponseWriter, *http.Request) *auth.Principal { return p },
@@ -80,18 +105,14 @@ func setup(t *testing.T, p *auth.Principal) (*httptest.Server, *echoExec, *[]sto
 		},
 		Exec: ex,
 		Fwd:  fwd,
-		Audit: func(_ context.Context, ev store.AuditEvent) {
-			mu.Lock()
-			audits = append(audits, ev)
-			mu.Unlock()
-		},
+		Audit: func(_ context.Context, ev store.AuditEvent) { audits.add(ev) },
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/terminal", h.ServeTerminal)
 	mux.HandleFunc("/ws/vnc", h.ServeVNC)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return srv, ex, &audits, fwd
+	return srv, ex, audits, fwd
 }
 
 func wsURL(srv *httptest.Server, path string) string {
@@ -130,12 +151,8 @@ func TestTerminal(t *testing.T) {
 	if len(sizes) != 1 || sizes[0] != (Size{120, 40}) {
 		t.Fatalf("resizes %v", sizes)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && len(*audits) < 2 {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if len(*audits) != 2 || (*audits)[0].Action != "terminal.open" || (*audits)[1].Action != "terminal.close" || !strings.Contains((*audits)[1].Detail, "durationSeconds") {
-		t.Fatalf("audits %+v", *audits)
+	if evs := audits.wait(2); len(evs) != 2 || evs[0].Action != "terminal.open" || evs[1].Action != "terminal.close" || !strings.Contains(evs[1].Detail, "durationSeconds") {
+		t.Fatalf("audits %+v", evs)
 	}
 }
 
@@ -201,7 +218,7 @@ func TestVNC(t *testing.T) {
 		t.Fatalf("vnc write %q %v", buf, err)
 	}
 	c.CloseNow()
-	if len(*audits) == 0 || (*audits)[0].Action != "vnc.open" {
-		t.Fatalf("audits %+v", *audits)
+	if evs := audits.wait(1); len(evs) == 0 || evs[0].Action != "vnc.open" {
+		t.Fatalf("audits %+v", evs)
 	}
 }

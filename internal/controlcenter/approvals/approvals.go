@@ -116,7 +116,7 @@ func (m *Manager) Watch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	for stream.Receive() {
 		m.Handle(ctx, stream.Msg())
 	}

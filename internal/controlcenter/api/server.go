@@ -111,7 +111,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/ws/vnc", th.ServeVNC)
 
 	mux.Handle("/hooks/forgejo/", s.forgeHook())
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.HandleFunc("/readyz", s.ready)
 	mux.Handle("/", spa())
 	return s.withPrincipal(s.csrf(securityHeaders(mux)))
@@ -120,7 +120,7 @@ func (s *Server) Handler() http.Handler {
 // HealthHandler serves /healthz and /readyz on the health port.
 func (s *Server) HealthHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.HandleFunc("/readyz", s.ready)
 	return mux
 }
@@ -132,7 +132,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "kubernetes: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 func securityHeaders(h http.Handler) http.Handler {
@@ -234,7 +234,7 @@ func spa() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !built {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write(web.Placeholder())
+			_, _ = w.Write(web.Placeholder())
 			return
 		}
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")

@@ -253,8 +253,7 @@ func (h *Handler) ciRed(ctx context.Context, d Delivery, p *payload, ws *v1alpha
 	if pr == nil && !onDefault {
 		return
 	}
-	room := ""
-	where := "on " + run.PrettyRef
+	room, where := "", ""
 	if pr != nil {
 		room = strings.ToLower(pr.User.Login)
 		where = fmt.Sprintf("on pull request %s#%d", repo.FullName, pr.Number)

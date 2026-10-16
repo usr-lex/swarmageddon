@@ -65,7 +65,7 @@ func TestMerge(t *testing.T) {
 		t.Fatalf("default network %+v", e.Settings.Network)
 	}
 	// Deprecated internet: false is network none.
-	w := &v1alpha1.Workspace{Spec: v1alpha1.WorkspaceSpec{Internet: ptr(false)}}
+	w := &v1alpha1.Workspace{Spec: v1alpha1.WorkspaceSpec{Internet: ptr(false)}} //nolint:staticcheck // an old workspace
 	if WorkspaceDefaults(w).Network.Mode != v1alpha1.NetworkNone {
 		t.Fatal("internet false not mapped to none")
 	}
@@ -135,7 +135,7 @@ func TestApplyLayers(t *testing.T) {
 	}
 	cur, _ := LoadCurrent(ctx, c, "acme")
 	d := Build(p, cur)
-	if d.Workspace.Spec.Internet != nil {
+	if d.Workspace.Spec.Internet != nil { //nolint:staticcheck // must be cleared
 		t.Fatal("internet kept next to a network setting")
 	}
 	changes := Diff(cur, d, false)

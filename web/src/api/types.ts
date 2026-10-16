@@ -51,6 +51,8 @@ export interface Preflight {
   roomEstimate: number;
   clusterCIDRs: string[];
   completed: boolean;
+  /** A re-run was asked for and the operator hasn't picked it up yet. */
+  rerunPending?: boolean;
 }
 
 export interface Condition {
@@ -350,6 +352,8 @@ export interface TranscriptEntry {
   at: string;
   kind: "user" | "assistant" | "tool" | "toolResult" | "system";
   text: string;
+  /** For tool calls and results. */
+  toolName?: string;
 }
 
 export type LogComponent = "supervisor" | "cli" | "engine" | "janitor";

@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -116,10 +117,61 @@ func validateChannels(p *ccv1.WorkspacePlan) []string {
 			probs = append(probs, "the digest interval is not a duration (e.g. 15m)")
 		}
 	}
-	if m := p.GetWardenMode(); m != "" && !slices.Contains([]string{"off", "monitor", "gate"}, m) {
+	modes := []string{"off", "monitor", "gate"}
+	if m := p.GetWardenMode(); m != "" && !slices.Contains(modes, m) {
 		probs = append(probs, "the warden mode must be off, monitor or gate")
 	}
+	if w := p.GetWarden(); w != nil {
+		if w.GetMode() != "" && !slices.Contains(modes, w.GetMode()) {
+			probs = append(probs, "the warden mode must be off, monitor or gate")
+		}
+		if w.GetMonthlyUsd() < 0 {
+			probs = append(probs, "the warden budget can't be negative")
+		}
+	}
+	for _, a := range p.GetAgents() {
+		if m := a.GetWardenMode(); m != "" && !slices.Contains(modes, m) {
+			probs = append(probs, fmt.Sprintf("agent %q: the warden mode must be off, monitor or gate", a.GetName()))
+		}
+		probs = append(probs, validateAdvisor("agent "+a.GetName(), a.GetAdvisor())...)
+	}
+	for _, name := range slices.Sorted(maps.Keys(p.GetRoleAdvisors())) {
+		probs = append(probs, validateAdvisor("role "+name, p.GetRoleAdvisors()[name])...)
+	}
 	return probs
+}
+
+func validateAdvisor(where string, a *ccv1.AdvisorPlan) []string {
+	if a == nil {
+		return nil
+	}
+	var probs []string
+	if a.GetMaxCallsPerHour() < 0 || a.GetMonthlyUsd() < 0 {
+		probs = append(probs, where+": advisor limits can't be negative")
+	}
+	return probs
+}
+
+// AdvisorFromPlan converts an advisor plan. Unset is nil (inherit). An
+// empty model is kept for a room (it turns the role's advisor off) and is
+// nil for a role template (no advisor).
+func AdvisorFromPlan(a *ccv1.AdvisorPlan, room bool) *v1alpha1.AdvisorSpec {
+	if a == nil || (a.GetModel() == "" && !room) {
+		return nil
+	}
+	if a.GetModel() == "" {
+		return &v1alpha1.AdvisorSpec{}
+	}
+	return &v1alpha1.AdvisorSpec{Model: a.GetModel(), Effort: a.GetEffort(), MaxCallsPerHour: a.GetMaxCallsPerHour(),
+		MonthlyUSD: a.GetMonthlyUsd(), Native: a.GetNative()}
+}
+
+// AdvisorToPlan is the reverse of AdvisorFromPlan.
+func AdvisorToPlan(a *v1alpha1.AdvisorSpec) *ccv1.AdvisorPlan {
+	if a == nil {
+		return nil
+	}
+	return &ccv1.AdvisorPlan{Model: a.Model, Effort: a.Effort, MaxCallsPerHour: a.MaxCallsPerHour, MonthlyUsd: a.MonthlyUSD, Native: a.Native}
 }
 
 // applyChannels sets channels, storm and warden settings on a spec.
@@ -141,6 +193,15 @@ func applyChannels(p *ccv1.WorkspacePlan, s *v1alpha1.WorkspaceSpec) {
 		if d, err := time.ParseDuration(st.GetDigestInterval()); err == nil && st.GetDigestInterval() != "" {
 			s.Messaging.Storm.DigestInterval = &metav1.Duration{Duration: d}
 		}
+	}
+	if w := p.GetWarden(); w != nil {
+		interrupt := s.Warden.InterruptOnHigh // unset defaults to true; keep it unset when that's what is asked
+		if v := w.GetInterruptOnHigh(); interrupt != nil || !v {
+			interrupt = &v
+		}
+		s.Warden = v1alpha1.WardenSpec{Mode: v1alpha1.WardenMode(w.GetMode()), Model: w.GetModel(), InterruptOnHigh: interrupt,
+			QuarantineOnHigh: w.GetQuarantineOnHigh(), MonthlyUSD: w.GetMonthlyUsd()}
+		return
 	}
 	if m := p.GetWardenMode(); m != "" {
 		s.Warden.Mode = v1alpha1.WardenMode(m)
@@ -168,4 +229,7 @@ func channelsToPlan(s v1alpha1.WorkspaceSpec, p *ccv1.WorkspacePlan) {
 	}
 	p.Storm = st
 	p.WardenMode, p.WardenModel = string(s.Warden.Mode), s.Warden.Model
+	w := s.Warden
+	p.Warden = &ccv1.WardenPlan{Mode: string(w.Mode), Model: w.Model, InterruptOnHigh: w.InterruptOnHigh == nil || *w.InterruptOnHigh,
+		QuarantineOnHigh: w.QuarantineOnHigh, MonthlyUsd: w.MonthlyUSD}
 }

@@ -177,7 +177,7 @@ func (s auditSvc) QueryAudit(ctx context.Context, req *connect.Request[ccv1.Quer
 		if err != nil {
 			return nil, err
 		}
-		defer stream.Close()
+		defer func() { _ = stream.Close() }()
 		for stream.Receive() && len(out.Entries) < 5000 {
 			r := stream.Msg()
 			e := &ccv1.AuditEntry{Source: ccv1.AuditSource_AUDIT_SOURCE_MESSAGING, At: r.GetAt(), Actor: r.GetFrom(), Action: r.GetKind(),

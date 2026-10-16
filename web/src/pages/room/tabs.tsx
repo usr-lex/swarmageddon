@@ -274,6 +274,14 @@ export function StorageTab({ workspace, room, canOperate }: { workspace: string;
           Reclaimed {bytes(prune.data.reclaimedBytes)}.
         </p>
       )}
+      {prune.data?.output && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted">Engine output</summary>
+          <pre className="mt-1 max-h-64 overflow-auto rounded-xs bg-surface-2 p-2 font-mono text-xs whitespace-pre-wrap" data-testid="prune-output">
+            {prune.data.output}
+          </pre>
+        </details>
+      )}
       <ErrorText error={prune.error} />
       {canOperate && (
         <div className="flex flex-wrap gap-2">

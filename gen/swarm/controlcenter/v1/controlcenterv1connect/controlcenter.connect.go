@@ -113,6 +113,12 @@ const (
 	// PlatformServiceWatchPlatformProcedure is the fully-qualified name of the PlatformService's
 	// WatchPlatform RPC.
 	PlatformServiceWatchPlatformProcedure = "/swarm.controlcenter.v1.PlatformService/WatchPlatform"
+	// PlatformServiceSetIsolationProcedure is the fully-qualified name of the PlatformService's
+	// SetIsolation RPC.
+	PlatformServiceSetIsolationProcedure = "/swarm.controlcenter.v1.PlatformService/SetIsolation"
+	// PlatformServiceRerunPreflightProcedure is the fully-qualified name of the PlatformService's
+	// RerunPreflight RPC.
+	PlatformServiceRerunPreflightProcedure = "/swarm.controlcenter.v1.PlatformService/RerunPreflight"
 	// WorkspaceServiceListWorkspacesProcedure is the fully-qualified name of the WorkspaceService's
 	// ListWorkspaces RPC.
 	WorkspaceServiceListWorkspacesProcedure = "/swarm.controlcenter.v1.WorkspaceService/ListWorkspaces"
@@ -185,6 +191,11 @@ const (
 	// RoomServiceUpdateRoomSettingsProcedure is the fully-qualified name of the RoomService's
 	// UpdateRoomSettings RPC.
 	RoomServiceUpdateRoomSettingsProcedure = "/swarm.controlcenter.v1.RoomService/UpdateRoomSettings"
+	// RoomServiceWatchTranscriptProcedure is the fully-qualified name of the RoomService's
+	// WatchTranscript RPC.
+	RoomServiceWatchTranscriptProcedure = "/swarm.controlcenter.v1.RoomService/WatchTranscript"
+	// RoomServicePruneEngineProcedure is the fully-qualified name of the RoomService's PruneEngine RPC.
+	RoomServicePruneEngineProcedure = "/swarm.controlcenter.v1.RoomService/PruneEngine"
 	// FleetServiceWatchFleetProcedure is the fully-qualified name of the FleetService's WatchFleet RPC.
 	FleetServiceWatchFleetProcedure = "/swarm.controlcenter.v1.FleetService/WatchFleet"
 	// InboxServiceListInboxProcedure is the fully-qualified name of the InboxService's ListInbox RPC.
@@ -286,6 +297,12 @@ const (
 	// ChannelServiceSetChannelDeliveryProcedure is the fully-qualified name of the ChannelService's
 	// SetChannelDelivery RPC.
 	ChannelServiceSetChannelDeliveryProcedure = "/swarm.controlcenter.v1.ChannelService/SetChannelDelivery"
+	// ChannelServiceWatchChannelItemsProcedure is the fully-qualified name of the ChannelService's
+	// WatchChannelItems RPC.
+	ChannelServiceWatchChannelItemsProcedure = "/swarm.controlcenter.v1.ChannelService/WatchChannelItems"
+	// ChannelServiceListMentionablesProcedure is the fully-qualified name of the ChannelService's
+	// ListMentionables RPC.
+	ChannelServiceListMentionablesProcedure = "/swarm.controlcenter.v1.ChannelService/ListMentionables"
 	// WardenServiceListVerdictsProcedure is the fully-qualified name of the WardenService's
 	// ListVerdicts RPC.
 	WardenServiceListVerdictsProcedure = "/swarm.controlcenter.v1.WardenService/ListVerdicts"
@@ -561,6 +578,14 @@ type PlatformServiceClient interface {
 	// WatchPlatform streams the Platform on every change: preflight results and
 	// service progress.
 	WatchPlatform(context.Context, *connect.Request[v1.WatchPlatformRequest]) (*connect.ServerStreamForClient[v1.WatchPlatformResponse], error)
+	// SetIsolation sets Platform.spec.isolationTier and privilegedAccepted
+	// (ADR 0001) and asks the operator to run preflight again, so status shows
+	// the tier rooms will get. Admin only, audited.
+	SetIsolation(context.Context, *connect.Request[v1.SetIsolationRequest]) (*connect.Response[v1.SetIsolationResponse], error)
+	// RerunPreflight sets the annotation swarmageddon.dev/rerun-preflight to
+	// the current time; the operator runs the checks again and records the
+	// value in status (PlatformStatus.preflight_rerun). Admin only, audited.
+	RerunPreflight(context.Context, *connect.Request[v1.RerunPreflightRequest]) (*connect.Response[v1.RerunPreflightResponse], error)
 }
 
 // NewPlatformServiceClient constructs a client for the swarm.controlcenter.v1.PlatformService
@@ -610,6 +635,18 @@ func NewPlatformServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(platformServiceMethods.ByName("WatchPlatform")),
 			connect.WithClientOptions(opts...),
 		),
+		setIsolation: connect.NewClient[v1.SetIsolationRequest, v1.SetIsolationResponse](
+			httpClient,
+			baseURL+PlatformServiceSetIsolationProcedure,
+			connect.WithSchema(platformServiceMethods.ByName("SetIsolation")),
+			connect.WithClientOptions(opts...),
+		),
+		rerunPreflight: connect.NewClient[v1.RerunPreflightRequest, v1.RerunPreflightResponse](
+			httpClient,
+			baseURL+PlatformServiceRerunPreflightProcedure,
+			connect.WithSchema(platformServiceMethods.ByName("RerunPreflight")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -621,6 +658,8 @@ type platformServiceClient struct {
 	updateHostname *connect.Client[v1.UpdateHostnameRequest, v1.UpdateHostnameResponse]
 	setWizardStep  *connect.Client[v1.SetWizardStepRequest, v1.SetWizardStepResponse]
 	watchPlatform  *connect.Client[v1.WatchPlatformRequest, v1.WatchPlatformResponse]
+	setIsolation   *connect.Client[v1.SetIsolationRequest, v1.SetIsolationResponse]
+	rerunPreflight *connect.Client[v1.RerunPreflightRequest, v1.RerunPreflightResponse]
 }
 
 // GetPlatform calls swarm.controlcenter.v1.PlatformService.GetPlatform.
@@ -653,6 +692,16 @@ func (c *platformServiceClient) WatchPlatform(ctx context.Context, req *connect.
 	return c.watchPlatform.CallServerStream(ctx, req)
 }
 
+// SetIsolation calls swarm.controlcenter.v1.PlatformService.SetIsolation.
+func (c *platformServiceClient) SetIsolation(ctx context.Context, req *connect.Request[v1.SetIsolationRequest]) (*connect.Response[v1.SetIsolationResponse], error) {
+	return c.setIsolation.CallUnary(ctx, req)
+}
+
+// RerunPreflight calls swarm.controlcenter.v1.PlatformService.RerunPreflight.
+func (c *platformServiceClient) RerunPreflight(ctx context.Context, req *connect.Request[v1.RerunPreflightRequest]) (*connect.Response[v1.RerunPreflightResponse], error) {
+	return c.rerunPreflight.CallUnary(ctx, req)
+}
+
 // PlatformServiceHandler is an implementation of the swarm.controlcenter.v1.PlatformService
 // service.
 type PlatformServiceHandler interface {
@@ -664,6 +713,14 @@ type PlatformServiceHandler interface {
 	// WatchPlatform streams the Platform on every change: preflight results and
 	// service progress.
 	WatchPlatform(context.Context, *connect.Request[v1.WatchPlatformRequest], *connect.ServerStream[v1.WatchPlatformResponse]) error
+	// SetIsolation sets Platform.spec.isolationTier and privilegedAccepted
+	// (ADR 0001) and asks the operator to run preflight again, so status shows
+	// the tier rooms will get. Admin only, audited.
+	SetIsolation(context.Context, *connect.Request[v1.SetIsolationRequest]) (*connect.Response[v1.SetIsolationResponse], error)
+	// RerunPreflight sets the annotation swarmageddon.dev/rerun-preflight to
+	// the current time; the operator runs the checks again and records the
+	// value in status (PlatformStatus.preflight_rerun). Admin only, audited.
+	RerunPreflight(context.Context, *connect.Request[v1.RerunPreflightRequest]) (*connect.Response[v1.RerunPreflightResponse], error)
 }
 
 // NewPlatformServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -709,6 +766,18 @@ func NewPlatformServiceHandler(svc PlatformServiceHandler, opts ...connect.Handl
 		connect.WithSchema(platformServiceMethods.ByName("WatchPlatform")),
 		connect.WithHandlerOptions(opts...),
 	)
+	platformServiceSetIsolationHandler := connect.NewUnaryHandler(
+		PlatformServiceSetIsolationProcedure,
+		svc.SetIsolation,
+		connect.WithSchema(platformServiceMethods.ByName("SetIsolation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	platformServiceRerunPreflightHandler := connect.NewUnaryHandler(
+		PlatformServiceRerunPreflightProcedure,
+		svc.RerunPreflight,
+		connect.WithSchema(platformServiceMethods.ByName("RerunPreflight")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/swarm.controlcenter.v1.PlatformService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PlatformServiceGetPlatformProcedure:
@@ -723,6 +792,10 @@ func NewPlatformServiceHandler(svc PlatformServiceHandler, opts ...connect.Handl
 			platformServiceSetWizardStepHandler.ServeHTTP(w, r)
 		case PlatformServiceWatchPlatformProcedure:
 			platformServiceWatchPlatformHandler.ServeHTTP(w, r)
+		case PlatformServiceSetIsolationProcedure:
+			platformServiceSetIsolationHandler.ServeHTTP(w, r)
+		case PlatformServiceRerunPreflightProcedure:
+			platformServiceRerunPreflightHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -754,6 +827,14 @@ func (UnimplementedPlatformServiceHandler) SetWizardStep(context.Context, *conne
 
 func (UnimplementedPlatformServiceHandler) WatchPlatform(context.Context, *connect.Request[v1.WatchPlatformRequest], *connect.ServerStream[v1.WatchPlatformResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.PlatformService.WatchPlatform is not implemented"))
+}
+
+func (UnimplementedPlatformServiceHandler) SetIsolation(context.Context, *connect.Request[v1.SetIsolationRequest]) (*connect.Response[v1.SetIsolationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.PlatformService.SetIsolation is not implemented"))
+}
+
+func (UnimplementedPlatformServiceHandler) RerunPreflight(context.Context, *connect.Request[v1.RerunPreflightRequest]) (*connect.Response[v1.RerunPreflightResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.PlatformService.RerunPreflight is not implemented"))
 }
 
 // WorkspaceServiceClient is a client for the swarm.controlcenter.v1.WorkspaceService service.
@@ -1132,6 +1213,13 @@ type RoomServiceClient interface {
 	GetRoomSettings(context.Context, *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error)
 	// UpdateRoomSettings replaces the room's own level; operators, audited.
 	UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error)
+	// WatchTranscript tails the room's session transcript read-only (the
+	// newest Claude Code or ore JSONL file, read by `tail -F` as the agent
+	// user through pods/exec) as simple items. Viewers of the workspace.
+	WatchTranscript(context.Context, *connect.Request[v1.WatchTranscriptRequest]) (*connect.ServerStreamForClient[v1.WatchTranscriptResponse], error)
+	// PruneEngine prunes the room's container engine as the agent user
+	// (docker ... prune). Operators, audited.
+	PruneEngine(context.Context, *connect.Request[v1.PruneEngineRequest]) (*connect.Response[v1.PruneEngineResponse], error)
 }
 
 // NewRoomServiceClient constructs a client for the swarm.controlcenter.v1.RoomService service. By
@@ -1235,6 +1323,18 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roomServiceMethods.ByName("UpdateRoomSettings")),
 			connect.WithClientOptions(opts...),
 		),
+		watchTranscript: connect.NewClient[v1.WatchTranscriptRequest, v1.WatchTranscriptResponse](
+			httpClient,
+			baseURL+RoomServiceWatchTranscriptProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("WatchTranscript")),
+			connect.WithClientOptions(opts...),
+		),
+		pruneEngine: connect.NewClient[v1.PruneEngineRequest, v1.PruneEngineResponse](
+			httpClient,
+			baseURL+RoomServicePruneEngineProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("PruneEngine")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -1255,6 +1355,8 @@ type roomServiceClient struct {
 	getRoomStorage        *connect.Client[v1.GetRoomStorageRequest, v1.GetRoomStorageResponse]
 	getRoomSettings       *connect.Client[v1.GetRoomSettingsRequest, v1.GetRoomSettingsResponse]
 	updateRoomSettings    *connect.Client[v1.UpdateRoomSettingsRequest, v1.UpdateRoomSettingsResponse]
+	watchTranscript       *connect.Client[v1.WatchTranscriptRequest, v1.WatchTranscriptResponse]
+	pruneEngine           *connect.Client[v1.PruneEngineRequest, v1.PruneEngineResponse]
 }
 
 // ListRooms calls swarm.controlcenter.v1.RoomService.ListRooms.
@@ -1332,6 +1434,16 @@ func (c *roomServiceClient) UpdateRoomSettings(ctx context.Context, req *connect
 	return c.updateRoomSettings.CallUnary(ctx, req)
 }
 
+// WatchTranscript calls swarm.controlcenter.v1.RoomService.WatchTranscript.
+func (c *roomServiceClient) WatchTranscript(ctx context.Context, req *connect.Request[v1.WatchTranscriptRequest]) (*connect.ServerStreamForClient[v1.WatchTranscriptResponse], error) {
+	return c.watchTranscript.CallServerStream(ctx, req)
+}
+
+// PruneEngine calls swarm.controlcenter.v1.RoomService.PruneEngine.
+func (c *roomServiceClient) PruneEngine(ctx context.Context, req *connect.Request[v1.PruneEngineRequest]) (*connect.Response[v1.PruneEngineResponse], error) {
+	return c.pruneEngine.CallUnary(ctx, req)
+}
+
 // RoomServiceHandler is an implementation of the swarm.controlcenter.v1.RoomService service.
 type RoomServiceHandler interface {
 	ListRooms(context.Context, *connect.Request[v1.ListRoomsRequest]) (*connect.Response[v1.ListRoomsResponse], error)
@@ -1357,6 +1469,13 @@ type RoomServiceHandler interface {
 	GetRoomSettings(context.Context, *connect.Request[v1.GetRoomSettingsRequest]) (*connect.Response[v1.GetRoomSettingsResponse], error)
 	// UpdateRoomSettings replaces the room's own level; operators, audited.
 	UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error)
+	// WatchTranscript tails the room's session transcript read-only (the
+	// newest Claude Code or ore JSONL file, read by `tail -F` as the agent
+	// user through pods/exec) as simple items. Viewers of the workspace.
+	WatchTranscript(context.Context, *connect.Request[v1.WatchTranscriptRequest], *connect.ServerStream[v1.WatchTranscriptResponse]) error
+	// PruneEngine prunes the room's container engine as the agent user
+	// (docker ... prune). Operators, audited.
+	PruneEngine(context.Context, *connect.Request[v1.PruneEngineRequest]) (*connect.Response[v1.PruneEngineResponse], error)
 }
 
 // NewRoomServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -1456,6 +1575,18 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roomServiceMethods.ByName("UpdateRoomSettings")),
 		connect.WithHandlerOptions(opts...),
 	)
+	roomServiceWatchTranscriptHandler := connect.NewServerStreamHandler(
+		RoomServiceWatchTranscriptProcedure,
+		svc.WatchTranscript,
+		connect.WithSchema(roomServiceMethods.ByName("WatchTranscript")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServicePruneEngineHandler := connect.NewUnaryHandler(
+		RoomServicePruneEngineProcedure,
+		svc.PruneEngine,
+		connect.WithSchema(roomServiceMethods.ByName("PruneEngine")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/swarm.controlcenter.v1.RoomService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RoomServiceListRoomsProcedure:
@@ -1488,6 +1619,10 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceGetRoomSettingsHandler.ServeHTTP(w, r)
 		case RoomServiceUpdateRoomSettingsProcedure:
 			roomServiceUpdateRoomSettingsHandler.ServeHTTP(w, r)
+		case RoomServiceWatchTranscriptProcedure:
+			roomServiceWatchTranscriptHandler.ServeHTTP(w, r)
+		case RoomServicePruneEngineProcedure:
+			roomServicePruneEngineHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1555,6 +1690,14 @@ func (UnimplementedRoomServiceHandler) GetRoomSettings(context.Context, *connect
 
 func (UnimplementedRoomServiceHandler) UpdateRoomSettings(context.Context, *connect.Request[v1.UpdateRoomSettingsRequest]) (*connect.Response[v1.UpdateRoomSettingsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.UpdateRoomSettings is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) WatchTranscript(context.Context, *connect.Request[v1.WatchTranscriptRequest], *connect.ServerStream[v1.WatchTranscriptResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.WatchTranscript is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) PruneEngine(context.Context, *connect.Request[v1.PruneEngineRequest]) (*connect.Response[v1.PruneEngineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.PruneEngine is not implemented"))
 }
 
 // FleetServiceClient is a client for the swarm.controlcenter.v1.FleetService service.
@@ -2719,6 +2862,17 @@ type ChannelServiceClient interface {
 	MarkChannelRead(context.Context, *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error)
 	GetUnreadSummary(context.Context, *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error)
 	SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error)
+	// WatchChannelItems streams new posts and direct messages the person can
+	// read, in the given workspaces (empty: all they can see). The control
+	// center polls messaging's ReadMessages for the person every two seconds
+	// (pull-mode channels push nothing), so items arrive within about 2 s.
+	// Items unread when the stream starts are not sent; read them with
+	// ReadChannelMessages.
+	WatchChannelItems(context.Context, *connect.Request[v1.WatchChannelItemsRequest]) (*connect.ServerStreamForClient[v1.WatchChannelItemsResponse], error)
+	// ListMentionables lists who an @mention can name in a workspace: agents
+	// and people the person may reach (messaging ListPeers), plus the control
+	// center's users who can see the workspace.
+	ListMentionables(context.Context, *connect.Request[v1.ListMentionablesRequest]) (*connect.Response[v1.ListMentionablesResponse], error)
 }
 
 // NewChannelServiceClient constructs a client for the swarm.controlcenter.v1.ChannelService
@@ -2774,6 +2928,18 @@ func NewChannelServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(channelServiceMethods.ByName("SetChannelDelivery")),
 			connect.WithClientOptions(opts...),
 		),
+		watchChannelItems: connect.NewClient[v1.WatchChannelItemsRequest, v1.WatchChannelItemsResponse](
+			httpClient,
+			baseURL+ChannelServiceWatchChannelItemsProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("WatchChannelItems")),
+			connect.WithClientOptions(opts...),
+		),
+		listMentionables: connect.NewClient[v1.ListMentionablesRequest, v1.ListMentionablesResponse](
+			httpClient,
+			baseURL+ChannelServiceListMentionablesProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("ListMentionables")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -2786,6 +2952,8 @@ type channelServiceClient struct {
 	markChannelRead     *connect.Client[v1.MarkChannelReadRequest, v1.MarkChannelReadResponse]
 	getUnreadSummary    *connect.Client[v1.GetUnreadSummaryRequest, v1.GetUnreadSummaryResponse]
 	setChannelDelivery  *connect.Client[v1.SetChannelDeliveryRequest, v1.SetChannelDeliveryResponse]
+	watchChannelItems   *connect.Client[v1.WatchChannelItemsRequest, v1.WatchChannelItemsResponse]
+	listMentionables    *connect.Client[v1.ListMentionablesRequest, v1.ListMentionablesResponse]
 }
 
 // ListChannels calls swarm.controlcenter.v1.ChannelService.ListChannels.
@@ -2823,6 +2991,16 @@ func (c *channelServiceClient) SetChannelDelivery(ctx context.Context, req *conn
 	return c.setChannelDelivery.CallUnary(ctx, req)
 }
 
+// WatchChannelItems calls swarm.controlcenter.v1.ChannelService.WatchChannelItems.
+func (c *channelServiceClient) WatchChannelItems(ctx context.Context, req *connect.Request[v1.WatchChannelItemsRequest]) (*connect.ServerStreamForClient[v1.WatchChannelItemsResponse], error) {
+	return c.watchChannelItems.CallServerStream(ctx, req)
+}
+
+// ListMentionables calls swarm.controlcenter.v1.ChannelService.ListMentionables.
+func (c *channelServiceClient) ListMentionables(ctx context.Context, req *connect.Request[v1.ListMentionablesRequest]) (*connect.Response[v1.ListMentionablesResponse], error) {
+	return c.listMentionables.CallUnary(ctx, req)
+}
+
 // ChannelServiceHandler is an implementation of the swarm.controlcenter.v1.ChannelService service.
 type ChannelServiceHandler interface {
 	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
@@ -2832,6 +3010,17 @@ type ChannelServiceHandler interface {
 	MarkChannelRead(context.Context, *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error)
 	GetUnreadSummary(context.Context, *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error)
 	SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error)
+	// WatchChannelItems streams new posts and direct messages the person can
+	// read, in the given workspaces (empty: all they can see). The control
+	// center polls messaging's ReadMessages for the person every two seconds
+	// (pull-mode channels push nothing), so items arrive within about 2 s.
+	// Items unread when the stream starts are not sent; read them with
+	// ReadChannelMessages.
+	WatchChannelItems(context.Context, *connect.Request[v1.WatchChannelItemsRequest], *connect.ServerStream[v1.WatchChannelItemsResponse]) error
+	// ListMentionables lists who an @mention can name in a workspace: agents
+	// and people the person may reach (messaging ListPeers), plus the control
+	// center's users who can see the workspace.
+	ListMentionables(context.Context, *connect.Request[v1.ListMentionablesRequest]) (*connect.Response[v1.ListMentionablesResponse], error)
 }
 
 // NewChannelServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -2883,6 +3072,18 @@ func NewChannelServiceHandler(svc ChannelServiceHandler, opts ...connect.Handler
 		connect.WithSchema(channelServiceMethods.ByName("SetChannelDelivery")),
 		connect.WithHandlerOptions(opts...),
 	)
+	channelServiceWatchChannelItemsHandler := connect.NewServerStreamHandler(
+		ChannelServiceWatchChannelItemsProcedure,
+		svc.WatchChannelItems,
+		connect.WithSchema(channelServiceMethods.ByName("WatchChannelItems")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceListMentionablesHandler := connect.NewUnaryHandler(
+		ChannelServiceListMentionablesProcedure,
+		svc.ListMentionables,
+		connect.WithSchema(channelServiceMethods.ByName("ListMentionables")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/swarm.controlcenter.v1.ChannelService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChannelServiceListChannelsProcedure:
@@ -2899,6 +3100,10 @@ func NewChannelServiceHandler(svc ChannelServiceHandler, opts ...connect.Handler
 			channelServiceGetUnreadSummaryHandler.ServeHTTP(w, r)
 		case ChannelServiceSetChannelDeliveryProcedure:
 			channelServiceSetChannelDeliveryHandler.ServeHTTP(w, r)
+		case ChannelServiceWatchChannelItemsProcedure:
+			channelServiceWatchChannelItemsHandler.ServeHTTP(w, r)
+		case ChannelServiceListMentionablesProcedure:
+			channelServiceListMentionablesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -2934,6 +3139,14 @@ func (UnimplementedChannelServiceHandler) GetUnreadSummary(context.Context, *con
 
 func (UnimplementedChannelServiceHandler) SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.SetChannelDelivery is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) WatchChannelItems(context.Context, *connect.Request[v1.WatchChannelItemsRequest], *connect.ServerStream[v1.WatchChannelItemsResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.WatchChannelItems is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) ListMentionables(context.Context, *connect.Request[v1.ListMentionablesRequest]) (*connect.Response[v1.ListMentionablesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.ListMentionables is not implemented"))
 }
 
 // WardenServiceClient is a client for the swarm.controlcenter.v1.WardenService service.

@@ -34,6 +34,21 @@ describe("PreflightStep", () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ isolationTier: "privileged", privilegedAccepted: true }), "signin");
   });
 
+  it("shows the kubectl command only when storing the tier fails", async () => {
+    sessionStorage.clear();
+    const api = createMockApi("demo");
+    setApi(api);
+    const platform = await api.getPlatform();
+    const save = vi.fn().mockRejectedValue(new Error("the API server said no"));
+    wrap(<PreflightStep platform={platform} save={save} saving={false} />);
+    expect(screen.queryByText(/kubectl patch/)).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText(/User namespaces/));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByText("the API server said no")).toBeInTheDocument();
+    expect(screen.getByText(/kubectl patch platform default/)).toHaveTextContent('"isolationTier":"userns"');
+  });
+
   it("blocks on failed checks and shows the fix", async () => {
     sessionStorage.clear();
     const api = createMockApi("demo");

@@ -1,9 +1,8 @@
 import type { AdvisorDraft, WardenMode } from "@/api/channels";
 import { Card, Checkbox, Field, Input, Select } from "@/components/ui";
 import type { DraftProps } from "./WorkspaceWizard";
-import { apiMode } from "@/api";
 
-const noAdvisor = (): AdvisorDraft => ({ model: "", effort: "high", maxCallsPerHour: 10, native: false });
+const noAdvisor = (): AdvisorDraft => ({ model: "", effort: "high", maxCallsPerHour: 10, monthlyUSD: 0, native: false });
 const efforts = ["low", "medium", "high", "xhigh", "max"];
 
 const modeHelp: Record<WardenMode, string> = {
@@ -14,7 +13,7 @@ const modeHelp: Record<WardenMode, string> = {
 
 function AdvisorEditor({ a, onChange, models, label, claude }: { a: AdvisorDraft; onChange: (a: AdvisorDraft) => void; models: string[]; label: string; claude: boolean }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-4 sm:items-end">
+    <div className="grid gap-2 sm:grid-cols-5 sm:items-end">
       <Field label={`${label}: advisor model`}>
         {(id) => (
           <Select id={id} value={a.model} onChange={(e) => onChange({ ...a, model: e.target.value })}>
@@ -38,6 +37,11 @@ function AdvisorEditor({ a, onChange, models, label, claude }: { a: AdvisorDraft
           </Field>
           <Field label="Max calls per hour">
             {(id) => <Input id={id} type="number" min={1} value={a.maxCallsPerHour} onChange={(e) => onChange({ ...a, maxCallsPerHour: Math.max(1, Number(e.target.value) || 1) })} />}
+          </Field>
+          <Field label="Advisor budget (USD/month)" hint="0: the workspace's per-room budget">
+            {(id, d) => (
+              <Input id={id} aria-describedby={d} type="number" min={0} value={a.monthlyUSD} onChange={(e) => onChange({ ...a, monthlyUSD: Math.max(0, Number(e.target.value) || 0) })} />
+            )}
           </Field>
           {claude && (
             <div>
@@ -63,12 +67,6 @@ export function WardenStep({ draft, set, models }: DraftProps & { models: string
   const roleUsesClaude = (role: string) => draft.rooms.some((r) => r.role === role && r.cli === "claude");
   return (
     <div className="space-y-4">
-      {apiMode() === "real" && (
-        <p role="note" className="border border-border bg-surface-2 p-2 text-xs text-muted">
-          The control center stores the warden's mode and model. Interrupt and quarantine on high, the warden budget, per-room modes and advisors
-          aren't in its API yet: set them on the Workspace, RoleTemplate and Room resources.
-        </p>
-      )}
       <Card title="Warden">
         <p className="mb-3 text-sm text-muted">A small model that watches each agent for drift, overreach, loops and risky actions. Its verdicts show on the fleet and in each room's Activity tab.</p>
         <div className="grid gap-3 sm:grid-cols-3">

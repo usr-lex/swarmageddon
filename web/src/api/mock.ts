@@ -208,7 +208,7 @@ function demoState(): State {
   };
   draft.chatChannels = defaultChatChannels(draft);
   draft.warden = { ...defaultWarden(), model: "claude-haiku-5" };
-  draft.advisors = { implementer: { model: "claude-opus-5-5", effort: "max", maxCallsPerHour: 10, native: false } };
+  draft.advisors = { implementer: { model: "claude-opus-5-5", effort: "max", maxCallsPerHour: 10, monthlyUSD: 0, native: false } };
   s.workspaces.acme = draft;
   const demo: Record<string, [RoomSummary["presence"], string, number, number]> = {
     athena: ["working", "Splitting the billing epic into task cards", 42.1, 12],

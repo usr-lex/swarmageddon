@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream" //nolint:staticcheck // client-go's spdy dialer still returns these types
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -66,6 +66,27 @@ func (k *Kube) Exec(ctx context.Context, ns, pod, container string, cmd []string
 	})
 }
 
+// Run implements Runner: the same exec protocols, without a TTY or stdin.
+func (k *Kube) Run(ctx context.Context, ns, pod, container string, cmd []string, stdout, stderr io.Writer) error {
+	req := k.Client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Name(pod).SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{Container: container, Command: cmd, Stdout: true, Stderr: true}, scheme.ParameterCodec)
+	ws, err := remotecommand.NewWebSocketExecutor(k.Config, "GET", req.URL().String())
+	if err != nil {
+		return err
+	}
+	sp, err := remotecommand.NewSPDYExecutor(k.Config, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+	exec, err := remotecommand.NewFallbackExecutor(ws, sp, func(err error) bool {
+		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+	})
+	if err != nil {
+		return err
+	}
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: stdout, Stderr: stderr})
+}
+
 // Forward implements Forwarder: one data stream to port in the pod, over
 // SPDY (pods/portforward).
 func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWriteCloser, error) {
@@ -80,7 +101,7 @@ func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWr
 		return nil, err
 	}
 	if proto != portforward.PortForwardProtocolV1Name {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("port-forward protocol %q not supported", proto)
 	}
 	id := strconv.FormatInt(k.reqID.Add(1), 10)
@@ -90,19 +111,19 @@ func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWr
 	h.Set(corev1.PortForwardRequestIDHeader, id)
 	errStream, err := conn.CreateStream(h)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	errStream.Close()
 	h.Set(corev1.StreamType, corev1.StreamTypeData)
 	data, err := conn.CreateStream(h)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	go func() {
 		<-ctx.Done()
-		conn.Close()
+		_ = conn.Close()
 	}()
 	return &fwdConn{Stream: data, conn: conn}, nil
 }

@@ -185,6 +185,20 @@ func TestPlatformReconcile(t *testing.T) {
 		t.Fatal("no new token after reset")
 	}
 
+	// Re-run preflight: a new annotation value restarts it once and is
+	// recorded in status; the same value again changes nothing.
+	p.Annotations = map[string]string{AnnotationRerunPreflight: "2026-10-16T12:00:00Z"}
+	must(c.Update(ctx, p))
+	reconcileOnce()
+	p = getPlatform()
+	if p.Status.PreflightRerun != "2026-10-16T12:00:00Z" || p.Status.Preflight != nil || p.Annotations[AnnotationRerunPreflight] == "" {
+		t.Fatalf("after rerun: handled %q preflight %+v", p.Status.PreflightRerun, p.Status.Preflight)
+	}
+	reconcileOnce()
+	if p = getPlatform(); p.Status.Preflight == nil || len(p.Status.Preflight.Checks) == 0 {
+		t.Fatal("preflight did not start again")
+	}
+
 	// Services: approve, then play the kubelet for each step.
 	p.Spec.Wizard.ServicesApproved = true
 	p.Spec.Services.Ntfy.Enabled = false

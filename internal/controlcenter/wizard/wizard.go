@@ -252,12 +252,12 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	if p.RoomDefaults != nil {
 		s.RoomDefaults = SettingsFromPlan(p.GetRoomDefaults())
 	}
-	if s.RoomDefaults.Network != nil {
-		s.Internet = nil // deprecated; the network setting decides
-	} else {
-		internet := p.GetInternet()
-		s.Internet = &internet
+	// The deprecated internet flag becomes roomDefaults.network; FromCluster
+	// already folded an old workspace's internet: false into the plan's network.
+	if s.RoomDefaults.Network == nil && !p.GetInternet() {
+		s.RoomDefaults.Network = &v1alpha1.NetworkAccess{Mode: v1alpha1.NetworkNone}
 	}
+	s.Internet = nil //nolint:staticcheck // cleared: roomDefaults.network now says the same
 	s.SharedVolumes = volumesFromPlan(p)
 	if d, err := time.ParseDuration(p.GetApprovalTimeout()); err == nil && p.GetApprovalTimeout() != "" {
 		s.ApprovalTimeout = &metav1.Duration{Duration: d}
@@ -302,6 +302,8 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 		if a.Settings != nil {
 			SetRoomSettings(rs, SettingsFromPlan(a.GetSettings()))
 		}
+		rs.Advisor = AdvisorFromPlan(a.GetAdvisor(), true)
+		rs.WardenMode = v1alpha1.WardenMode(a.GetWardenMode())
 		rooms = append(rooms, r)
 	}
 	var templates []*v1alpha1.RoleTemplate
@@ -311,14 +313,25 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 		if rd, ok := p.GetRoleDefaults()[t.Name]; ok {
 			t.Spec.RoomDefaults = SettingsFromPlan(rd)
 		}
+		if ad, ok := p.GetRoleAdvisors()[t.Name]; ok {
+			t.Spec.Advisor = AdvisorFromPlan(ad, false)
+		}
 		have[t.Name] = true
 		templates = append(templates, t)
 	}
-	for _, name := range slices.Sorted(maps.Keys(p.GetRoleDefaults())) {
+	names := slices.Collect(maps.Keys(p.GetRoleDefaults()))
+	names = append(names, slices.Collect(maps.Keys(p.GetRoleAdvisors()))...)
+	slices.Sort(names)
+	for _, name := range slices.Compact(names) {
 		if !have[name] {
 			t := &v1alpha1.RoleTemplate{}
 			t.Name, t.Namespace = name, ns
-			t.Spec.RoomDefaults = SettingsFromPlan(p.GetRoleDefaults()[name])
+			if rd, ok := p.GetRoleDefaults()[name]; ok {
+				t.Spec.RoomDefaults = SettingsFromPlan(rd)
+			}
+			if ad, ok := p.GetRoleAdvisors()[name]; ok {
+				t.Spec.Advisor = AdvisorFromPlan(ad, false)
+			}
 			templates = append(templates, t)
 		}
 	}
@@ -343,13 +356,16 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Name: w.Name, DisplayName: s.DisplayName, Org: s.Forge.Org, DefaultLinks: string(s.Messaging.DefaultLinks),
 		Owners: s.Owners, DefaultModel: s.Models.Default, BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
 		UpdateMode: string(s.UpdatePolicy.Mode), UpdateWindow: s.UpdatePolicy.Window, RequiredApprovals: s.Forge.RequiredApprovals,
-		Internet:     s.Internet == nil || *s.Internet,
+		Internet:     s.Internet == nil || *s.Internet, //nolint:staticcheck // still read for workspaces written before roomDefaults.network
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
-		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{},
+		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{}, RoleAdvisors: map[string]*ccv1.AdvisorPlan{},
 	}
 	for _, t := range cur.RoleTemplates {
 		if !isEmpty(t.Spec.RoomDefaults) {
 			p.RoleDefaults[t.Name] = SettingsToPlan(t.Spec.RoomDefaults)
+		}
+		if t.Spec.Advisor != nil {
+			p.RoleAdvisors[t.Name] = AdvisorToPlan(t.Spec.Advisor)
 		}
 	}
 	if s.ApprovalTimeout != nil {
@@ -382,7 +398,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		p.Agents = append(p.Agents, &ccv1.AgentPlan{Name: r.Name, DisplayName: rs.DisplayName, Role: rs.Role, Cli: string(rs.CLI),
 			Model: rs.Model, Effort: rs.Effort, Group: rs.Group, Cpu: qstr(rs.Resources.CPU), Memory: qstr(rs.Resources.Memory),
 			HomeVolume: qstr(rs.Volumes.Home), EngineVolume: qstr(rs.Volumes.Engine), Repos: rs.Repos, WorkDir: rs.WorkDir, Paused: rs.Paused,
-			Settings: SettingsToPlan(RoomSettings(rs))})
+			Settings: SettingsToPlan(RoomSettings(rs)), Advisor: AdvisorToPlan(rs.Advisor), WardenMode: string(rs.WardenMode)})
 	}
 	if cur.Pool != nil {
 		p.RunnerLabels = cur.Pool.Spec.Labels
@@ -476,18 +492,25 @@ func Diff(cur Current, d Desired, prune bool) []*ccv1.Change {
 	if d.Pool != nil {
 		newPool = &d.Pool.Spec
 	}
-	curRT := map[string]*v1alpha1.RoomDefaults{}
+	curRT := map[string]*roleFields{}
 	for i := range cur.RoleTemplates {
-		curRT[cur.RoleTemplates[i].Name] = &cur.RoleTemplates[i].Spec.RoomDefaults
+		curRT[cur.RoleTemplates[i].Name] = &roleFields{cur.RoleTemplates[i].Spec.RoomDefaults, cur.RoleTemplates[i].Spec.Advisor}
 	}
 	for _, t := range d.RoleTemplates {
 		before := curRT[t.Name]
 		if before == nil {
-			before = &v1alpha1.RoomDefaults{}
+			before = &roleFields{}
 		}
-		c := change("RoleTemplate", t.Name, before, &t.Spec.RoomDefaults)
+		after := &roleFields{t.Spec.RoomDefaults, t.Spec.Advisor}
+		c := change("RoleTemplate", t.Name, before, after)
 		if c.Action != ccv1.ChangeAction_CHANGE_ACTION_UNCHANGED {
-			c.Fields = []string{"roomDefaults"}
+			c.Fields = nil
+			if specJSON(&before.RoomDefaults) != specJSON(&after.RoomDefaults) {
+				c.Fields = append(c.Fields, "roomDefaults")
+			}
+			if specJSON(before.Advisor) != specJSON(after.Advisor) {
+				c.Fields = append(c.Fields, "advisor")
+			}
 			out = append(out, c)
 		}
 	}
@@ -500,6 +523,12 @@ func Diff(cur Current, d Desired, prune bool) []*ccv1.Change {
 		out = append(out, c)
 	}
 	return out
+}
+
+// roleFields are the RoleTemplate fields the wizard manages.
+type roleFields struct {
+	RoomDefaults v1alpha1.RoomDefaults `json:"roomDefaults"`
+	Advisor      *v1alpha1.AdvisorSpec `json:"advisor,omitempty"`
 }
 
 // LoadCurrent reads a workspace's resources; a missing workspace is a zero Current.
@@ -585,7 +614,7 @@ func Apply(ctx context.Context, c client.Client, cur Current, d Desired, changes
 	}
 	for _, t := range d.RoleTemplates {
 		if ch := byKey["RoleTemplate/"+t.Name]; ch != nil && ch.Action != ccv1.ChangeAction_CHANGE_ACTION_UNCHANGED {
-			if err := setRoleDefaults(ctx, c, t, wait); err != nil {
+			if err := setRoleFields(ctx, c, t, wait); err != nil {
 				return err
 			}
 		}
@@ -605,10 +634,10 @@ func Apply(ctx context.Context, c client.Client, cur Current, d Desired, changes
 	return nil
 }
 
-// setRoleDefaults writes a template's roomDefaults. A built-in template the
-// operator hasn't created yet is waited for; the wizard never creates one,
-// since the operator would then skip filling it in.
-func setRoleDefaults(ctx context.Context, c client.Client, t *v1alpha1.RoleTemplate, wait time.Duration) error {
+// setRoleFields writes a template's roomDefaults and advisor. A built-in
+// template the operator hasn't created yet is waited for; the wizard never
+// creates one, since the operator would then skip filling it in.
+func setRoleFields(ctx context.Context, c client.Client, t *v1alpha1.RoleTemplate, wait time.Duration) error {
 	deadline := time.Now().Add(wait)
 	for {
 		var cur v1alpha1.RoleTemplate
@@ -616,6 +645,7 @@ func setRoleDefaults(ctx context.Context, c client.Client, t *v1alpha1.RoleTempl
 		if err == nil {
 			orig := cur.DeepCopy()
 			cur.Spec.RoomDefaults = t.Spec.RoomDefaults
+			cur.Spec.Advisor = t.Spec.Advisor
 			if err := c.Patch(ctx, &cur, client.MergeFrom(orig)); err != nil {
 				return fmt.Errorf("role template %s: %w", t.Name, err)
 			}

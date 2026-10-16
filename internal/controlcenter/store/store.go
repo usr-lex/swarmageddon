@@ -53,7 +53,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 
 func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	sub, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return err
@@ -155,7 +155,7 @@ func (s *Store) SignIn(ctx context.Context, id Identity) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // a no-op after Commit
 	var userID string
 	err = tx.QueryRow(ctx, `SELECT user_id FROM identities WHERE provider=$1 AND subject=$2`, id.Provider, id.Subject).Scan(&userID)
 	switch {
@@ -284,7 +284,7 @@ func (s *Store) SetAssignments(ctx context.Context, userID string, workspaces []
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // a no-op after Commit
 	if _, err := tx.Exec(ctx, `DELETE FROM workspace_assignments WHERE user_id=$1 AND kind='member'`, userID); err != nil {
 		return err
 	}
@@ -611,7 +611,7 @@ func (s *Store) SetPrefs(ctx context.Context, userID string, prefs []Pref) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // a no-op after Commit
 	if _, err := tx.Exec(ctx, `DELETE FROM notification_prefs WHERE user_id=$1`, userID); err != nil {
 		return err
 	}
