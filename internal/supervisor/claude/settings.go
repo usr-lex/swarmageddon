@@ -11,7 +11,7 @@ import (
 // HookEvents are the events the platform hooks, each calling `swarm hook <Event>`.
 var HookEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
-	"Stop", "Notification", "PermissionRequest",
+	"Stop", "Notification", "PermissionRequest", "PostToolUseFailure", "StopFailure",
 }
 
 // ManagedPolicy is the input for ManagedSettings and ManagedMCP: the persona's

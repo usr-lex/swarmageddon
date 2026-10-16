@@ -256,4 +256,22 @@ func TestHooksAndDelivery(t *testing.T) {
 	if !strings.Contains(string(out), `"behavior":"deny","message":"no"`) {
 		t.Errorf("deny %s", out)
 	}
+
+	// Answered in the TUI: the PostToolUse hook for the same call ends the wait.
+	ev.approve = func(ctx context.Context, _ agent.Approval) (agent.Decision, error) { <-ctx.Done(); return agent.Decision{}, ctx.Err() }
+	res := make(chan []byte, 1)
+	go func() {
+		out, _ := d.Hook(context.Background(), "PermissionRequest", []byte(`{"tool_name":"Bash","tool_input":{"command":"ls","description":"d"}}`), nil)
+		res <- out
+	}()
+	time.Sleep(50 * time.Millisecond)
+	d.Hook(context.Background(), "PostToolUse", []byte(`{"tool_name":"Bash","tool_input":{"description":"d","command":"ls"}}`), nil)
+	select {
+	case out := <-res:
+		if out != nil {
+			t.Errorf("output after a local answer: %s", out)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("PostToolUse did not resolve the pending request")
+	}
 }

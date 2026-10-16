@@ -52,6 +52,7 @@ type Driver struct {
 	ready   chan struct{} // closed when the inbox socket is known
 	runSeq  int           // increments per CLI start
 	firstAt int           // runSeq for which the first turn was sent
+	pending map[*context.CancelFunc]string
 }
 
 func (d *Driver) init() {
@@ -302,6 +303,12 @@ func (d *Driver) Hook(ctx context.Context, event string, payload []byte, env map
 	}
 	ev := d.Events
 	switch event {
+	case "PostToolUse", "PostToolUseFailure":
+		d.resolveLocal(toolKey(in.ToolName, in.ToolInput))
+	case "Stop", "StopFailure", "UserPromptSubmit", "SessionStart":
+		d.resolveLocal("")
+	}
+	switch event {
 	case "SessionStart":
 		d.sessionStart(in, env)
 	case "UserPromptSubmit":
@@ -309,9 +316,9 @@ func (d *Driver) Hook(ctx context.Context, event string, payload []byte, env map
 		if p := strings.TrimSpace(in.Prompt); p != "" && !strings.HasPrefix(p, "<cross-session-message") {
 			ev.Task(p)
 		}
-	case "PreToolUse", "PostToolUse":
+	case "PreToolUse", "PostToolUse", "PostToolUseFailure":
 		ev.Presence(messagingv1.Presence_PRESENCE_WORKING)
-	case "Stop":
+	case "Stop", "StopFailure":
 		ev.Presence(messagingv1.Presence_PRESENCE_IDLE)
 	case "Notification":
 		switch in.NotificationType {
@@ -367,8 +374,28 @@ func (d *Driver) permission(ctx context.Context, in HookInput) ([]byte, error) {
 		Detail:       string(in.ToolInput),
 		SessionScope: len(in.PermissionSuggestions) > 0,
 	}
-	dec, err := d.Events.Approve(ctx, a)
+	// Claude doesn't stop this hook when the dialog is answered in the TUI
+	// (checked with 2.1.301), so a later hook event for the same call, or
+	// the turn moving on, cancels it, which withdraws the request.
+	key := toolKey(in.ToolName, in.ToolInput)
+	actx, cancel := context.WithCancel(ctx)
+	d.mu.Lock()
+	if d.pending == nil {
+		d.pending = map[*context.CancelFunc]string{}
+	}
+	d.pending[&cancel] = key
+	d.mu.Unlock()
+	defer func() {
+		d.mu.Lock()
+		delete(d.pending, &cancel)
+		d.mu.Unlock()
+		cancel()
+	}()
+	dec, err := d.Events.Approve(actx, a)
 	if err != nil {
+		if ctx.Err() == nil && actx.Err() != nil {
+			return nil, nil // answered in the terminal
+		}
 		return nil, err
 	}
 	var out PermissionOutput
@@ -386,6 +413,28 @@ func (d *Driver) permission(ctx context.Context, in HookInput) ([]byte, error) {
 		}
 	}
 	return json.Marshal(out)
+}
+
+// toolKey identifies a tool call by name and normalized input.
+func toolKey(tool string, input json.RawMessage) string {
+	var v any
+	if json.Unmarshal(input, &v) == nil {
+		if b, err := json.Marshal(v); err == nil {
+			return tool + " " + string(b)
+		}
+	}
+	return tool + " " + string(input)
+}
+
+// resolveLocal cancels pending permission requests for key ("" for all).
+func (d *Driver) resolveLocal(key string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for c, k := range d.pending {
+		if key == "" || k == key {
+			(*c)()
+		}
+	}
 }
 
 // sessionRules keeps the suggestions that remember an allow (rules and

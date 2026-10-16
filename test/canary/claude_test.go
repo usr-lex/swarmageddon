@@ -196,6 +196,17 @@ func TestClaudeCode(t *testing.T) {
 			return &messagingv1.ApprovalAnswer{ApprovalId: a.GetId(), Decision: messagingv1.Decision_DECISION_ALLOW}
 		}
 		r.fake.PushMessage("01MCP", "alice@acme", "MARK-MCP")
+		defer func() {
+			if t.Failed() {
+				for _, q := range m.Requests() {
+					if q.Turn == "MARK-MCP" {
+						t.Logf("request step %d reply %s; swarm tool offered: %v", q.Step, q.Reply, strings.Contains(q.Body, "mcp__swarm__send_message"))
+					}
+				}
+				pane, _ := drv.Session.Capture()
+				t.Logf("pane:\n%s", pane)
+			}
+		}()
 		waitFor(t, "message sent through swarm mcp", 90*time.Second, func() bool {
 			sent, _, _, _, _, _ := r.fake.Snapshot()
 			for _, s := range sent {

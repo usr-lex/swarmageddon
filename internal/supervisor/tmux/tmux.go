@@ -124,13 +124,13 @@ func (s *Session) Kill() error { return s.tmux("kill-session", "-t", "="+s.Name)
 
 // Capture returns the visible pane text.
 func (s *Session) Capture() (string, error) {
-	out, err := s.tmux("capture-pane", "-p", "-t", "="+s.Name).Output()
+	out, err := s.tmux("capture-pane", "-p", "-t", "="+s.Name+":").Output()
 	return string(out), err
 }
 
 // SendKeys types keys into the pane (used by tests).
 func (s *Session) SendKeys(keys ...string) error {
-	return s.tmux(append([]string{"send-keys", "-t", "=" + s.Name}, keys...)...).Run()
+	return s.tmux(append([]string{"send-keys", "-t", "=" + s.Name + ":"}, keys...)...).Run()
 }
 
 func socketFlag(sock string) string {

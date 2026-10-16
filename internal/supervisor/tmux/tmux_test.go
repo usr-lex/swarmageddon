@@ -37,6 +37,12 @@ func TestRunWaitsForExit(t *testing.T) {
 	if !s.Exists() {
 		t.Fatal("session not running")
 	}
+	if _, err := s.Capture(); err != nil {
+		t.Errorf("capture: %v", err)
+	}
+	if err := s.SendKeys("x"); err != nil {
+		t.Errorf("send-keys: %v", err)
+	}
 	cancel()
 	select {
 	case <-errc:
