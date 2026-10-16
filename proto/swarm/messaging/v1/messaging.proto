@@ -1,0 +1,245 @@
+syntax = "proto3";
+
+// The messaging service (docs/design.md §7, ADRs 0002 and 0003).
+//
+// Callers are identified by their mTLS client certificate, never by a field:
+//   - a room:            CN=<agent>@<workspace>
+//   - the control center: CN=control-center, which may act for a person with
+//     the "x-swarm-on-behalf-of" header (<handle>@<workspace>), and may call
+//     the Watch*/Answer*/Query* methods.
+// Fields only ever get added; a breaking change gets a v2 package.
+package swarm.messaging.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1;messagingv1";
+
+service MessagingService {
+  // Send stores a message for its recipient after policy checks. Retrying with
+  // the same id is safe: duplicates within the dedup window are dropped.
+  rpc Send(SendRequest) returns (SendResponse);
+  // Subscribe streams the caller's inbox (messages and approval answers).
+  // Each delivery must be acked; unacked deliveries are redelivered.
+  rpc Subscribe(SubscribeRequest) returns (stream Delivery);
+  rpc Ack(AckRequest) returns (AckResponse);
+  // ReportPresence sets the caller's presence; also a heartbeat.
+  rpc ReportPresence(ReportPresenceRequest) returns (ReportPresenceResponse);
+  // ListPeers lists who the caller may message, with their presence.
+  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
+
+  // Approvals: a room asks, the control center answers, the room receives the
+  // answer as a Delivery. A room withdraws a request answered locally.
+  rpc RequestApproval(RequestApprovalRequest) returns (RequestApprovalResponse);
+  rpc WithdrawApproval(WithdrawApprovalRequest) returns (WithdrawApprovalResponse);
+  rpc WatchApprovals(WatchApprovalsRequest) returns (stream ApprovalEvent);
+  rpc AnswerApproval(AnswerApprovalRequest) returns (AnswerApprovalResponse);
+
+  // Room telemetry for the control center: current task, usage, disk.
+  rpc ReportStatus(ReportStatusRequest) returns (ReportStatusResponse);
+
+  // Control center only.
+  rpc WatchPresence(WatchPresenceRequest) returns (stream PresenceEvent);
+  rpc QueryAudit(QueryAuditRequest) returns (stream AuditRecord);
+}
+
+message Message {
+  // ULID chosen by the sender; the dedup key.
+  string id = 1;
+  // Addresses: name@workspace.
+  string from = 2;
+  string to = 3;
+  string reply_to = 4;
+  string body = 5;
+  google.protobuf.Timestamp sent_at = 6;
+  // Kind of the sender: "agent" or "human".
+  string from_kind = 7;
+}
+
+message SendRequest {
+  string id = 1;
+  // name@workspace, or a bare name in the sender's workspace.
+  string to = 2;
+  string body = 3;
+  string reply_to = 4;
+}
+
+message SendResponse {
+  string id = 1;
+  // True if this id was already stored (a retry).
+  bool duplicate = 2;
+}
+
+message SubscribeRequest {}
+
+message Delivery {
+  // Opaque; pass back to Ack.
+  string delivery_id = 1;
+  oneof item {
+    Message message = 2;
+    ApprovalAnswer approval_answer = 3;
+    Notice notice = 4;
+  }
+}
+
+// Notice is a message from the platform itself, e.g. "not delivered".
+message Notice {
+  string id = 1;
+  string text = 2;
+  string about_message_id = 3;
+}
+
+message AckRequest {
+  string delivery_id = 1;
+}
+message AckResponse {}
+
+enum Presence {
+  PRESENCE_UNSPECIFIED = 0;
+  PRESENCE_WORKING = 1;
+  PRESENCE_WAITING_ON_HUMAN = 2;
+  PRESENCE_IDLE = 3;
+  PRESENCE_OFFLINE = 4;
+}
+
+message ReportPresenceRequest {
+  Presence presence = 1;
+}
+message ReportPresenceResponse {}
+
+message ListPeersRequest {}
+
+message Peer {
+  string address = 1;
+  string kind = 2;  // agent or human
+  string display_name = 3;
+  string title = 4;    // role title
+  string summary = 5;  // role summary
+  string group = 6;
+  Presence presence = 7;
+  // Restrictions the sender must satisfy, e.g. a required prefix.
+  string note = 8;
+}
+
+message ListPeersResponse {
+  string self = 1;
+  repeated Peer peers = 2;
+}
+
+message ApprovalRequest {
+  // ULID chosen by the room.
+  string id = 1;
+  string room = 2;       // address of the room
+  string cli = 3;        // claude or ore
+  string tool = 4;       // e.g. Bash, Edit, exec, patch
+  string summary = 5;    // one line: the command or file
+  string detail = 6;     // full input, diff, JSON
+  string reason = 7;     // the agent's stated reason, if any
+  bool session_scope_available = 8;
+  google.protobuf.Timestamp requested_at = 9;
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_ALLOW = 1;
+  DECISION_ALLOW_FOR_SESSION = 2;
+  DECISION_DENY = 3;
+}
+
+message ApprovalAnswer {
+  string approval_id = 1;
+  Decision decision = 2;
+  string message = 3;
+  // Who answered: a person's address, or "rule:<persona>".
+  string answered_by = 4;
+  google.protobuf.Timestamp answered_at = 5;
+}
+
+message RequestApprovalRequest {
+  ApprovalRequest request = 1;
+}
+message RequestApprovalResponse {}
+
+message WithdrawApprovalRequest {
+  string approval_id = 1;
+  // How it was resolved locally, e.g. "answered in the terminal".
+  string reason = 2;
+}
+message WithdrawApprovalResponse {}
+
+message WatchApprovalsRequest {
+  // Workspaces to watch; empty: all the caller may see.
+  repeated string workspaces = 1;
+}
+
+message ApprovalEvent {
+  oneof event {
+    ApprovalRequest requested = 1;
+    ApprovalAnswer answered = 2;
+    WithdrawApprovalRequest withdrawn = 3;
+  }
+}
+
+message AnswerApprovalRequest {
+  ApprovalAnswer answer = 1;
+  // Room address the approval came from.
+  string room = 2;
+}
+message AnswerApprovalResponse {}
+
+message VolumeUsage {
+  string name = 1;
+  int64 used_bytes = 2;
+  int64 capacity_bytes = 3;
+}
+
+message RoomStatusReport {
+  string current_task = 1;
+  int64 input_tokens = 2;
+  int64 output_tokens = 3;
+  int64 context_tokens = 4;
+  repeated VolumeUsage volumes = 5;
+  string cli_version = 6;
+  string session_id = 7;
+  // Consecutive unexpected CLI exits; the control center raises roomCrashed.
+  int32 crash_count = 8;
+}
+
+message ReportStatusRequest {
+  RoomStatusReport status = 1;
+}
+message ReportStatusResponse {}
+
+message WatchPresenceRequest {
+  repeated string workspaces = 1;
+}
+
+message PresenceEvent {
+  string address = 1;
+  Presence presence = 2;
+  google.protobuf.Timestamp at = 3;
+  RoomStatusReport status = 4;
+}
+
+message QueryAuditRequest {
+  string workspace = 1;
+  // message, crossing, refusal, presence; empty: all.
+  repeated string kinds = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp until = 4;
+  // Only records involving this address.
+  string address = 5;
+  int32 limit = 6;
+}
+
+message AuditRecord {
+  string kind = 1;
+  google.protobuf.Timestamp at = 2;
+  string from = 3;
+  string to = 4;
+  string message_id = 5;
+  string body = 6;
+  // For refusals: the rule and the explanation returned to the sender.
+  string reason = 7;
+  // For crossings: the link, e.g. "clean->dirty".
+  string link = 8;
+}

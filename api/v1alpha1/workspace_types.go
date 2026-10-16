@@ -1,0 +1,284 @@
+package v1alpha1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// WorkspaceSpec is a team: its forge org, groups, messaging policy, models
+// and notifications. The workspace owns the namespace ws-<name>.
+type WorkspaceSpec struct {
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+	Forge       ForgeSpec `json:"forge"`
+	// +optional
+	Groups []Group `json:"groups,omitempty"`
+	// +optional
+	Messaging MessagingPolicy `json:"messaging,omitempty"`
+	// +optional
+	Models ModelSettings `json:"models,omitempty"`
+	// +optional
+	Notifications NotificationSettings `json:"notifications,omitempty"`
+	// +optional
+	Repositories []RepositorySpec `json:"repositories,omitempty"`
+	// +kubebuilder:default=inherit
+	// +optional
+	IsolationTier string `json:"isolationTier,omitempty"`
+	// +optional
+	UpdatePolicy UpdatePolicy `json:"updatePolicy,omitempty"`
+	// Owners are control center users (by email or handle) who operate this workspace.
+	// +optional
+	Owners []string `json:"owners,omitempty"`
+	// Room egress: false cuts rooms off from the internet; platform services stay reachable.
+	// +kubebuilder:default=true
+	// +optional
+	Internet *bool `json:"internet,omitempty"`
+	// AllowedCIDRs rooms may reach even inside denied ranges (e.g. a model server on the LAN).
+	// +optional
+	AllowedCIDRs []string `json:"allowedCIDRs,omitempty"`
+	// ApprovalTimeout after which an unanswered approval leaves the inbox. Default 24h.
+	// +optional
+	ApprovalTimeout *metav1.Duration `json:"approvalTimeout,omitempty"`
+	// DeletedRoomRetention keeps a removed room's volumes this long. Default 168h.
+	// +optional
+	DeletedRoomRetention *metav1.Duration `json:"deletedRoomRetention,omitempty"`
+}
+
+type ForgeSpec struct {
+	// Org is the Forgejo organization the workspace's agents work in.
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`
+	Org string `json:"org"`
+	// +kubebuilder:default=1
+	// +optional
+	RequiredApprovals int32 `json:"requiredApprovals,omitempty"`
+	// +kubebuilder:default=true
+	// +optional
+	SignedCommits *bool `json:"signedCommits,omitempty"`
+	// Extra teams and their members (room names). Built-in teams come from role templates.
+	// +optional
+	Teams []TeamSpec `json:"teams,omitempty"`
+}
+
+// TeamPermission is a Forgejo team permission.
+// +kubebuilder:validation:Enum=read;write;admin
+type TeamPermission string
+
+type TeamSpec struct {
+	Name string `json:"name"`
+	// +kubebuilder:default=write
+	// +optional
+	Permission TeamPermission `json:"permission,omitempty"`
+	// +optional
+	Members []string `json:"members,omitempty"`
+}
+
+type Group struct {
+	// +kubebuilder:validation:Pattern=`^[a-z][a-z0-9-]*$`
+	Name string `json:"name"`
+	// +optional
+	Description string `json:"description,omitempty"`
+}
+
+// LinkMode is how one group may reach another.
+// +kubebuilder:validation:Enum=open;mediated;none
+type LinkMode string
+
+const (
+	LinkOpen     LinkMode = "open"
+	LinkMediated LinkMode = "mediated"
+	LinkNone     LinkMode = "none"
+)
+
+// DefaultLinks is how rooms in the same group reach each other.
+// +kubebuilder:validation:Enum=withinGroup;none
+type DefaultLinks string
+
+const (
+	DefaultWithinGroup DefaultLinks = "withinGroup"
+	DefaultNone        DefaultLinks = "none"
+)
+
+type MessagingPolicy struct {
+	// +kubebuilder:default=withinGroup
+	// +optional
+	DefaultLinks DefaultLinks `json:"defaultLinks,omitempty"`
+	// Links between groups. "" names the default group (rooms without a group).
+	// +optional
+	Links []GroupLink `json:"links,omitempty"`
+	// +optional
+	Limits MessageLimits `json:"limits,omitempty"`
+	// +optional
+	Retention RetentionSettings `json:"retention,omitempty"`
+	// People with the operator role may message agents; agents may message people.
+	// +kubebuilder:default=true
+	// +optional
+	HumansReachable *bool `json:"humansReachable,omitempty"`
+}
+
+// GroupLink lets messages flow one way, from one group to another.
+type GroupLink struct {
+	From string   `json:"from"`
+	To   string   `json:"to"`
+	Mode LinkMode `json:"mode"`
+	// Mediated: only these rooms in From may send. Empty: anyone.
+	// +optional
+	Senders []string `json:"senders,omitempty"`
+	// Mediated: only these rooms in To may receive. Empty: anyone.
+	// +optional
+	Recipients []string `json:"recipients,omitempty"`
+	// RequirePrefix the message must start with; {recipient} is replaced by the recipient's name.
+	// +optional
+	RequirePrefix string `json:"requirePrefix,omitempty"`
+}
+
+type MessageLimits struct {
+	// +kubebuilder:default=65536
+	// +optional
+	MaxBytes int32 `json:"maxBytes,omitempty"`
+	// +kubebuilder:default=30
+	// +optional
+	RatePerMinute int32 `json:"ratePerMinute,omitempty"`
+}
+
+// RetentionSettings are TTLs; 0 keeps forever.
+type RetentionSettings struct {
+	// +optional
+	Messages *metav1.Duration `json:"messages,omitempty"`
+	// +optional
+	Audit *metav1.Duration `json:"audit,omitempty"`
+	// +optional
+	Transcripts *metav1.Duration `json:"transcripts,omitempty"`
+	// AuditBodies keeps message bodies in the audit log; false keeps metadata only.
+	// +kubebuilder:default=true
+	// +optional
+	AuditBodies *bool `json:"auditBodies,omitempty"`
+}
+
+type ModelSettings struct {
+	// +optional
+	Default string `json:"default,omitempty"`
+	// +optional
+	Budgets BudgetSettings `json:"budgets,omitempty"`
+}
+
+type BudgetSettings struct {
+	// Monthly budget per room in USD; 0 is unlimited.
+	// +optional
+	PerRoomMonthlyUSD int32 `json:"perRoomMonthlyUSD,omitempty"`
+}
+
+// ChannelKind is a notification channel.
+// +kubebuilder:validation:Enum=webPush;ntfy;slack;discord;email
+type ChannelKind string
+
+// NotificationEvent is something people get notified about.
+// +kubebuilder:validation:Enum=approvalWaiting;idleWithOpenWork;ciRed;budget;diskLow;roomCrashed
+type NotificationEvent string
+
+const (
+	EventApprovalWaiting  NotificationEvent = "approvalWaiting"
+	EventIdleWithOpenWork NotificationEvent = "idleWithOpenWork"
+	EventCIRed            NotificationEvent = "ciRed"
+	EventBudget           NotificationEvent = "budget"
+	EventDiskLow          NotificationEvent = "diskLow"
+	EventRoomCrashed      NotificationEvent = "roomCrashed"
+)
+
+type NotificationSettings struct {
+	// +optional
+	Channels []NotificationChannel `json:"channels,omitempty"`
+	// +optional
+	Events []NotificationEvent `json:"events,omitempty"`
+}
+
+type NotificationChannel struct {
+	Kind ChannelKind `json:"kind"`
+	// ntfy topic.
+	// +optional
+	Topic string `json:"topic,omitempty"`
+	// Secret in the system namespace holding key url (Slack, Discord) or smtp settings (email).
+	// +optional
+	SecretName string `json:"secretName,omitempty"`
+}
+
+type RepositorySpec struct {
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`
+	Name string `json:"name"`
+	// ImportURL to clone from instead of creating an empty repository.
+	// +optional
+	ImportURL string `json:"importURL,omitempty"`
+	// Group whose team owns it; empty: the default teams.
+	// +optional
+	Group string `json:"group,omitempty"`
+	// PushMirror to GitHub (or any git URL); credentials from MirrorSecretName (key token).
+	// +optional
+	PushMirror string `json:"pushMirror,omitempty"`
+	// +optional
+	MirrorSecretName string `json:"mirrorSecretName,omitempty"`
+	// StatusChecks required on the default branch.
+	// +optional
+	StatusChecks []string `json:"statusChecks,omitempty"`
+}
+
+// UpdateMode is when rooms move to a new image.
+// +kubebuilder:validation:Enum=whenIdle;manual;window
+type UpdateMode string
+
+const (
+	UpdateWhenIdle UpdateMode = "whenIdle"
+	UpdateManual   UpdateMode = "manual"
+	UpdateWindow   UpdateMode = "window"
+)
+
+type UpdatePolicy struct {
+	// +kubebuilder:default=whenIdle
+	// +optional
+	Mode UpdateMode `json:"mode,omitempty"`
+	// Window, for mode window, e.g. "Sat 02:00-06:00" (UTC).
+	// +optional
+	Window string `json:"window,omitempty"`
+}
+
+type WorkspaceStatus struct {
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// Workspace condition types.
+const (
+	ConditionNamespaceReady = "NamespaceReady"
+	ConditionForgeOrgReady  = "ForgeOrgReady"
+)
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster,shortName=ws
+// +kubebuilder:printcolumn:name="Org",type=string,JSONPath=`.spec.forge.org`
+// +kubebuilder:printcolumn:name="Namespace",type=string,JSONPath=`.status.namespace`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+
+// Workspace is a team of agents.
+type Workspace struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   WorkspaceSpec   `json:"spec,omitempty"`
+	Status WorkspaceStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+type WorkspaceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Workspace `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&Workspace{}, &WorkspaceList{})
+}

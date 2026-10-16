@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+// The room-local API: `swarm` (MCP server, hooks, CLI) talks to the room
+// supervisor over a Unix socket (/run/swarm/supervisor.sock), only reachable
+// by the agent user and root.
+package swarm.room.v1;
+
+option go_package = "github.com/usr-lex/swarmageddon/gen/swarm/room/v1;roomv1";
+
+service SupervisorService {
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
+  rpc SetStatus(SetStatusRequest) returns (SetStatusResponse);
+  // Hook reports a CLI hook event. For PermissionRequest it blocks until the
+  // approval is answered (or the hook's own timeout ends the call).
+  rpc Hook(HookRequest) returns (HookResponse);
+}
+
+message SendMessageRequest {
+  string to = 1;
+  string body = 2;
+  string reply_to = 3;
+}
+message SendMessageResponse {
+  string id = 1;
+}
+
+message ListAgentsRequest {}
+message Agent {
+  string address = 1;
+  string kind = 2;
+  string title = 3;
+  string summary = 4;
+  string group = 5;
+  string presence = 6;
+  string note = 7;
+}
+message ListAgentsResponse {
+  string self = 1;
+  repeated Agent agents = 2;
+}
+
+message WhoAmIRequest {}
+message WhoAmIResponse {
+  string address = 1;
+  string workspace = 2;
+  string group = 3;
+  string role = 4;
+  string forge_user = 5;
+  string forge_url = 6;
+}
+
+message SetStatusRequest {
+  string current_task = 1;
+}
+message SetStatusResponse {}
+
+message HookRequest {
+  // Claude Code hook event name, e.g. SessionStart, PermissionRequest.
+  string event = 1;
+  // The hook's JSON input, verbatim.
+  bytes payload = 2;
+  // Environment the hook saw that matters (CLAUDE_CODE_MESSAGING_SOCKET, ..._TOKEN).
+  map<string, string> env = 3;
+}
+message HookResponse {
+  // JSON to print on the hook's stdout; empty prints nothing.
+  bytes output = 1;
+}
