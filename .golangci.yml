@@ -1,0 +1,20 @@
+version: "2"
+linters:
+  settings:
+    errcheck:
+      # Closing a response body or writing to stdout/stderr: nothing useful
+      # to do with the error.
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - (net.Conn).Close
+        - (*net/http.Response).Body.Close
+  exclusions:
+    rules:
+      # Tests may ignore errors from cleanup helpers.
+      - path: _test\.go
+        linters: [errcheck]

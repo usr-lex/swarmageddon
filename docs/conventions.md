@@ -38,6 +38,7 @@ Change them here first.
 | `forgejo-admin` | platform | `username`, `password`, `token` |
 | `gateway-master` | platform | `masterKey` |
 | `postgres-<service>` | platform | `username`, `password`, `database`, `url` |
+| `room-secrets` | `ws-<ws>` | label `swarmageddon.dev/room-secret=true`; keys people enter in the control center for `secretEnv` and MCP `valueFrom` (design §6.6). The operator creates it empty and owns only its metadata; the control center writes the data and may get, update and patch this one Secret by name, nothing else in the namespace |
 | `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts` |
 
 ## Identities (internal CA)

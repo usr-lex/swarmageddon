@@ -1374,7 +1374,10 @@ install if policies aren't enforced, rather than pretending they are.
   - In each workspace namespace, a RoleBinding the operator creates:
     `rooms`, `roletemplates` and `runnerpools` (read and write), pods and
     pods/log (read), `pods/exec` and `pods/portforward` (create),
-    `metrics.k8s.io` pods (read).
+    `metrics.k8s.io` pods (read), and get, update and patch on the one
+    Secret `room-secrets` by name, which the operator creates empty and
+    which holds the values people enter for `secretEnv` and MCP `valueFrom`
+    (§6.6).
   - In the system namespace: its own Secrets (session key, VAPID, database
     credentials) by name.
 
