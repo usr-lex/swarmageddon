@@ -34,24 +34,33 @@ type Rule struct {
 	Reason string
 }
 
-// Table is an ordered list of rules; the first match wins.
+// Table is a list of rules. The strictest matching rule wins (deny over
+// escalate over allow), so a persona's allow can't undo a built-in deny;
+// this matches internal/warden/rules, which can replace it.
 type Table []Rule
+
+var actionRank = map[string]int{ActionAllow: 1, ActionEscalate: 2, ActionDeny: 3}
 
 // Check implements RuleSet.
 func (t Table) Check(call agent.ToolCall) (Rule, bool) {
-	for _, r := range t {
+	subject := call.Command
+	if subject == "" {
+		subject = call.Input
+	}
+	var best *Rule
+	for i := range t {
+		r := &t[i]
 		if len(r.Tools) > 0 && !r.Tools[call.Tool] && !(r.Tools["mcp"] && strings.HasPrefix(call.Tool, "mcp__")) {
 			continue
 		}
-		subject := call.Command
-		if subject == "" {
-			subject = call.Input
-		}
-		if r.Match.MatchString(subject) {
-			return r, true
+		if r.Match.MatchString(subject) && (best == nil || actionRank[r.Action] > actionRank[best.Action]) {
+			best = r
 		}
 	}
-	return Rule{}, false
+	if best == nil {
+		return Rule{}, false
+	}
+	return *best, true
 }
 
 // Tool sets the built-in rules use. Claude Code's and ore's names.
@@ -106,8 +115,7 @@ var builtin = []struct{ name, tools, match, action, reason string }{
 		"Changing the CLI's settings needs a person's approval."},
 }
 
-// Compile builds the rule table: the persona's rules first, then the
-// built-ins.
+// Compile builds the rule table: the built-ins and the persona's rules.
 func Compile(extra []roomcfg.WardenRule) (Table, error) {
 	var t Table
 	for _, r := range extra {

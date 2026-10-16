@@ -82,6 +82,12 @@ type Room struct {
 	// for the CLI and the agent's shells. Secret variables come from the
 	// identity Secret's env.<NAME> keys.
 	Env map[string]string `json:"env,omitempty"`
+	// SecretEnv names variables whose values are in the identity Secret,
+	// at env_<NAME> (SecretEnvKey).
+	SecretEnv []string `json:"secretEnv,omitempty"`
+	// MCPServers names the layered MCP servers, already rendered into the
+	// CLI's files by the operator.
+	MCPServers []string `json:"mcpServers,omitempty"`
 	// Network is the room's network access (design §11.2).
 	Network NetworkSettings `json:"network,omitempty"`
 
@@ -106,13 +112,20 @@ const (
 type NetworkSettings struct {
 	// Mode is none, limited or full.
 	Mode string `json:"mode,omitempty"`
-	// Proxy is the egress proxy URL, e.g. http://egress.swarmageddon-platform.svc:3128.
-	Proxy string `json:"proxy,omitempty"`
+	// ProxyURL is the egress proxy, without credentials, e.g.
+	// http://egress.swarmageddon-platform.svc:3128. The supervisor adds the
+	// room name and the identity Secret's egress_auth as the password.
+	ProxyURL string `json:"proxyURL,omitempty"`
 	// NoProxy adds hosts or domain suffixes reached directly (platform
 	// services); the cluster domains and the platform URLs' hosts are
 	// always included.
 	NoProxy []string `json:"noProxy,omitempty"`
+	// Domains reachable through the proxy (informational).
+	Domains []string `json:"domains,omitempty"`
 }
+
+// SecretEnvKey is the identity Secret key holding a secretEnv variable.
+func SecretEnvKey(name string) string { return "env_" + name }
 
 // NoProxyHosts is NO_PROXY's list: loopback, cluster domains, the hosts of
 // the platform URLs, and network.noProxy.
@@ -163,6 +176,8 @@ type AdvisorSettings struct {
 	Model           string `json:"model,omitempty"`
 	Effort          string `json:"effort,omitempty"`
 	MaxCallsPerHour int    `json:"maxCallsPerHour,omitempty"`
+	// Native also runs Claude Code's own advisor tool (--advisor <model>).
+	Native bool `json:"native,omitempty"`
 }
 
 // WardenSettings configure the in-room warden layers (ADR 0011).
@@ -172,6 +187,8 @@ type WardenSettings struct {
 	Model string `json:"model,omitempty"`
 	// InterruptOnHigh interrupts the turn on a high trajectory verdict.
 	InterruptOnHigh bool `json:"interruptOnHigh,omitempty"`
+	// QuarantineOnHigh is for the gateway guard (layer 4); unused here.
+	QuarantineOnHigh bool `json:"quarantineOnHigh,omitempty"`
 	// ReviewEveryToolCalls also reviews the trajectory every N tool calls (default 20).
 	ReviewEveryToolCalls int `json:"reviewEveryToolCalls,omitempty"`
 	// Rules added by the persona, on top of the built-ins.

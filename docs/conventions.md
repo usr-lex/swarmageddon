@@ -38,7 +38,7 @@ Change them here first.
 | `forgejo-admin` | platform | `username`, `password`, `token` |
 | `gateway-master` | platform | `masterKey` |
 | `postgres-<service>` | platform | `username`, `password`, `database`, `url` |
-| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (`user:password` for the egress proxy, limited network mode), and `env.<NAME>` per secret variable (value of `NAME`, design §6.6) |
+| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
 
 ## Identities (internal CA)
 
@@ -71,27 +71,30 @@ Change them here first.
 
 Persona ConfigMap `room-<name>-persona` keys and where the supervisor puts them:
 `room.json` → `/etc/swarm/room.json`; `role.md` → `/etc/swarm/role.md`;
-`claude-managed-settings.json`, `claude-CLAUDE.md`, `claude-managed-mcp.json`
+`claude-managed-settings.json`, `claude-CLAUDE.md`, `claude-agent-advisor.md`
+(→ `/etc/claude-code/.claude/agents/advisor.md`), `claude-managed-mcp.json`
 (→ `/etc/claude-code/managed-mcp.json`, which holds the `swarm` MCP server and is
 exclusive); `ore-requirements.toml`,
 `ore-config.toml`, `ore-persona.rules`. The pod mounts the ConfigMap at
 `/etc/swarm/persona/`, and the supervisor copies the files into place at start
 (root-owned, read-only to the agent).
 
-room.json also carries, when set: `network` (`mode` none/limited/full,
-`proxy` the egress proxy URL, `noProxy` extra direct hosts), `storm`
+room.json also carries, when set: `secretEnv` (variable names), `mcpServers`
+(names), `network` (`mode` none/limited/full, `proxyURL` without credentials,
+`noProxy` extra direct hosts, `domains`), `storm`
 (`coalesceBytes`, default 4096), `advisor` (`model`, `effort`,
-`maxCallsPerHour`), `warden` (`mode` off/monitor/gate, `model`,
+`maxCallsPerHour`, `native`), `warden` (`mode` off/monitor/gate, `model`,
 `interruptOnHigh`, `reviewEveryToolCalls`, `rules`: `[{name, tool, match,
-action, reason}]`, where `tool` is a name, `a|b`, or empty for all, `match` a
-regular expression on the command or path, `action` allow/deny/escalate) and
+action, reason}]`, where `tool` is a name, `a|b`, or `*`, `match` a regular
+expression on the command or path, `action` allow/deny/escalate; with the
+built-ins, the strictest match wins) and
 `janitor`. The Go form is `roomcfg.Room` in `internal/supervisor/roomcfg`.
 
-The supervisor sets room.json `env` plus the secret variables (`env.<NAME>`
+The supervisor sets room.json `env` plus the secret variables (`env_<NAME>`
 keys) for the CLI, writes them to `~/.swarm/env` (0600) for the agent's shells
 (sourced from `/etc/profile.d/swarm-env.sh` and `/etc/bash.bashrc`), and in
 `limited` mode adds `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (and lowercase)
-with `egress_auth` in the proxy URL, also in
+with `<room>:<egress_auth>` in the proxy URL, also in
 `/etc/containers/containers.conf.d/60-swarm-proxy.conf` for nested
 containers. Names the supervisor sets itself (`HOME`, `PATH`, the gateway and
 proxy variables) can't be overridden.

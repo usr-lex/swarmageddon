@@ -12,18 +12,21 @@ import (
 
 func TestRoomEnvAndProxy(t *testing.T) {
 	secrets := t.TempDir()
-	os.WriteFile(filepath.Join(secrets, "env.API_TOKEN"), []byte("s3cr'et\n"), 0o600)
-	os.WriteFile(filepath.Join(secrets, "env.HTTPS_PROXY"), []byte("x"), 0o600)
+	os.WriteFile(filepath.Join(secrets, "env_API_TOKEN"), []byte("s3cr'et\n"), 0o600)
+	os.WriteFile(filepath.Join(secrets, "env_HTTPS_PROXY"), []byte("x"), 0o600)
 	os.WriteFile(filepath.Join(secrets, "gateway_key"), []byte("k"), 0o600)
 	room := &roomcfg.Room{
-		Room: "athena", Workspace: "acme", Env: map[string]string{"FOO": "bar", "bad-name": "x"},
+		Room: "athena", Workspace: "acme", Env: map[string]string{"FOO": "bar", "bad-name": "x"}, SecretEnv: []string{"API_TOKEN", "HTTPS_PROXY", "MISSING"},
 		ForgeURL: "http://forgejo.swarmageddon-platform.svc:3000", ForgeSSHHost: "forgejo-ssh.example:2222",
 		GatewayURL: "http://gateway.swarmageddon-platform.svc:4000",
-		Network:    roomcfg.NetworkSettings{Mode: "limited", Proxy: "http://egress.swarmageddon-platform.svc:3128", NoProxy: []string{"registry.local"}},
+		Network:    roomcfg.NetworkSettings{Mode: "limited", ProxyURL: "http://egress.swarmageddon-platform.svc:3128", NoProxy: []string{"registry.local"}},
 	}
 	env, skipped := RoomEnv(room, secrets)
-	if strings.Join(env, ";") != "API_TOKEN=s3cr'et;FOO=bar" || len(skipped) != 2 {
+	if strings.Join(env, ";") != "API_TOKEN=s3cr'et;FOO=bar" || len(skipped) != 3 {
 		t.Errorf("env %q skipped %q", env, skipped)
+	}
+	if p, _ := ProxyEnv(room, "tok\n"); p[0] != "HTTPS_PROXY=http://athena:tok@egress.swarmageddon-platform.svc:3128" {
+		t.Errorf("proxy %q", p[0])
 	}
 	proxy, err := ProxyEnv(room, "athena:p@ss\n")
 	if err != nil {

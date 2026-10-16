@@ -18,7 +18,10 @@ import (
 )
 
 func TestRules(t *testing.T) {
-	tab, err := Compile([]roomcfg.WardenRule{{Name: "no-prod", Tool: "Bash", Match: `kubectl .*--context prod`, Action: "deny"}})
+	tab, err := Compile([]roomcfg.WardenRule{
+		{Name: "no-prod", Tool: "Bash", Match: `kubectl .*--context prod`, Action: "deny"},
+		{Name: "allow-push", Tool: "Bash|exec", Match: `git push`, Action: "allow"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +34,7 @@ func TestRules(t *testing.T) {
 		{"Bash", "git push origin +main", "force-push-protected"},
 		{"Bash", "git push -f origin feature", "force-push"},
 		{"Bash", "git push origin --delete main", "delete-protected"},
-		{"Bash", "git push origin feature", ""},
+		{"Bash", "git push origin feature", "allow-push"},
 		{"Read", "/run/swarm/identity/tls.key", "identity-files"},
 		{"Write", "/etc/claude-code/managed-settings.json", "policy-files"},
 		{"Bash", "cat /etc/claude-code/CLAUDE.md", ""},

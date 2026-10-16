@@ -40,6 +40,7 @@ var personaFiles = map[string]string{
 	"ore-requirements.toml":        filepath.Join(roomcfg.CodexEtc, "requirements.toml"),
 	"ore-config.toml":              filepath.Join(roomcfg.CodexEtc, "config.toml"),
 	"ore-persona.rules":            filepath.Join(roomcfg.CodexEtc, "rules", "persona.rules"),
+	"claude-agent-advisor.md":      filepath.Join(roomcfg.ClaudeEtc, ".claude", "agents", "advisor.md"),
 }
 
 // installPersona copies the mounted persona files into place, root-owned and
@@ -72,8 +73,6 @@ const (
 	KeyWarden      = "warden_key"
 	KeyEgressAuth  = "egress_auth"
 	KeyVNCPassword = "vnc_password"
-	// SecretEnvPrefix: each key env.<NAME> is the value of variable NAME.
-	SecretEnvPrefix = "env."
 )
 
 func readSecret(name string) string {
@@ -340,8 +339,14 @@ func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, roomEnv [
 	} else if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {
 		env = append(env, "ANTHROPIC_BASE_URL="+base)
 	}
+	var extra []string
+	if room.Advisor.Native && room.Advisor.Model != "" {
+		// ADR 0010: opt-in, unverified through the gateway.
+		extra = []string{"--advisor", room.Advisor.Model}
+		env = append(env, "CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1")
+	}
 	return &claude.Driver{
-		Name: room.Room, Model: room.Model, Effort: room.Effort, PermissionMode: room.PermissionMode,
+		Name: room.Room, ExtraArgs: extra, Model: room.Model, Effort: room.Effort, PermissionMode: room.PermissionMode,
 		Home: u.Home, WorkDir: work, User: u, Env: env, FirstTurn: room.FirstTurnPrompt(),
 		Events: ev, Log: log,
 	}

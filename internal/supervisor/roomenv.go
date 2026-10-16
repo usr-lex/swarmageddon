@@ -15,7 +15,7 @@ import (
 )
 
 // The room's environment (design §6.6, §11.2): room.json's env, the secret
-// env from the identity Secret (keys env.<NAME>), and in limited network
+// env from the identity Secret (room.json secretEnv names, keys env_<NAME>), and in limited network
 // mode the egress proxy settings. It is set for the CLI, written for the
 // agent's shells, and the proxy part for nested containers.
 
@@ -43,13 +43,8 @@ func RoomEnv(room *roomcfg.Room, secretDir string) (env []string, skipped []stri
 	for k, v := range room.Env {
 		set(k, v)
 	}
-	entries, _ := os.ReadDir(secretDir)
-	for _, e := range entries {
-		name, ok := strings.CutPrefix(e.Name(), SecretEnvPrefix)
-		if !ok || strings.HasPrefix(e.Name(), "..") {
-			continue
-		}
-		b, err := os.ReadFile(filepath.Join(secretDir, e.Name()))
+	for _, name := range room.SecretEnv {
+		b, err := os.ReadFile(filepath.Join(secretDir, roomcfg.SecretEnvKey(name)))
 		if err != nil {
 			skipped = append(skipped, name)
 			continue
@@ -64,22 +59,23 @@ func RoomEnv(room *roomcfg.Room, secretDir string) (env []string, skipped []stri
 }
 
 // ProxyEnv returns HTTPS_PROXY, HTTP_PROXY and NO_PROXY (and lowercase
-// forms) for limited mode, with auth ("user:password", the identity
-// Secret's egress_auth) in the proxy URL. Other modes, or no proxy URL,
-// return nil.
+// forms) for limited mode. The proxy URL carries the room name as user and
+// auth (the identity Secret's egress_auth) as password; an auth of the form
+// user:password is used as is. Other modes, or no proxy URL, return nil.
 func ProxyEnv(room *roomcfg.Room, auth string) ([]string, error) {
 	n := room.Network
-	if n.Mode != roomcfg.NetworkLimited || n.Proxy == "" {
+	if n.Mode != roomcfg.NetworkLimited || n.ProxyURL == "" {
 		return nil, nil
 	}
-	u, err := url.Parse(n.Proxy)
+	u, err := url.Parse(n.ProxyURL)
 	if err != nil || u.Host == "" {
-		return nil, fmt.Errorf("network.proxy %q is not a URL", n.Proxy)
+		return nil, fmt.Errorf("network.proxyURL %q is not a URL", n.ProxyURL)
 	}
-	if user, pass, ok := strings.Cut(strings.TrimSpace(auth), ":"); ok {
+	auth = strings.TrimSpace(auth)
+	if user, pass, ok := strings.Cut(auth, ":"); ok {
 		u.User = url.UserPassword(user, pass)
 	} else if auth != "" {
-		u.User = url.User(strings.TrimSpace(auth))
+		u.User = url.UserPassword(room.Room, auth)
 	}
 	noProxy := strings.Join(room.NoProxyHosts(), ",")
 	p := u.String()
