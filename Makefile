@@ -5,7 +5,7 @@ GOBIN := $(shell go env GOPATH)/bin
 export PATH := $(GOBIN):$(PATH)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 REGISTRY ?= ghcr.io/usr-lex/swarmageddon
-BINARIES := operator control-center messaging supervisor swarm mockmodel
+BINARIES := operator control-center messaging warden egress supervisor swarm mockmodel
 
 .PHONY: all generate manifests envtest build test lint
 all: generate build
@@ -53,7 +53,7 @@ HOST_ARCH := $(shell go env GOARCH)
 
 # Images are $(REGISTRY)/<name>:$(VERSION). Locally: the host's platform,
 # loaded into docker. CI: PLATFORMS=linux/amd64,linux/arm64 IMAGE_OUTPUT=--push.
-SERVICE_IMAGES := operator control-center messaging mockmodel
+SERVICE_IMAGES := operator control-center messaging warden egress mockmodel
 IMAGES := room runner $(SERVICE_IMAGES)
 PLATFORMS ?= linux/$(HOST_ARCH)
 IMAGE_OUTPUT ?= --load

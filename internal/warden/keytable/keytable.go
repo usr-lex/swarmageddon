@@ -53,8 +53,8 @@ type Entry struct {
 }
 
 // Name and Workspace split the room's address.
-func (e *Entry) Name() string      { n, _, _ := strings.Cut(e.Room, "@"); return n }
-func (e *Entry) Workspace() string { _, w, _ := strings.Cut(e.Room, "@"); return w }
+func (e Entry) Name() string      { n, _, _ := strings.Cut(e.Room, "@"); return n }
+func (e Entry) Workspace() string { _, w, _ := strings.Cut(e.Room, "@"); return w }
 
 // DataKey is a room's key in the ConfigMap.
 func DataKey(workspace, room string) string { return workspace + "." + room }
@@ -66,7 +66,7 @@ func Hash(key string) string {
 }
 
 // Marshal encodes an entry for the ConfigMap.
-func (e *Entry) Marshal() string {
+func (e Entry) Marshal() string {
 	b, _ := json.Marshal(e) // map keys sort: stable
 	return string(b)
 }
