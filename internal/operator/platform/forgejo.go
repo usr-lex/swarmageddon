@@ -9,13 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/usr-lex/swarmageddon/internal/forgejo"
 )
 
 // Token scopes. Verified against Forgejo 17.0.0 (2026-10-16): basic auth on
 // POST /api/v1/users/{admin}/tokens issues them.
 var (
 	operatorTokenScopes = []string{"all"}
-	readerTokenScopes   = []string{"read:admin", "read:repository", "read:organization", "read:user"}
+	readerTokenScopes   = forgejo.ReaderTokenScopes
 )
 
 // createForgejoToken creates an access token for user, authenticating with

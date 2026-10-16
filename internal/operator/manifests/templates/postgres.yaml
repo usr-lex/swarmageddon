@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: postgres
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: postgres}
+  labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
 spec:
   selector: {swarmageddon.dev/component: postgres}
   ports:
@@ -14,7 +14,7 @@ kind: StatefulSet
 metadata:
   name: postgres
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: postgres}
+  labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
 spec:
   replicas: 1
   serviceName: postgres
@@ -22,7 +22,7 @@ spec:
     matchLabels: {swarmageddon.dev/component: postgres}
   template:
     metadata:
-      labels: {swarmageddon.dev/component: postgres}
+      labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
     spec:
       enableServiceLinks: false
       automountServiceAccountToken: false
@@ -66,13 +66,13 @@ kind: Job
 metadata:
   name: postgres-bootstrap-{{ .Postgres.BootstrapHash }}
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: postgres-bootstrap}
+  labels: {swarmageddon.dev/component: postgres-bootstrap, app.kubernetes.io/name: postgres-bootstrap}
 spec:
   backoffLimit: 20
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
-      labels: {swarmageddon.dev/component: postgres-bootstrap}
+      labels: {swarmageddon.dev/component: postgres-bootstrap, app.kubernetes.io/name: postgres-bootstrap}
     spec:
       restartPolicy: OnFailure
       enableServiceLinks: false

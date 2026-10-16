@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    app.kubernetes.io/name: ntfy
     swarmageddon.dev/component: ntfy
   name: ntfy
   namespace: swarmageddon-platform
@@ -18,6 +19,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
+    app.kubernetes.io/name: ntfy
     swarmageddon.dev/component: ntfy
   name: ntfy
   namespace: swarmageddon-platform
@@ -30,6 +32,7 @@ spec:
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: ntfy
         swarmageddon.dev/component: ntfy
     spec:
       automountServiceAccountToken: false

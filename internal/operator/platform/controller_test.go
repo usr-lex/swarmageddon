@@ -82,7 +82,7 @@ func TestPlatformReconcile(t *testing.T) {
 	var out bytes.Buffer
 	r := &Reconciler{
 		Client: c, Scheme: env.Scheme, Out: &out,
-		Deps:      deps.Deps{PKI: &pki.Store{Client: c, Namespace: sys}, Images: imgs, Version: "v0.1.0"},
+		Deps:      deps.Deps{CAStore: &pki.Store{Client: c, Namespace: sys}, Pinned: imgs, Version: "v0.1.0"},
 		Preflight: &preflight.Runner{Client: c, Images: imgs, ServerVersion: dc.ServerVersion},
 	}
 	must(EnsurePlatform(ctx, c))

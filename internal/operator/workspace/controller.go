@@ -43,10 +43,6 @@ const (
 // ControlCenterServiceAccount is bound to the per-workspace Role.
 const ControlCenterServiceAccount = "control-center"
 
-// WebhookEvents the org webhook subscribes to (design §9.7; names checked
-// against Forgejo 17.0.0, which silently drops unknown ones such as workflow_run).
-var WebhookEvents = []string{"issues", "issue_comment", "pull_request", "pull_request_review", "pull_request_comment", "workflow_run_failure", "action_run_failure"}
-
 // WebhookSecretName is the Secret in the system namespace with the
 // workspace's webhook HMAC secret (key "secret").
 func WebhookSecretName(workspace string) string { return "forge-webhook-" + workspace }
@@ -161,16 +157,15 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 	}}}); err != nil {
 		return err
 	}
-	ca, err := r.Deps.PKI.CA(ctx)
-	if err != nil {
-		return err
+	if r.Deps.PKI == nil {
+		return fmt.Errorf("no PKI")
 	}
 	tcp, udp := corev1.ProtocolTCP, corev1.ProtocolUDP
 	dns := intstr.FromInt32(53)
 	objs := []client.Object{
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "platform-ca-bundle", Namespace: ns},
-			Data:       map[string]string{pki.CACertKey: string(ca.CertPEM)},
+			Data:       map[string]string{pki.CACertKey: string(r.Deps.PKI.CABundle())},
 		},
 		&networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: "default-deny", Namespace: ns},
@@ -248,16 +243,22 @@ func (r *Reconciler) ensureRoleTemplates(ctx context.Context, w *v1alpha1.Worksp
 	return nil
 }
 
-// ensureWebhookSecret returns the workspace's webhook secret, creating it once.
-func (r *Reconciler) ensureWebhookSecret(ctx context.Context, w *v1alpha1.Workspace) (string, error) {
+// ensureWebhookSecret returns the workspace's webhook secret, creating it
+// once, and whether it was just created.
+func (r *Reconciler) ensureWebhookSecret(ctx context.Context, w *v1alpha1.Workspace) (string, bool, error) {
 	key := types.NamespacedName{Namespace: v1alpha1.SystemNamespace, Name: WebhookSecretName(w.Name)}
 	var sec corev1.Secret
 	err := r.Get(ctx, key, &sec)
 	if err == nil && len(sec.Data["secret"]) > 0 {
-		return string(sec.Data["secret"]), nil
+		return string(sec.Data["secret"]), false, nil
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
+		return "", false, err
+	}
+	if err == nil {
+		// Present but empty: fill it in.
+		sec.Data = map[string][]byte{"secret": []byte(randomHex(32))}
+		return string(sec.Data["secret"]), true, r.Update(ctx, &sec)
 	}
 	value := randomHex(32)
 	sec = corev1.Secret{
@@ -268,10 +269,10 @@ func (r *Reconciler) ensureWebhookSecret(ctx context.Context, w *v1alpha1.Worksp
 		Data: map[string][]byte{"secret": []byte(value)},
 	}
 	if err := controllerutil.SetControllerReference(w, &sec, r.Scheme); err != nil {
-		return "", err
+		return "", false, err
 	}
 	if err := r.Create(ctx, &sec); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return value, nil
+	return value, true, nil
 }

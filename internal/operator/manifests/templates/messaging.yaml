@@ -3,14 +3,14 @@ kind: ServiceAccount
 metadata:
   name: messaging
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 automountServiceAccountToken: true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: swarmageddon-messaging
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 rules:
   - apiGroups: [swarmageddon.dev]
     resources: [workspaces, rooms]
@@ -20,7 +20,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: swarmageddon-messaging
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: swarmageddon-messaging}
 subjects:
   - {kind: ServiceAccount, name: messaging, namespace: {{ .Namespace }}}
@@ -30,7 +30,7 @@ kind: Service
 metadata:
   name: messaging
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 spec:
   selector: {swarmageddon.dev/component: messaging}
   ports:
@@ -41,7 +41,7 @@ kind: Service
 metadata:
   name: messaging-headless
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 spec:
   clusterIP: None
   publishNotReadyAddresses: true
@@ -55,7 +55,7 @@ kind: PodDisruptionBudget
 metadata:
   name: messaging
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 spec:
   maxUnavailable: 1
   selector:
@@ -66,7 +66,7 @@ kind: StatefulSet
 metadata:
   name: messaging
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: messaging}
+  labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
 spec:
   replicas: {{ .Messaging.Replicas }}
   serviceName: messaging-headless
@@ -75,7 +75,7 @@ spec:
     matchLabels: {swarmageddon.dev/component: messaging}
   template:
     metadata:
-      labels: {swarmageddon.dev/component: messaging}
+      labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
     spec:
       serviceAccountName: messaging
       enableServiceLinks: false

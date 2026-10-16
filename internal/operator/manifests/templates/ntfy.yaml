@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: ntfy
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: ntfy}
+  labels: {swarmageddon.dev/component: ntfy, app.kubernetes.io/name: ntfy}
 spec:
   selector: {swarmageddon.dev/component: ntfy}
   ports:
@@ -14,7 +14,7 @@ kind: StatefulSet
 metadata:
   name: ntfy
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: ntfy}
+  labels: {swarmageddon.dev/component: ntfy, app.kubernetes.io/name: ntfy}
 spec:
   replicas: 1
   serviceName: ntfy
@@ -22,7 +22,7 @@ spec:
     matchLabels: {swarmageddon.dev/component: ntfy}
   template:
     metadata:
-      labels: {swarmageddon.dev/component: ntfy}
+      labels: {swarmageddon.dev/component: ntfy, app.kubernetes.io/name: ntfy}
     spec:
       enableServiceLinks: false
       automountServiceAccountToken: false

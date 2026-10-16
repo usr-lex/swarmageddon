@@ -18,6 +18,7 @@ data:
 kind: ConfigMap
 metadata:
   labels:
+    app.kubernetes.io/name: registry-cache
     swarmageddon.dev/component: registry-cache
   name: registry-cache-config
   namespace: swarmageddon-platform
@@ -26,6 +27,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    app.kubernetes.io/name: registry-cache
     swarmageddon.dev/component: registry-cache
   name: registry-cache
   namespace: swarmageddon-platform
@@ -41,6 +43,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
+    app.kubernetes.io/name: registry-cache
     swarmageddon.dev/component: registry-cache
   name: registry-cache
   namespace: swarmageddon-platform
@@ -53,6 +56,7 @@ spec:
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: registry-cache
         swarmageddon.dev/component: registry-cache
     spec:
       automountServiceAccountToken: false

@@ -47,7 +47,7 @@ func storage(q *resource.Quantity, def string) string {
 func (r *Reconciler) values(ctx context.Context, p *v1alpha1.Platform) (manifests.Values, error) {
 	ns := v1alpha1.PlatformNamespace
 	s := p.Spec.Services
-	v := manifests.Values{Namespace: ns, SystemNamespace: v1alpha1.SystemNamespace, Images: r.Deps.Images}
+	v := manifests.Values{Namespace: ns, SystemNamespace: v1alpha1.SystemNamespace, Images: r.Deps.Pinned}
 
 	var dbs []manifests.Database
 	var names []string
@@ -56,7 +56,7 @@ func (r *Reconciler) values(ctx context.Context, p *v1alpha1.Platform) (manifest
 		names = append(names, d.name+"="+d.secret)
 	}
 	v.Postgres = manifests.PostgresValues{Storage: storage(s.Postgres.Storage, "20Gi"), Databases: dbs,
-		BootstrapHash: manifests.Hash(strings.Join(names, ",") + r.Deps.Images.Postgres)}
+		BootstrapHash: manifests.Hash(strings.Join(names, ",") + r.Deps.Pinned.Postgres)}
 
 	v.Forgejo = manifests.ForgejoValues{
 		Storage:   storage(s.Forgejo.Storage, "50Gi"),
@@ -210,7 +210,7 @@ func (r *Reconciler) applyForgejo(ctx context.Context, p *v1alpha1.Platform, v m
 }
 
 func (r *Reconciler) applyMessaging(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {
-	ca, err := r.Deps.PKI.CA(ctx)
+	ca, err := r.Deps.CAStore.CA(ctx)
 	if err != nil {
 		return false, "", err
 	}

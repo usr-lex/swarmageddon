@@ -916,7 +916,9 @@ agent is delivered to it as a message.
   Forgejo, pointed at the control center (`/hooks/forgejo/<workspace>`) and
   signed with a per-workspace HMAC secret. It subscribes to `issues`,
   `issue_comment`, `pull_request`, `pull_request_review`,
-  `pull_request_comment` and `workflow_run`. The same receiver feeds the
+  `pull_request_comment`, `workflow_run_failure` and `action_run_failure`
+  (Forgejo 17 has no `workflow_run` hook event, and drops unknown names
+  silently). The same receiver feeds the
   `ciRed` notification for people (§10.3).
 - **Events delivered to an agent**, with the forge user mapped to the room of
   the same name:

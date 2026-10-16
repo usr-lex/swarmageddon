@@ -262,6 +262,20 @@ func Fingerprint(certPEM []byte) (string, error) {
 	return b.String(), nil
 }
 
+// IssueClientCert issues a client certificate with CN cn and URI SAN uriSAN,
+// valid from now for ttl (deps.PKI).
+func (ca *CA) IssueClientCert(cn, uriSAN string, ttl time.Duration) (certPEM, keyPEM []byte, err error) {
+	var uris []string
+	if uriSAN != "" {
+		uris = []string{uriSAN}
+	}
+	leaf, err := ca.Issue(Request{CommonName: cn, URIs: uris, Usage: Client, Lifetime: ttl}, time.Now())
+	return leaf.CertPEM, leaf.KeyPEM, err
+}
+
+// CABundle is the CA certificate in PEM (deps.PKI).
+func (ca *CA) CABundle() []byte { return ca.CertPEM }
+
 // Fingerprint of the CA certificate.
 func (ca *CA) Fingerprint() string {
 	fp, _ := Fingerprint(ca.CertPEM)

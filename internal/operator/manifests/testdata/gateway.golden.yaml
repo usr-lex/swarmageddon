@@ -22,6 +22,7 @@ data:
 kind: ConfigMap
 metadata:
   labels:
+    app.kubernetes.io/name: gateway
     swarmageddon.dev/component: gateway
   name: gateway-config
   namespace: swarmageddon-platform
@@ -30,6 +31,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    app.kubernetes.io/name: gateway
     swarmageddon.dev/component: gateway
   name: gateway
   namespace: swarmageddon-platform
@@ -45,6 +47,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
+    app.kubernetes.io/name: gateway
     swarmageddon.dev/component: gateway
   name: gateway
   namespace: swarmageddon-platform
@@ -58,6 +61,7 @@ spec:
       annotations:
         swarmageddon.dev/config-hash: c9c5b2326b
       labels:
+        app.kubernetes.io/name: gateway
         swarmageddon.dev/component: gateway
     spec:
       automountServiceAccountToken: false

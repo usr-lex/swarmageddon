@@ -5,7 +5,7 @@ kind: ServersTransport
 metadata:
   name: control-center
   namespace: {{ .SystemNamespace }}
-  labels: {swarmageddon.dev/component: control-center}
+  labels: {swarmageddon.dev/component: control-center, app.kubernetes.io/name: control-center}
 spec:
   serverName: control-center.{{ .SystemNamespace }}.svc
   rootCAs:

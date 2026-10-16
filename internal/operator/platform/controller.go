@@ -132,10 +132,7 @@ func EnsurePlatform(ctx context.Context, c client.Client) error {
 }
 
 func (r *Reconciler) now() time.Time {
-	if r.Deps.Clock != nil {
-		return r.Deps.Clock.Now()
-	}
-	return time.Now()
+	return r.Deps.Now()
 }
 
 func (r *Reconciler) applier() *apply.Applier {
@@ -211,7 +208,7 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		return result, err
 	}
 
-	ca, err := r.Deps.PKI.CA(ctx)
+	ca, err := r.Deps.CAStore.CA(ctx)
 	if err != nil {
 		return result, fmt.Errorf("platform CA: %w", err)
 	}
@@ -243,7 +240,7 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		requeue(d)
 	}
 
-	p.Status.Versions = r.Deps.Images.Versions(r.Deps.Version)
+	p.Status.Versions = r.Deps.Pinned.Versions(r.Deps.Version)
 
 	if !p.Spec.Wizard.ServicesApproved {
 		for _, s := range services {

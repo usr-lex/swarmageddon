@@ -8,6 +8,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
   labels:
+    app.kubernetes.io/name: control-center
     swarmageddon.dev/component: control-center
   name: control-center
   namespace: swarmageddon-system

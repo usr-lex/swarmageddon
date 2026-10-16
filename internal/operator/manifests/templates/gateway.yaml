@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: gateway-config
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway}
+  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
 data:
   config.yaml: |
 {{ indent 4 .Gateway.Config }}
@@ -13,7 +13,7 @@ kind: Service
 metadata:
   name: gateway
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway}
+  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
 spec:
   selector: {swarmageddon.dev/component: gateway}
   ports:
@@ -24,14 +24,14 @@ kind: Deployment
 metadata:
   name: gateway
   namespace: {{ .Namespace }}
-  labels: {swarmageddon.dev/component: gateway}
+  labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
 spec:
   replicas: 1
   selector:
     matchLabels: {swarmageddon.dev/component: gateway}
   template:
     metadata:
-      labels: {swarmageddon.dev/component: gateway}
+      labels: {swarmageddon.dev/component: gateway, app.kubernetes.io/name: gateway}
       annotations:
         swarmageddon.dev/config-hash: {{ .Gateway.ConfigHash }}
     spec:
