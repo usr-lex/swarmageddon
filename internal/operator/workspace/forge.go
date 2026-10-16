@@ -23,6 +23,8 @@ const (
 	TeamReviewers    = "reviewers"
 	TeamMergers      = "mergers"
 	TeamCI           = "ci"
+	// TeamObservers has read access, for the chronicler (§8.7).
+	TeamObservers = "observers"
 )
 
 func randomHex(n int) string {
@@ -46,6 +48,7 @@ func teams(w *v1alpha1.Workspace) []forgejo.Team {
 		{Name: TeamReviewers, Description: "Agents that review pull requests", Permission: "write", IncludesAllRepositories: allRepos},
 		{Name: TeamMergers, Description: "May merge into protected branches", Permission: "write", IncludesAllRepositories: allRepos},
 		{Name: TeamCI, Description: "CI and infrastructure", Permission: "write", IncludesAllRepositories: allRepos},
+		{Name: TeamObservers, Description: "Read-only, for reporting", Permission: "read", IncludesAllRepositories: allRepos},
 	}
 	for _, g := range w.Spec.Groups {
 		out = append(out, forgejo.Team{Name: GroupTeam(g.Name), Description: "Repositories of group " + g.Name, Permission: "write"})

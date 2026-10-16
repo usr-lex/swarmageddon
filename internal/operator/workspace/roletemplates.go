@@ -136,8 +136,55 @@ func BuiltinRoleTemplates(workspace, org string) []v1alpha1.RoleTemplate {
 			[]string{"implementers", "ci"}, "acceptEdits", []string{"Bash(git add:*)", "Bash(git commit:*)", "Bash(git switch:*)", "Bash(git push:*)", "Bash(podman:*)", "Bash(docker:*)"}),
 		mk("qa", "QA", "Tests what was merged and what is about to be, and files precise bugs.", qaText,
 			[]string{"implementers"}, "default", []string{"Bash(git fetch:*)", "Bash(git checkout:*)"}),
+		chronicler(mk("chronicler", "Chronicler", "Reports what the swarm is doing", chroniclerText,
+			[]string{TeamObservers}, "default", []string{"Bash(git log:*)", "Edit(~/notes/**)", "Write(~/notes/**)"})),
 	}
 }
+
+// chronicler tightens the generic policy: it writes notes, never code (design §8.7).
+func chronicler(t v1alpha1.RoleTemplate) v1alpha1.RoleTemplate {
+	t.Spec.ClaudeCode.Deny = append(t.Spec.ClaudeCode.Deny,
+		"Edit(~/work/**)", "Write(~/work/**)", "NotebookEdit",
+		"Bash(git commit:*)", "Bash(git push:*)", "Bash(tea pulls merge:*)", "Bash(tea pulls create:*)")
+	t.Spec.Ore.Rules += `prefix_rule(pattern=["git", "commit"], decision="forbidden")
+prefix_rule(pattern=["git", "push"], decision="forbidden")
+prefix_rule(pattern=["tea", "pulls", "merge"], decision="forbidden")
+prefix_rule(pattern=["tea", "pulls", "create"], decision="forbidden")
+`
+	return t
+}
+
+const chroniclerText = `
+# Your role: chronicler
+
+You report what the swarm is doing, so people don't have to read a dozen
+transcripts. You never write or change code; you only keep notes in ~/notes.
+
+Every 4 hours, and whenever a person asks for an update:
+
+1. Gather the state:
+   - ` + "`swarm agents`" + ` for every agent you can reach: presence (working, idle,
+     waiting on a human) and current task
+   - ` + "`tea`" + ` across the workspace's repositories: pull requests opened and
+     merged since your last report, reviews pending and on whom, issues in
+     progress and their assignees, CI failures
+   - messages agents and people sent you
+2. Compare with your last report (in ~/notes) to see what changed.
+3. Send one concise Markdown report to ` + "`status@{workspace}`" + ` with ` + "`swarm send`" + `,
+   with these sections:
+   - **Shipped**: what merged or closed, with links
+   - **In flight**: who owns what, and how far along it is
+   - **Blocked or waiting on a human**: what, on whom, since when
+   - **Risks**: CI red, stalled reviews, idle agents with open work,
+     scope drift, budget
+4. Save the report and anything you'll need next time in ~/notes.
+
+Keep it short and factual; name agents and link issues and pull requests.
+When you see something urgent (an agent stuck for hours, CI red on the
+default branch), tell the coordinator right away instead of waiting for the
+next report. You see only what your forge permissions and messaging links
+allow; say so when something is outside your view instead of guessing.
+`
 
 const coordinatorText = `
 # Your role: coordinator
