@@ -20,6 +20,7 @@ import (
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/egress"
 	"github.com/usr-lex/swarmageddon/internal/operator/persona"
+	"github.com/usr-lex/swarmageddon/internal/roomsettings"
 	"github.com/usr-lex/swarmageddon/internal/warden/keytable"
 )
 
@@ -178,39 +179,13 @@ type sharedMount struct {
 }
 
 func selects(sel string, r *v1.Room) bool {
-	kind, val, _ := strings.Cut(sel, ":")
-	switch kind {
-	case "everyone":
-		return true
-	case "role":
-		return r.Spec.Role == val
-	case "group":
-		return r.Spec.Group == val
-	case "room":
-		return r.Name == val
-	}
-	return false
-}
-
-// openLink reports an open link from group a to group b.
-func openLink(ws *v1.Workspace, a, b string) bool {
-	for _, l := range ws.Spec.Messaging.Links {
-		if l.From == a && l.To == b && l.Mode == v1.LinkOpen {
-			return true
-		}
-	}
-	return false
-}
-
-// sameSide reports whether two groups are on the same side of every wall:
-// the same group, or joined by open links in both directions.
-func sameSide(ws *v1.Workspace, a, b string) bool {
-	return a == b || (openLink(ws, a, b) && openLink(ws, b, a))
+	return roomsettings.Selects(sel, r.Name, r.Spec.Role, r.Spec.Group)
 }
 
 // WallViolations returns, by volume name, why a shared volume may not be
 // mounted read-write as declared: rooms on both sides of a wall would write
-// to it. rooms are the workspace's rooms. The room controller mounts such a
+// to it (a mediated or none link between their groups, roomsettings.Walled).
+// rooms are the workspace's rooms. The room controller mounts such a
 // volume read-only everywhere; the workspace controller can report it.
 func WallViolations(ws *v1.Workspace, rooms []v1.Room) map[string]string {
 	out := map[string]string{}
@@ -230,7 +205,7 @@ func WallViolations(ws *v1.Workspace, rooms []v1.Room) map[string]string {
 	pairs:
 		for i, a := range gs {
 			for _, b := range gs[i+1:] {
-				if !sameSide(ws, a, b) {
+				if roomsettings.Walled(ws.Spec.Messaging.Links, a, b) {
 					out[vol.Name] = fmt.Sprintf("shared volume %s would be writable by %s (group %q) and %s (group %q), on both sides of a wall; it is mounted read-only",
 						vol.Name, groups[a], a, groups[b], b)
 					break pairs

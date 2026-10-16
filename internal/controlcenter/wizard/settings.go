@@ -11,108 +11,33 @@ import (
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
+	"github.com/usr-lex/swarmageddon/internal/roomsettings"
 )
 
 // Settings levels, in merge order (docs/design.md §6.6).
 const (
-	LevelWorkspace = "workspace"
-	LevelRole      = "role"
-	LevelRoom      = "room"
+	LevelWorkspace = roomsettings.LevelWorkspace
+	LevelRole      = roomsettings.LevelRole
+	LevelRoom      = roomsettings.LevelRoom
 )
 
 // RoomSettings returns a room's own level of layered settings.
-func RoomSettings(s v1alpha1.RoomSpec) v1alpha1.RoomDefaults {
-	return v1alpha1.RoomDefaults{Env: s.Env, SecretEnv: s.SecretEnv, MCPServers: s.MCPServers, Network: s.Network}
-}
+func RoomSettings(s v1alpha1.RoomSpec) v1alpha1.RoomDefaults { return roomsettings.RoomLevel(s) }
 
 // SetRoomSettings writes a level into a room's spec.
 func SetRoomSettings(s *v1alpha1.RoomSpec, d v1alpha1.RoomDefaults) {
 	s.Env, s.SecretEnv, s.MCPServers, s.Network = d.Env, d.SecretEnv, d.MCPServers, d.Network
 }
 
-// Merge applies the levels in order, later ones overriding earlier ones by
-// key: env and secretEnv by variable name, MCP servers by name (disabled
-// removes), network mode as a whole, domains as a union and packageManagers
-// from the latest level that sets it. Sources say where each entry came from.
-func Merge(levels []string, ds []v1alpha1.RoomDefaults) (v1alpha1.RoomDefaults, []*ccv1.SettingSource) {
-	out := v1alpha1.RoomDefaults{}
-	src := map[string]string{} // kind/key -> level
-	env := map[string]string{}
-	senv := map[string]v1alpha1.SecretEnvVar{}
-	mcp := map[string]v1alpha1.MCPServer{}
-	net := v1alpha1.NetworkAccess{Mode: v1alpha1.NetworkFull}
-	domains := map[string]bool{}
-	var domainOrder []string
-	for i, d := range ds {
-		lvl := levels[i]
-		for k, v := range d.Env {
-			env[k] = v
-			src["env/"+k] = lvl
-		}
-		for _, e := range d.SecretEnv {
-			senv[e.Name] = e
-			src["secretEnv/"+e.Name] = lvl
-		}
-		for k, v := range d.MCPServers {
-			if v.Disabled {
-				delete(mcp, k)
-				delete(src, "mcpServer/"+k)
-				continue
-			}
-			mcp[k] = v
-			src["mcpServer/"+k] = lvl
-		}
-		if n := d.Network; n != nil {
-			if n.Mode != "" {
-				net.Mode = n.Mode
-				src["network/mode"] = lvl
-			}
-			for _, dom := range n.Domains {
-				if !domains[dom] {
-					domains[dom] = true
-					domainOrder = append(domainOrder, dom)
-					src["domain/"+dom] = lvl
-				}
-			}
-			if n.PackageManagers != nil {
-				pm := *n.PackageManagers
-				net.PackageManagers = &pm
-				src["packageManagers/"] = lvl
-			}
-		}
-	}
-	if len(env) > 0 {
-		out.Env = env
-	}
-	for _, k := range slices.Sorted(maps.Keys(senv)) {
-		out.SecretEnv = append(out.SecretEnv, senv[k])
-	}
-	if len(mcp) > 0 {
-		out.MCPServers = mcp
-	}
-	net.Domains = domainOrder
-	out.Network = &net
-	if _, ok := src["network/mode"]; !ok {
-		src["network/mode"] = "default"
-	}
-	var sources []*ccv1.SettingSource
-	for _, k := range slices.Sorted(maps.Keys(src)) {
-		var kind, key string
-		for i := range k {
-			if k[i] == '/' {
-				kind, key = k[:i], k[i+1:]
-				break
-			}
-		}
-		sources = append(sources, &ccv1.SettingSource{Kind: kind, Key: key, Level: src[k]})
-	}
-	return out, sources
-}
-
-// Effective merges a room's levels into the API shape.
+// Effective merges a room's levels (internal/roomsettings, as the operator
+// does) into the API shape.
 func Effective(room, role string, ws, rt, own v1alpha1.RoomDefaults) *ccv1.EffectiveSettings {
-	m, src := Merge([]string{LevelWorkspace, LevelRole, LevelRoom}, []v1alpha1.RoomDefaults{ws, rt, own})
-	return &ccv1.EffectiveSettings{Room: room, Role: role, Settings: SettingsToPlan(m), Sources: src}
+	m := roomsettings.Merge(ws, rt, own)
+	var src []*ccv1.SettingSource
+	for _, s := range m.Sources {
+		src = append(src, &ccv1.SettingSource{Kind: s.Kind, Key: s.Key, Level: s.Level})
+	}
+	return &ccv1.EffectiveSettings{Room: room, Role: role, Settings: SettingsToPlan(m.Settings), Sources: src}
 }
 
 // SettingsFromPlan converts the API shape to the CRD shape; nil is empty.
@@ -365,17 +290,7 @@ func validateVolumes(p *ccv1.WorkspacePlan) []string {
 }
 
 // Selects reports whether a shared-volume selector matches a room.
-func Selects(sel, room, role, group string) bool {
-	switch {
-	case sel == "everyone":
-		return true
-	case sel == "role:"+role, sel == "room:"+room:
-		return true
-	case group != "" && sel == "group:"+group:
-		return true
-	}
-	return false
-}
+func Selects(sel, room, role, group string) bool { return roomsettings.Selects(sel, room, role, group) }
 
 // RoomVolumes returns the shared volumes a room mounts: name -> "ro" or "rw"
 // (read-write wins when several mounts match).
@@ -447,11 +362,7 @@ func EffectiveAll(d Desired) []*ccv1.EffectiveSettings {
 // WorkspaceDefaults is the workspace level of room settings, mapping the
 // deprecated internet: false to network mode none when no network is set.
 func WorkspaceDefaults(w *v1alpha1.Workspace) v1alpha1.RoomDefaults {
-	d := w.Spec.RoomDefaults
-	if d.Network == nil && w.Spec.Internet != nil && !*w.Spec.Internet {
-		d.Network = &v1alpha1.NetworkAccess{Mode: v1alpha1.NetworkNone}
-	}
-	return d
+	return roomsettings.WorkspaceLevel(w)
 }
 
 // EffectiveCurrent returns the merged settings of every existing room.

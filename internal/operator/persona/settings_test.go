@@ -13,47 +13,20 @@ import (
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 )
 
-func TestMerge(t *testing.T) {
-	ws := v1.RoomDefaults{
-		Env:       map[string]string{"A": "ws", "B": "ws", "SWARM_ROOM": "evil"},
-		SecretEnv: []v1.SecretEnvVar{{Name: "TOKEN", SecretRef: v1.SecretKeyRef{Name: "s", Key: "ws"}}},
-		MCPServers: map[string]v1.MCPServer{
-			"docs":   {Type: "http", URL: "https://docs.example/mcp"},
-			"jira":   {Command: "jira-mcp"},
-			"legacy": {Command: "old"},
-		},
-		Network: &v1.NetworkAccess{Mode: v1.NetworkLimited, Domains: []string{"a.example"}, PackageManagers: ptr.To(true)},
+func TestMergeFor(t *testing.T) {
+	ws := &v1.Workspace{Spec: v1.WorkspaceSpec{RoomDefaults: v1.RoomDefaults{
+		Env: map[string]string{"A": "ws", "SWARM_ROOM": "evil", "TOKEN": "plain"},
+	}}}
+	role := &v1.RoleTemplate{Spec: v1.RoleTemplateSpec{RoomDefaults: v1.RoomDefaults{
+		SecretEnv: []v1.SecretEnvVar{{Name: "TOKEN", SecretRef: v1.SecretKeyRef{Name: "room-secrets", Key: "t"}}, {Name: "HTTPS_PROXY", SecretRef: v1.SecretKeyRef{Name: "s", Key: "k"}}},
+	}}}
+	room := &v1.Room{Spec: v1.RoomSpec{Env: map[string]string{"C": "room"}}}
+	got := MergeFor(ws, role, room)
+	if !reflect.DeepEqual(got.Env, map[string]string{"A": "ws", "C": "room"}) || len(got.SecretEnv) != 1 || got.SecretEnv[0].Name != "TOKEN" {
+		t.Errorf("merged = %+v", got)
 	}
-	role := v1.RoomDefaults{
-		Env:        map[string]string{"B": "role"},
-		MCPServers: map[string]v1.MCPServer{"legacy": {Disabled: true}, "jira": {Command: "jira-mcp", Args: []string{"--ro"}}},
-		Network:    &v1.NetworkAccess{Domains: []string{"b.example", "a.example"}},
-	}
-	room := v1.RoomDefaults{
-		Env:       map[string]string{"C": "room", "TOKEN": "plain"},
-		SecretEnv: []v1.SecretEnvVar{{Name: "TOKEN", SecretRef: v1.SecretKeyRef{Name: "s", Key: "room"}}},
-		Network:   &v1.NetworkAccess{PackageManagers: ptr.To(false), Domains: []string{"c.example"}},
-	}
-	got := Merge(ws, role, room)
-	if want := map[string]string{"A": "ws", "B": "role", "C": "room"}; !reflect.DeepEqual(got.Env, want) {
-		t.Errorf("env = %v", got.Env)
-	}
-	if len(got.SecretEnv) != 1 || got.SecretEnv[0].SecretRef.Key != "room" {
-		t.Errorf("secretEnv = %v", got.SecretEnv)
-	}
-	if _, ok := got.MCPServers["legacy"]; ok || len(got.MCPServers) != 2 || got.MCPServers["jira"].Args[0] != "--ro" {
-		t.Errorf("mcp = %v", got.MCPServers)
-	}
-	n := got.Network
-	if n.Mode != v1.NetworkLimited || !reflect.DeepEqual(n.Domains, []string{"a.example", "b.example", "c.example"}) || *n.PackageManagers {
-		t.Errorf("network = %+v", n)
-	}
-	if NetworkMode(Merge()) != v1.NetworkFull {
+	if NetworkMode(got) != v1.NetworkFull {
 		t.Error("default mode is not full")
-	}
-	off := &v1.Workspace{Spec: v1.WorkspaceSpec{Internet: ptr.To(false)}}
-	if NetworkMode(Merge(WorkspaceLevel(off))) != v1.NetworkNone {
-		t.Error("internet: false is not mode none")
 	}
 }
 

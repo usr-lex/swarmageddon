@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/roomsettings"
 )
 
 // Layered room settings (docs/design.md §6.6).
@@ -15,72 +15,14 @@ import (
 // SecretEnvKey is the identity Secret key holding a secretEnv variable.
 func SecretEnvKey(name string) string { return "env_" + name }
 
-// RoomLevel is the room's own level of the layered settings.
-func RoomLevel(r *v1.Room) v1.RoomDefaults {
-	return v1.RoomDefaults{Env: r.Spec.Env, SecretEnv: r.Spec.SecretEnv, MCPServers: r.Spec.MCPServers, Network: r.Spec.Network}
+// MergeFor merges the workspace's, the role's and the room's levels with
+// internal/roomsettings, then lets a secret variable win over a plain one of
+// the same name and drops the platform's own variables.
+func MergeFor(ws *v1.Workspace, role *v1.RoleTemplate, r *v1.Room) v1.RoomDefaults {
+	return clean(roomsettings.For(ws, role, r).Settings)
 }
 
-// WorkspaceLevel is the workspace's level, with the deprecated
-// spec.internet=false read as network mode none.
-func WorkspaceLevel(ws *v1.Workspace) v1.RoomDefaults {
-	d := *ws.Spec.RoomDefaults.DeepCopy()
-	if d.Network == nil && ws.Spec.Internet != nil && !*ws.Spec.Internet {
-		d.Network = &v1.NetworkAccess{Mode: v1.NetworkNone}
-	}
-	return d
-}
-
-// Merge applies levels in order, later ones overriding earlier ones by key:
-// env and secretEnv by variable name, mcpServers by server name (disabled
-// removes an inherited server), network's mode from the latest level that
-// sets it, its domains as a union, packageManagers from the latest level that
-// sets it. The result has no disabled servers.
-func Merge(levels ...v1.RoomDefaults) v1.RoomDefaults {
-	var out v1.RoomDefaults
-	secret := map[string]v1.SecretEnvVar{}
-	for _, l := range levels {
-		for k, v := range l.Env {
-			if out.Env == nil {
-				out.Env = map[string]string{}
-			}
-			out.Env[k] = v
-		}
-		for _, s := range l.SecretEnv {
-			secret[s.Name] = s
-		}
-		for name, s := range l.MCPServers {
-			if out.MCPServers == nil {
-				out.MCPServers = map[string]v1.MCPServer{}
-			}
-			if s.Disabled {
-				delete(out.MCPServers, name)
-				continue
-			}
-			out.MCPServers[name] = *s.DeepCopy()
-		}
-		if n := l.Network; n != nil {
-			if out.Network == nil {
-				out.Network = &v1.NetworkAccess{}
-			}
-			if n.Mode != "" {
-				out.Network.Mode = n.Mode
-			}
-			for _, d := range n.Domains {
-				if !slices.Contains(out.Network.Domains, d) {
-					out.Network.Domains = append(out.Network.Domains, d)
-				}
-			}
-			if n.PackageManagers != nil {
-				b := *n.PackageManagers
-				out.Network.PackageManagers = &b
-			}
-		}
-	}
-	for _, n := range slices.Sorted(maps.Keys(secret)) {
-		out.SecretEnv = append(out.SecretEnv, secret[n])
-	}
-	// A secret variable wins over a plain one of the same name; the
-	// platform's own variables can't be overridden.
+func clean(out v1.RoomDefaults) v1.RoomDefaults {
 	for _, s := range out.SecretEnv {
 		delete(out.Env, s.Name)
 	}
@@ -90,15 +32,7 @@ func Merge(levels ...v1.RoomDefaults) v1.RoomDefaults {
 		}
 	}
 	out.SecretEnv = slices.DeleteFunc(out.SecretEnv, func(s v1.SecretEnvVar) bool { return Reserved(s.Name) })
-	if out.Network != nil {
-		sort.Strings(out.Network.Domains)
-	}
 	return out
-}
-
-// MergeFor merges the workspace's, the role's and the room's levels.
-func MergeFor(ws *v1.Workspace, role *v1.RoleTemplate, r *v1.Room) v1.RoomDefaults {
-	return Merge(WorkspaceLevel(ws), role.Spec.RoomDefaults, RoomLevel(r))
 }
 
 // NetworkMode is the merged mode; full when no level sets one.
