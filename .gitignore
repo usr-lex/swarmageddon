@@ -5,3 +5,4 @@
 *.test
 /.cache/
 /hack/.k3d/
+/.claude/
