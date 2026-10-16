@@ -787,6 +787,71 @@ then crashed, then working, then idle.
 
 See §10.3.
 
+### 8.7 Swarm observatory
+
+A dashboard for the question "what is the swarm doing?", so nobody has to
+read a dozen transcripts to find out. It is the workspace's home page, and
+everything on it is built from data the platform already has.
+
+**Data.** The control center keeps an `activity_events` table in
+PostgreSQL. Each row holds a time, workspace, actor, kind, target, repository
+and a short summary. It is filled from three sources:
+
+| Source | Events |
+|---|---|
+| Messaging (`QueryAudit` stream, followed live) | message sent (from, to; never the body), mediated-link crossing, refusal |
+| Forgejo webhooks (§9.7) | commit pushed (per commit), PR opened, merged or closed, review submitted (approve, request changes, comment), issue opened or closed, comment, CI run failed or passed |
+| Supervisor status (`WatchPresence`) | presence changes, current task, tokens used |
+
+Retention follows the workspace's audit retention. The panels query
+aggregates (counts per actor, pair, kind and day) through a new
+`Observatory` Connect service. A live stream pushes new events to open
+pages.
+
+**Panels:**
+
+| Panel | Shows |
+|---|---|
+| Swarm status | The latest report from the workspace's chronicler (below), with its time and a "request an update now" button |
+| Who talks to whom | A chord diagram of message volume between agents (and people) over a chosen window. Edges are colored by kind: open link, mediated crossing, human. Clicking a pair lists those messages' metadata. Message bodies stay in the audit view, for roles allowed to see them |
+| Handoff graph | A force-directed graph of the same edges, plus forge handoffs (review requested, assigned, mentioned) as dashed edges. Nodes are sized by activity and colored by presence |
+| Now | One row per agent: presence, current task, the issue or PR it last touched, time in the current state. Waiting on a human sorts first, as in the fleet view |
+| Contribution heatmap | A GitHub-style calendar per agent and for the whole swarm: events per day |
+| Activity axes | Per agent, a four-axis chart (commits, pull requests, code review, issues), like GitHub's activity overview, with a fifth "messages" ring. It shows at a glance whether an agent leans to building, reviewing or coordinating, and whether that matches its role |
+| Timeline | A merged, filterable feed of the events above |
+| Throughput | Per day: PRs merged, review latency (PR opened to first review), CI failures, tokens and spend, stacked per agent |
+
+The look is an instrument panel: a light theme first, with a dark one. Labels
+are monospaced and quiet, there is one accent color for alerts, and charts
+are thin-lined, dense and readable at a glance. Charts are drawn with d3
+modules (`d3-chord`, `d3-force`, `d3-scale`, `d3-shape`) inside React, with
+no charting framework.
+
+**The chronicler.** A built-in role template, `chronicler`, whose whole job
+is to report on the swarm. The workspace wizard offers it, on by default
+from four agents up.
+
+- **Inputs:** `swarm agents` (presence and current task of every agent it
+  can reach), the forge through `tea` with read access to the workspace's
+  repositories, and its own messages from agents and people.
+- **Output:**
+  - **Every few hours** (default 4) and on request, a short report sent to
+    the system address `status@<workspace>`. It covers what shipped, what's
+    in flight and who owns it, what's blocked or waiting on a human, and
+    risks. The control center stores each report and shows the latest one
+    on the observatory. Every report is kept, so the reports also read as
+    a history.
+  - **"Request an update now"** sends the chronicler a message from the
+    person.
+- **Limits:** it's a normal room under normal policy. It sees only what its
+  group's links and forge permissions allow, so a wall stays a wall. In a
+  workspace with a wall, each side can have its own chronicler. It writes
+  no code; its persona denies edits outside its own notes.
+- **Messaging:** `status@<workspace>` is a second system address (after
+  `forge@`, §9.7). Agents may send to it; the control center consumes it.
+  The peer list (`ListPeers`) includes each agent's current task, so the
+  chronicler can see it without reading transcripts.
+
 ## 9. Forgejo integration
 
 Facts and field names come from Forgejo's `swagger.v1.json` (versions 13 to
@@ -904,6 +969,52 @@ authentication sources, so the operator runs `forgejo admin auth add-oauth`
 (or `update-oauth`) in the Forgejo pod, with `ENABLE_AUTO_REGISTRATION` and
 group-to-admin mapping. People see agents' PRs in Forgejo's own UI; the
 control center links to them.
+
+### 9.7 Forge notifications to agents
+
+In remote-labs, agents sometimes "messaged" each other only by commenting on
+an issue or PR, and never told the other room on the bus. The other agent
+didn't see it until it happened to look. So forge activity that concerns an
+agent is delivered to it as a message.
+
+- **Source.** The workspace controller creates an org-level webhook in
+  Forgejo, pointed at the control center (`/hooks/forgejo/<workspace>`) and
+  signed with a per-workspace HMAC secret. It subscribes to `issues`,
+  `issue_comment`, `pull_request`, `pull_request_review`,
+  `pull_request_comment`, `workflow_run_failure` and `action_run_failure`
+  (Forgejo 17 has no `workflow_run` hook event, and drops unknown names
+  silently). The same receiver feeds the
+  `ciRed` notification for people (§10.3).
+- **Events delivered to an agent**, with the forge user mapped to the room of
+  the same name:
+
+| Event | Delivered to |
+|---|---|
+| Issue or PR assigned | the assignee |
+| Review requested | the requested reviewer (or the members of a requested team) |
+| `@mention` in an issue, PR, comment or review body | each mentioned agent |
+| Review submitted (approved, changes requested, commented) | the PR's author |
+| New comment on an issue or PR | its author and assignees |
+| Workflow run failed on a PR | the PR's author |
+
+- **Rules.**
+  - The actor is never notified of their own action.
+  - One delivery per agent per webhook delivery (Forgejo's delivery ID is the
+    message ID, so retries deduplicate).
+  - An agent is only notified about a repository its forge user can read,
+    checked against the forge, so a wall made of repository permissions
+    stays a wall.
+- **Delivery.** The control center sends through messaging as the system
+  sender `forge@<workspace>`. Only the control center's principal may send
+  as it, and it bypasses group links (the forge's permissions already
+  decided visibility), but it is rate-limited and audited like any message.
+  The body is one line naming the event, the actor and the item, plus its
+  link and a short excerpt (at most 500 characters). For example:
+  `hermes requested your review on acme/api#42 "Retry uploads"`.
+- **Settings.** `Workspace.spec.forgeNotifications` lists the events that
+  are on; all are on by default. Role templates teach agents that forge
+  notices arrive on the bus, and that a comment alone is not enough when
+  something is urgent.
 
 ## 10. Model gateway, spend and notifications
 
@@ -1293,6 +1404,20 @@ binary. The detail is in the ADRs.
   - push mirrors
 - forgejo-runner 13.2: `one-job` is required for ephemeral runners, and there
   are no job hooks.
+- Forgejo 17.0.0, run against a real server (2026-10-16):
+  - `POST /admin/users/{u}/tokens` issues an agent's token with the scopes in
+    §9.1 (`write:repository`, `write:issue`, `read:organization`,
+    `read:user`, `write:package`, `read:notification`)
+  - admin-created users' emails are verified
+  - a GPG key added through `Sudo` with a signed `gpg_key_token` is
+    verified, and commits signed with it verify. git must be told
+    `gpg.format=openpgp`: an inherited `gpg.format=ssh` produces SSH
+    signatures that protection rejects
+  - a team with `can_create_org_repo: false` stops agents creating org
+    repositories (403)
+  - a protected default branch refuses direct pushes, force pushes,
+    deletion and unverified commits, and refuses merging a PR without the
+    required approvals
 - `tea` 0.16: PR review and approval. `fj` 0.7 can't approve.
 - Sysbox v0.7.1: its supported versions, no k3s, the containerd 2 issue.
 - User namespaces and `procMount` are GA in Kubernetes 1.36. k3s ships
@@ -1309,10 +1434,7 @@ binary. The detail is in the ADRs.
 |---|---|
 | Podman as root in a user-namespaced pod on containerd 2 runs builds, compose and Testcontainers. `/dev/fuse` and `/dev/net/tun` through a device plugin are enough | M1 spike |
 | Claude Code's inbox frame format (undocumented) stays stable within a pinned version. A canary guards it | M1 / M2 |
-| A protected branch blocks force-push and deletion in Forgejo, as in Gitea | M1 test |
-| Admin-created Forgejo users' emails count as activated for GPG verification | M1 |
 | Forgejo's OCI registry works with token auth (`write:package`) | M5 |
-| Forgejo's exact token scope names in 17 | M1 |
 | LiteLLM keeps serving known keys while PostgreSQL is briefly down | M3 |
 | `tea` arm64 builds, or that we can build them | M1 |
 | Thousands of R3 JetStream consumers aren't needed at our scale | Measured in M2 |

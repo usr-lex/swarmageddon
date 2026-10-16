@@ -765,7 +765,9 @@ type Peer struct {
 	Group       string                 `protobuf:"bytes,6,opt,name=group,proto3" json:"group,omitempty"`
 	Presence    Presence               `protobuf:"varint,7,opt,name=presence,proto3,enum=swarm.messaging.v1.Presence" json:"presence,omitempty"`
 	// Restrictions the sender must satisfy, e.g. a required prefix.
-	Note          string `protobuf:"bytes,8,opt,name=note,proto3" json:"note,omitempty"`
+	Note string `protobuf:"bytes,8,opt,name=note,proto3" json:"note,omitempty"`
+	// What the agent reports it is working on (RoomStatusReport.current_task).
+	CurrentTask   string `protobuf:"bytes,9,opt,name=current_task,json=currentTask,proto3" json:"current_task,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -852,6 +854,13 @@ func (x *Peer) GetPresence() Presence {
 func (x *Peer) GetNote() string {
 	if x != nil {
 		return x.Note
+	}
+	return ""
+}
+
+func (x *Peer) GetCurrentTask() string {
+	if x != nil {
+		return x.CurrentTask
 	}
 	return ""
 }
@@ -2077,7 +2086,7 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\x15ReportPresenceRequest\x128\n" +
 	"\bpresence\x18\x01 \x01(\x0e2\x1c.swarm.messaging.v1.PresenceR\bpresence\"\x18\n" +
 	"\x16ReportPresenceResponse\"\x12\n" +
-	"\x10ListPeersRequest\"\xeb\x01\n" +
+	"\x10ListPeersRequest\"\x8e\x02\n" +
 	"\x04Peer\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12!\n" +
@@ -2086,7 +2095,8 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\asummary\x18\x05 \x01(\tR\asummary\x12\x14\n" +
 	"\x05group\x18\x06 \x01(\tR\x05group\x128\n" +
 	"\bpresence\x18\a \x01(\x0e2\x1c.swarm.messaging.v1.PresenceR\bpresence\x12\x12\n" +
-	"\x04note\x18\b \x01(\tR\x04note\"W\n" +
+	"\x04note\x18\b \x01(\tR\x04note\x12!\n" +
+	"\fcurrent_task\x18\t \x01(\tR\vcurrentTask\"W\n" +
 	"\x11ListPeersResponse\x12\x12\n" +
 	"\x04self\x18\x01 \x01(\tR\x04self\x12.\n" +
 	"\x05peers\x18\x02 \x03(\v2\x18.swarm.messaging.v1.PeerR\x05peers\"\x9c\x02\n" +

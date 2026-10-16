@@ -17,6 +17,7 @@ Change them here first.
 | LiteLLM | Service `gateway.swarmageddon-platform.svc:4000` |
 | Registry cache | Service `registry-cache.swarmageddon-platform.svc:5000` (HTTP) |
 | ntfy | Service `ntfy.swarmageddon-platform.svc:80` |
+| Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
 | Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080 |
 | Operator | Deployment `swarmageddon-operator`; health on 8081, metrics 8080 |
 
@@ -58,7 +59,7 @@ Change them here first.
 |---|---|
 | `/run/swarm/identity/` | the room's Secret (mode 0440, group = agent) |
 | `/etc/swarm/ca/ca.crt` | platform CA bundle |
-| `/etc/swarm/room.json` | from the persona ConfigMap: room, workspace, group, role title and summary, cli, model, effort, forge URL, messaging URL, gateway URL, workDir, repos, firstTurn |
+| `/etc/swarm/room.json` | from the persona ConfigMap; the struct is `persona.RoomConfig` in `internal/operator/persona` (room, address, workspace, group, email, role title and summary, cli, model, effort, permission mode, sudo, forge URL, SSH host and org, messaging and gateway URLs, workDir, repos, firstTurn, approval timeout, env) |
 | `/etc/claude-code/managed-settings.json`, `/etc/claude-code/CLAUDE.md` | persona (Claude rooms) |
 | `/etc/codex/requirements.toml`, `/etc/codex/config.toml`, `/etc/codex/rules/persona.rules` | persona (ore rooms) |
 | `/etc/swarm/role.md` | the role text (both CLIs) |
@@ -70,7 +71,9 @@ Change them here first.
 
 Persona ConfigMap `room-<name>-persona` keys and where the supervisor puts them:
 `room.json` → `/etc/swarm/room.json`; `role.md` → `/etc/swarm/role.md`;
-`claude-managed-settings.json`, `claude-CLAUDE.md`; `ore-requirements.toml`,
+`claude-managed-settings.json`, `claude-CLAUDE.md`, `claude-managed-mcp.json`
+(→ `/etc/claude-code/managed-mcp.json`, which holds the `swarm` MCP server and is
+exclusive); `ore-requirements.toml`,
 `ore-config.toml`, `ore-persona.rules`. The pod mounts the ConfigMap at
 `/etc/swarm/persona/`, and the supervisor copies the files into place at start
 (root-owned, read-only to the agent).
