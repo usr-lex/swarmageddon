@@ -1,0 +1,17 @@
+# Managed by swarmageddon from RoleTemplate "reviewer". Read-only.
+allowed_approval_policies = ["on-request"]
+allowed_approvals_reviewers = ["user"]
+allow_managed_hooks_only = true
+model_provider = "gateway"
+
+[model_providers]
+[model_providers.gateway]
+name = "swarmageddon gateway"
+base_url = "http://gateway.swarmageddon-platform.svc:4000/v1"
+env_key = "SWARM_GATEWAY_KEY"
+wire_api = "anthropic"
+
+[mcp_servers]
+[mcp_servers.swarm]
+[mcp_servers.swarm.identity]
+command = "swarm"

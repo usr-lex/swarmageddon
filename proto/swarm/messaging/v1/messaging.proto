@@ -118,6 +118,8 @@ message Peer {
   Presence presence = 7;
   // Restrictions the sender must satisfy, e.g. a required prefix.
   string note = 8;
+  // What the agent reports it is working on (RoomStatusReport.current_task).
+  string current_task = 9;
 }
 
 message ListPeersResponse {

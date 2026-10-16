@@ -1,0 +1,30 @@
+{
+  "room": "athena",
+  "workspace": "acme",
+  "address": "athena@acme",
+  "displayName": "Athena",
+  "email": "athena@agents.acme.invalid",
+  "group": "clean",
+  "role": "reviewer",
+  "roleTitle": "Reviewer",
+  "roleSummary": "Reviews every pull request against the task card.",
+  "cli": "claude",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "forgeURL": "http://forgejo.swarmageddon-platform.svc:3000",
+  "forgeSSHHost": "forgejo-ssh.swarmageddon-platform.svc",
+  "forgeOrg": "acme",
+  "messagingURL": "https://messaging.swarmageddon-platform.svc:8443",
+  "gatewayURL": "http://gateway.swarmageddon-platform.svc:4000",
+  "workDir": "work",
+  "repos": [
+    "acme/api"
+  ],
+  "firstTurn": "You have just started. Check your messages with the swarm tools, then pick up your open work in the forge (issues and pull requests assigned to you).",
+  "sudo": true,
+  "permissionMode": "acceptEdits",
+  "approvalTimeoutSeconds": 86400,
+  "env": {
+    "FOO": "bar"
+  }
+}
