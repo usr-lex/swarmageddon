@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/ProtonMail/go-crypto v1.5.2 // indirect
 	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.8.0-default-no-op // indirect
 	github.com/beevik/etree v1.7.0 // indirect
