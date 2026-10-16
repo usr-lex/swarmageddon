@@ -194,6 +194,11 @@ func TestWorkspaceReconcile(t *testing.T) {
 	if rb.Subjects[0].Namespace != v1alpha1.SystemNamespace {
 		t.Fatalf("binding subject %+v", rb.Subjects)
 	}
+	var roomSecrets corev1.Secret
+	must(c.Get(ctx, types.NamespacedName{Namespace: ns, Name: RoomSecretsName}, &roomSecrets))
+	if roomSecrets.Labels["swarmageddon.dev/room-secret"] != "true" {
+		t.Fatalf("room-secrets labels %v", roomSecrets.Labels)
+	}
 	var bundle corev1.ConfigMap
 	must(c.Get(ctx, types.NamespacedName{Namespace: ns, Name: "platform-ca-bundle"}, &bundle))
 	var quota corev1.ResourceQuota

@@ -37,7 +37,9 @@ func armorEntity(e *openpgp.Entity) (*GPGKeyPair, error) {
 	if err := e.SerializePrivate(w, nil); err != nil {
 		return nil, err
 	}
-	w.Close()
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
 	w, err = armor.Encode(&pub, openpgp.PublicKeyType, nil)
 	if err != nil {
 		return nil, err
@@ -45,7 +47,9 @@ func armorEntity(e *openpgp.Entity) (*GPGKeyPair, error) {
 	if err := e.Serialize(w); err != nil {
 		return nil, err
 	}
-	w.Close()
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
 	return &GPGKeyPair{ArmoredPrivate: priv.String(), ArmoredPublic: pub.String(), KeyID: e.PrimaryKey.KeyIdString()}, nil
 }
 

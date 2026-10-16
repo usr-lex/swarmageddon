@@ -105,11 +105,26 @@ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messag
 		return err
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	var mu sync.Mutex
+	// The watchers run in goroutines; none may touch the stream once this
+	// handler returns, so stop them and wait for them first.
+	var (
+		mu     sync.Mutex
+		closed bool
+		wg     sync.WaitGroup
+	)
+	defer func() {
+		cancel(nil)
+		mu.Lock()
+		closed = true
+		mu.Unlock()
+		wg.Wait()
+	}()
 	emit := func(ev *messagingv1.ApprovalEvent) error {
 		mu.Lock()
 		defer mu.Unlock()
+		if closed {
+			return context.Canceled
+		}
 		return stream.Send(ev)
 	}
 	if err := stream.Send(nil); err != nil {
@@ -126,7 +141,9 @@ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messag
 			return
 		}
 		watching[name] = true
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			if err := s.st.WatchApprovals(ctx, name, emit); err != nil && ctx.Err() == nil {
 				cancel(err)
 			}
