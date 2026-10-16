@@ -1,7 +1,10 @@
 # swarmageddon: design
 
-- Status: **Draft for the owner's approval.** No code is written until it is
-  approved.
+- Status: **Approved** by the owner on 2026-10-16, with the recommendations in
+  §17 accepted. Implementation notes since approval:
+  - The room image is based on Ubuntu 26.04 instead of Fedora (§6.1). Ubuntu's
+    archive is reachable from our build environments and Fedora's mirrors
+    were not, and Podman, crun and netavark are packaged there too.
 - Date: 2026-10-16
 - Decisions with real alternatives are recorded as ADRs in [`adr/`](adr/).
 
