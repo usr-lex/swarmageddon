@@ -205,6 +205,15 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 				Default:        corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")},
 			}}},
 		},
+		// Values for rooms' secretEnv and MCP valueFrom that people enter in
+		// the control center (design §6.6). Created empty; the control center
+		// writes the data, which this apply never owns.
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: RoomSecretsName, Namespace: ns, Labels: map[string]string{
+				v1alpha1.LabelWorkspace: w.Name, "swarmageddon.dev/room-secret": "true",
+			}},
+			Type: corev1.SecretTypeOpaque,
+		},
 		controlCenterRole(ns),
 		&rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "control-center", Namespace: ns},
@@ -228,9 +237,15 @@ func controlCenterRole(ns string) *rbacv1.Role {
 			{APIGroups: []string{""}, Resources: []string{"pods/log"}, Verbs: []string{"get"}},
 			{APIGroups: []string{""}, Resources: []string{"pods/exec", "pods/portforward"}, Verbs: []string{"create"}},
 			{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
+			// Only the one Secret people fill in through the control center.
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{RoomSecretsName}, Verbs: []string{"get", "update", "patch"}},
 		},
 	}
 }
+
+// RoomSecretsName is the Secret in each workspace namespace that holds values
+// the control center writes for rooms' secretEnv and MCP valueFrom.
+const RoomSecretsName = "room-secrets"
 
 // ensureRoleTemplates creates the built-in templates that are missing. It
 // never overwrites a template, so people's edits stay.
