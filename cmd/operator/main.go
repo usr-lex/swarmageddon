@@ -40,6 +40,13 @@ func main() {
 		roomImage   = flag.String("room-image", "", "room image, overriding the default and --images-from")
 		showVersion = flag.Bool("version", false, "print the version and exit")
 	)
+	if len(os.Args) > 1 && os.Args[1] == "welcome" {
+		if err := welcome(15 * time.Minute); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -68,11 +75,8 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	if err != nil {
 		return err
 	}
-	scheme := runtime.NewScheme()
-	if err := clientgoscheme.AddToScheme(scheme); err != nil {
-		return err
-	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	scheme, err := newScheme()
+	if err != nil {
 		return err
 	}
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -138,4 +142,15 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	}
 	log.Info("starting", "version", version.Version, "room", imgs.Room)
 	return mgr.Start(ctrl.SetupSignalHandler())
+}
+
+func newScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	return scheme, nil
 }
