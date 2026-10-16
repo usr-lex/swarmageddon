@@ -23,6 +23,11 @@ const (
 	ControlCenterCN = "control-center"
 	// WardenCN is the gateway guard's certificate CN (ADR 0011).
 	WardenCN = "warden"
+	// HeaderOperatorPost ("1") marks a post the control center makes for a
+	// workspace operator, who may post to any channel of the workspace
+	// (design §7.8). Honored only from the control center acting for a
+	// person; ignored from anyone else.
+	HeaderOperatorPost = "x-swarm-operator-post"
 )
 
 // Caller is who is calling, from the connection's client certificate.
@@ -35,6 +40,9 @@ type Caller struct {
 	// for; empty for the control center acting as itself.
 	Workspace, Name string
 	Kind            policy.Kind
+	// OperatorPost: the control center vouches that the person is an
+	// operator of the workspace (HeaderOperatorPost).
+	OperatorPost bool
 }
 
 // Address is name@workspace, or "control-center".
@@ -74,6 +82,7 @@ func Identify(h http.Handler, dev bool) http.Handler {
 			_ = ew.Write(w, r, err)
 			return
 		}
+		c.OperatorPost = c.ControlCenter && c.Kind == policy.Human && r.Header.Get(HeaderOperatorPost) == "1"
 		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, c)))
 	})
 }

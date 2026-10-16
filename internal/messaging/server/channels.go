@@ -89,7 +89,11 @@ func (s *Server) Post(ctx context.Context, req *connect.Request[messagingv1.Post
 	}
 	ws := from.ws
 	acc := mem.Access[from.p.Name]
+	caller, _ := CallerFrom(ctx)
+	operator := caller.OperatorPost && from.p.Kind == policy.Human
 	switch {
+	case operator:
+		// The control center checked the person's role; limits still apply.
 	case !acc.Write && !acc.Read:
 		return nil, s.refused(ctx, from, target, m.Id, m.Body, &policy.Refusal{Code: policy.Denied, Rule: "channel-access",
 			Reason: fmt.Sprintf("%s is not a member of %s; list_channels shows the channels you can post to", from.addr, target)})
@@ -155,6 +159,9 @@ func (s *Server) Post(ctx context.Context, req *connect.Request[messagingv1.Post
 	}
 	if !dup {
 		rec := &messagingv1.AuditRecord{Kind: store.AuditPost, From: from.addr, To: target, MessageId: m.Id}
+		if operator && !acc.Write {
+			rec.Reason = "operator post"
+		}
 		if ws.AuditBodies() {
 			rec.Body = m.Body
 		}

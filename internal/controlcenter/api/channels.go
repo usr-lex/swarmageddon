@@ -64,8 +64,9 @@ func (s channelSvc) ListChannels(ctx context.Context, req *connect.Request[ccv1.
 }
 
 // PostToChannel posts as the person. Viewers are read-only (§8.1), so only
-// operators of the workspace (and admins) may post; messaging then checks
-// the channel's membership and access, which it alone knows.
+// operators of the workspace (and admins) may post, to any channel:
+// messaging skips its membership check for them (x-swarm-operator-post) but
+// still applies limits and audits the post.
 func (s channelSvc) PostToChannel(ctx context.Context, req *connect.Request[ccv1.PostToChannelRequest]) (*connect.Response[ccv1.PostToChannelResponse], error) {
 	ws := req.Msg.GetWorkspace()
 	if _, err := s.canOperate(ctx, ws); err != nil {
@@ -81,7 +82,11 @@ func (s channelSvc) PostToChannel(ctx context.Context, req *connect.Request[ccv1
 	}
 	ch := strings.TrimPrefix(req.Msg.GetChannel(), "#")
 	id := ulid.Make().String()
-	res, err := s.Msg.Post(ctx, onBehalf(&messagingv1.PostRequest{Id: id, Channel: ch, Body: body}, as))
+	// Operators may post to any channel of their workspace (§7.8); this
+	// header tells messaging the person passed canOperate above.
+	preq := onBehalf(&messagingv1.PostRequest{Id: id, Channel: ch, Body: body}, as)
+	preq.Header().Set("x-swarm-operator-post", "1")
+	res, err := s.Msg.Post(ctx, preq)
 	s.audit(ctx, req, "channel.post", "channel/"+ch, ws, nil, map[string]any{"id": id, "bytes": len(body)}, err)
 	if err != nil {
 		return nil, err
