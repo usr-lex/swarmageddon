@@ -10,6 +10,8 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import * as pb from "@/gen/swarm/controlcenter/v1/controlcenter_pb";
 import { ApiError, type Api } from "./api";
 import { defaultStorm, defaultWarden } from "@/lib/workspace";
+import type { ChannelAccess, ChatChannelDraft, DeliveryMode, InboxItem, ReadScope, Severity, StormDraft, Verdict, WardenMode } from "./channels";
+import { emptySettings, type EffectiveSettings, type McpServer, type McpValue, type RoomSettings, type SettingSource, type SharedVolumeDraft } from "./settings";
 import type { ActivityEvent, ActivityKind, AgentAxes, Edges, HandoffKind, MessageEdge, ObservatoryApi, ObsWindow, ThroughputDay } from "./observatory";
 import type {
   Approval,
@@ -56,6 +58,9 @@ const conditionFrom = (c: pb.Condition): Condition => ({
   message: c.message,
 });
 
+const severityFrom = (s: pb.Severity): Severity | undefined =>
+  s === pb.Severity.CRITICAL ? "critical" : s === pb.Severity.HIGH ? "high" : s === pb.Severity.MEDIUM ? "medium" : s === pb.Severity.LOW ? "low" : undefined;
+
 // ---------------------------------------------------------------- quantities
 
 /** "6Gi" -> 6, "512Mi" -> 0.5, "1Ti" -> 1024. */
@@ -99,8 +104,137 @@ export function roomFrom(r: pb.RoomSummary): RoomSummary {
     paused: r.paused,
     updateAvailable: r.updateAvailable,
     pendingApprovals: r.pendingApprovals,
+    verdict: r.undecidedVerdicts > 0 ? severityFrom(r.wardenSeverity) : undefined,
+    quarantined: r.quarantined,
+    quarantineReason: r.quarantineReason,
   };
 }
+
+// ---------------------------------------------------------------- layered settings
+
+const mcpValueFrom = (v: pb.McpValuePlan): McpValue => (v.valueFrom ? { value: "", valueFrom: { name: v.valueFrom.name, key: v.valueFrom.key } } : { value: v.value });
+const mcpValueTo = (v: McpValue) => (v.valueFrom ? { valueFrom: { name: v.valueFrom.name, key: v.valueFrom.key } } : { value: v.value });
+const mapValues = <A, B>(m: Record<string, A>, f: (a: A) => B): Record<string, B> => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, f(v)]));
+
+export function settingsFrom(p: pb.RoomSettingsPlan | undefined): RoomSettings {
+  if (!p) return emptySettings();
+  return {
+    env: { ...p.env },
+    secretEnv: p.secretEnv.map((e) => ({ name: e.name, secret: { name: e.secret?.name ?? "", key: e.secret?.key ?? "" } })),
+    mcpServers: mapValues(
+      p.mcpServers,
+      (m): McpServer => ({
+        type: m.type === "http" ? "http" : m.type === "stdio" ? "stdio" : "",
+        command: m.command,
+        args: m.args,
+        env: mapValues(m.env, mcpValueFrom),
+        url: m.url,
+        headers: mapValues(m.headers, mcpValueFrom),
+        enabledTools: m.enabledTools,
+        disabled: m.disabled,
+      }),
+    ),
+    network: p.network
+      ? { mode: (["none", "limited", "full"].includes(p.network.mode) ? p.network.mode : "") as "", domains: p.network.domains, packageManagers: p.network.packageManagers }
+      : undefined,
+  };
+}
+
+export function settingsTo(s: RoomSettings | undefined): pb.RoomSettingsPlan {
+  const x = s ?? emptySettings();
+  return create(pb.RoomSettingsPlanSchema, {
+    env: x.env,
+    secretEnv: x.secretEnv.map((e) => ({ name: e.name, secret: e.secret })),
+    mcpServers: mapValues(x.mcpServers, (m) => ({
+      type: m.type,
+      command: m.command,
+      args: m.args,
+      env: mapValues(m.env, mcpValueTo),
+      url: m.url,
+      headers: mapValues(m.headers, mcpValueTo),
+      enabledTools: m.enabledTools,
+      disabled: m.disabled,
+    })),
+    network: x.network ? { mode: x.network.mode, domains: x.network.domains, packageManagers: x.network.packageManagers } : undefined,
+  });
+}
+
+const effectiveFrom = (e: pb.EffectiveSettings): EffectiveSettings => ({
+  room: e.room,
+  role: e.role,
+  settings: settingsFrom(e.settings),
+  sources: e.sources.map((x) => ({ kind: x.kind, key: x.key, level: x.level as SettingSource["level"] })),
+});
+
+const sharedVolumeFrom = (v: pb.SharedVolumePlan): SharedVolumeDraft => ({
+  name: v.name,
+  sizeGi: parseGi(v.size),
+  storageClass: v.storageClass,
+  mounts: v.mounts.map((m) => ({ select: m.select, readOnly: m.readOnly })),
+});
+
+// ---------------------------------------------------------------- channels and storm
+
+/** "15m" -> 15, "1h30m" -> 90, "90s" -> 1.5. */
+export function durationMinutes(d: string): number {
+  let total = 0;
+  for (const m of d.matchAll(/([0-9.]+)(h|m|s)/g)) total += Number(m[1]) * (m[2] === "h" ? 60 : m[2] === "s" ? 1 / 60 : 1);
+  return total;
+}
+
+const delivery = (m: string): DeliveryMode => (m === "push" || m === "pull" ? m : "digest");
+const access = (a: string): ChannelAccess => (a === "read" || a === "write" ? a : "readWrite");
+
+const chatChannelFrom = (c: pb.ChannelPlan): ChatChannelDraft => ({
+  name: c.name,
+  description: c.description,
+  members: c.members.map((m) => ({ select: m.select, access: access(m.access) })),
+  defaultDelivery: delivery(c.defaultDelivery),
+  allowedDelivery: c.allowedDelivery.map(delivery),
+  postsPerMinute: c.postsPerMinute,
+});
+
+const chatChannelTo = (c: ChatChannelDraft) =>
+  create(pb.ChannelPlanSchema, {
+    name: c.name,
+    description: c.description,
+    members: c.members,
+    defaultDelivery: c.defaultDelivery,
+    allowedDelivery: c.allowedDelivery,
+    postsPerMinute: c.postsPerMinute,
+  });
+
+const stormFrom = (s: pb.StormPlan | undefined): StormDraft =>
+  s ? { pushPerMinute: s.pushPerMinute, coalesceBytes: s.coalesceBytes, digestMinutes: durationMinutes(s.digestInterval), fanoutPerMinute: s.fanoutPerMinute } : defaultStorm();
+
+const itemFrom = (workspace: string, i: pb.ChannelItem): InboxItem => ({
+  id: i.id,
+  workspace,
+  channel: i.channel,
+  from: i.from,
+  fromKind: i.fromKind === "human" ? "human" : "agent",
+  body: i.body,
+  at: iso(i.sentAt),
+  read: i.read,
+  mentionsMe: i.mentionsMe,
+});
+
+const scopeTo = (s: ReadScope) => (s.startsWith("#") ? s.slice(1) : s);
+
+const verdictFrom = (v: pb.Verdict): Verdict => ({
+  id: v.id,
+  workspace: v.workspace,
+  room: v.room,
+  layer: (["rules", "judge", "trajectory", "gateway"].includes(v.layer) ? v.layer : "rules") as Verdict["layer"],
+  severity: severityFrom(v.severity) ?? "low",
+  rule: v.rule,
+  reason: v.reason,
+  evidence: v.evidence,
+  action: v.action,
+  source: v.source === "gateway" ? "gateway" : "room",
+  at: iso(v.at),
+  decision: v.decision ? { kind: v.decision === "dismiss" ? "dismissed" : "confirmed", by: v.decidedBy, at: iso(v.decidedAt) } : undefined,
+});
 
 function approvalFrom(a: pb.Approval): Approval {
   return {
@@ -239,6 +373,7 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
       homeGi: parseGi(a.homeVolume),
       engineGi: parseGi(a.engineVolume),
       repos: a.repos,
+      settings: settingsFrom(a.settings),
     })),
     groups: p.groups.map((g) => g.name),
     defaultLinks: p.defaultLinks === "none" ? "none" : "withinGroup",
@@ -254,11 +389,15 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     // Write-only channel settings come back empty; an empty target keeps what's stored.
     channels: p.notificationChannels.map((c) => ({ kind: c.kind as ChannelKind, target: c.kind === "ntfy" ? c.topic : "" })),
     events: p.notificationEvents as NotificationEvent[],
-    // Not in the control center's WorkspacePlan yet; edited in the wizard but not sent.
-    chatChannels: [],
-    storm: defaultStorm(),
-    warden: defaultWarden(),
+    chatChannels: p.channels.map(chatChannelFrom),
+    storm: stormFrom(p.storm),
+    // WorkspacePlan carries the warden's mode and model only; the rest stays at the defaults.
+    warden: { ...defaultWarden(), mode: (["off", "monitor", "gate"].includes(p.wardenMode) ? p.wardenMode : defaultWarden().mode) as WardenMode, model: p.wardenModel },
+    // Advisors are not in WorkspacePlan; edited in the wizard but not sent.
     advisors: {},
+    roomDefaults: settingsFrom(p.roomDefaults),
+    roleDefaults: mapValues(p.roleDefaults, settingsFrom),
+    sharedVolumes: p.sharedVolumes.map(sharedVolumeFrom),
     source: p,
   };
 }
@@ -300,6 +439,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
         homeVolume: gi(r.homeGi),
         engineVolume: gi(r.engineGi),
         repos: r.repos,
+        settings: settingsTo(r.settings),
       }),
     ),
     groups: d.groups.map((g) => from(pb.GroupPlanSchema, srcGroup.get(g), { name: g })),
@@ -308,6 +448,13 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     repositories: d.repositories.map((r) => from(pb.RepositoryPlanSchema, srcRepo.get(r.name), { name: r.name, importUrl: r.importURL, group: r.group, pushMirror: r.pushMirror })),
     notificationChannels: d.channels.map(channel),
     notificationEvents: d.events,
+    channels: d.chatChannels.map(chatChannelTo),
+    storm: create(pb.StormPlanSchema, { pushPerMinute: d.storm.pushPerMinute, coalesceBytes: d.storm.coalesceBytes, digestInterval: `${d.storm.digestMinutes}m`, fanoutPerMinute: d.storm.fanoutPerMinute }),
+    wardenMode: d.warden.mode,
+    wardenModel: d.warden.model,
+    roomDefaults: settingsTo(d.roomDefaults),
+    roleDefaults: mapValues(d.roleDefaults, settingsTo),
+    sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
   });
 }
 
@@ -376,6 +523,9 @@ export function createConnectApi(transport: Transport = createConnectTransport({
   const spend = createClient(pb.SpendService, transport);
   const users = createClient(pb.UserService, transport);
   const obs = createClient(pb.ObservatoryService, transport);
+  const channels = createClient(pb.ChannelService, transport);
+  const warden = createClient(pb.WardenService, transport);
+  const myWorkspaces = async () => (me ?? (await api.me())).workspaces;
 
   const ref = (workspace: string, name: string) => ({ room: { workspace, name } });
 
@@ -423,7 +573,13 @@ export function createConnectApi(transport: Transport = createConnectTransport({
         activity.set(from, (activity.get(from) ?? 0) + count);
         activity.set(to, (activity.get(to) ?? 0) + count);
         if (e.kind === pb.EdgeKind.FORGE_HANDOFF) handoffs.push({ from, to, kind: handoffKind(e.subkind), count });
-        else messages.push({ from, to, count, kind: e.kind === pb.EdgeKind.CROSSING ? "mediated" : e.kind === pb.EdgeKind.HUMAN ? "human" : "open" });
+        else
+          messages.push({
+            from,
+            to,
+            count,
+            kind: e.kind === pb.EdgeKind.CHANNEL_POST ? "channel" : e.kind === pb.EdgeKind.CROSSING ? "mediated" : e.kind === pb.EdgeKind.HUMAN ? "human" : "open",
+          });
       }
       return {
         agents: rs.map((r) => ({ name: r.name, group: r.group, role: r.role, presence: roomFrom(r).presence, activity: activity.get(r.name) ?? 0 })),
@@ -563,7 +719,11 @@ export function createConnectApi(transport: Transport = createConnectTransport({
     },
     async updateIsolation(tier, privilegedAccepted) {
       // The proto has no isolation-tier setting yet; "auto" needs none.
-      if (tier !== "auto" || privilegedAccepted) throw unimplemented("Choosing the isolation tier");
+      if (tier !== "auto" || privilegedAccepted)
+        throw new ApiError(
+          "unimplemented",
+          `The control center can't set the isolation tier yet. Run: kubectl patch platform default --type merge -p '{"spec":{"isolationTier":"${tier}","privilegedAccepted":${privilegedAccepted}}}'`,
+        );
       return api.getPlatform();
     },
     async updateSignIn(spec, secrets) {
@@ -650,10 +810,26 @@ export function createConnectApi(transport: Transport = createConnectTransport({
         problems: r.problems,
         fits: r.fits,
         fitNote: r.fitNote,
+        effective: r.effective.map(effectiveFrom),
       };
     },
     async applyWorkspace(draft) {
       await workspaces.applyWorkspace({ plan: planTo(draft), pruneRooms: true });
+    },
+    async defaultChannels(draft) {
+      const r = await workspaces.defaultChannels({ plan: planTo(draft) });
+      return r.channels.map(chatChannelFrom);
+    },
+    async listRoomSecrets(workspace) {
+      const r = await workspaces.listRoomSecrets({ workspace });
+      return { secretName: r.secretName, keys: r.keys };
+    },
+    async setRoomSecret(workspace, key, value) {
+      const r = await workspaces.setRoomSecret({ workspace, key, value });
+      return { name: r.ref?.name ?? "room-secrets", key: r.ref?.key ?? key };
+    },
+    async deleteRoomSecret(workspace, key) {
+      await workspaces.deleteRoomSecret({ workspace, key });
     },
     async *watchProvisioning(workspace, signal) {
       const state = new Map<string, RoomProgress>();
@@ -740,9 +916,26 @@ export function createConnectApi(transport: Transport = createConnectTransport({
           await rooms.updateRoomNow(r);
           break;
         case "quarantine":
+          await rooms.quarantineRoom({ ...r, reason: a.reason });
+          break;
         case "release":
-          throw unimplemented("Quarantine");
+          await rooms.releaseRoom({ ...r, note: a.note ?? "" });
+          break;
       }
+    },
+    async getRoomSettings(workspace, name) {
+      const r = await rooms.getRoomSettings(ref(workspace, name));
+      return {
+        workspace: settingsFrom(r.workspace),
+        role: settingsFrom(r.role),
+        room: settingsFrom(r.room),
+        effective: r.effective ? effectiveFrom(r.effective) : { room: name, role: "", settings: emptySettings(), sources: [] },
+        sharedVolumes: mapValues(r.sharedVolumes, (m) => (m === "ro" ? ("ro" as const) : ("rw" as const))),
+      };
+    },
+    async updateRoomSettings(workspace, name, settings) {
+      const r = await rooms.updateRoomSettings({ ...ref(workspace, name), settings: settingsTo(settings) });
+      return r.effective ? effectiveFrom(r.effective) : { room: name, role: "", settings, sources: [] };
     },
 
     async listApprovals() {
@@ -886,35 +1079,76 @@ export function createConnectApi(transport: Transport = createConnectTransport({
       await notify.sendTestNotification({ channel });
     },
 
-    // Channels and the warden are not in the control center proto yet.
     async listChannels() {
-      throw unimplemented("Channels");
+      const wss = await myWorkspaces();
+      const per = await Promise.all(
+        wss.map(async (workspace) => {
+          const r = await channels.listChannels({ workspace });
+          return r.channels.map((c) => ({
+            workspace,
+            name: c.name,
+            description: c.description,
+            access: access(c.access),
+            delivery: delivery(c.delivery),
+            allowedDelivery: c.allowedDelivery.map(delivery),
+            unread: c.unread,
+            members: c.members,
+          }));
+        }),
+      );
+      return per.flat();
     },
-    async readMessages() {
-      throw unimplemented("Channels");
+    async readMessages(workspace, scope, opts) {
+      const r = await channels.readChannelMessages({ workspace, scope: scopeTo(scope), unreadOnly: opts.unreadOnly, limit: opts.limit, cursor: opts.cursor ?? "", full: true, markRead: false });
+      return { items: r.items.map((i) => itemFrom(workspace, i)), nextCursor: r.nextCursor, unreadRemaining: r.unreadRemaining };
     },
-    async post() {
-      throw unimplemented("Channels");
+    async post(workspace, channel, body) {
+      const r = await channels.postToChannel({ workspace, channel: channel.replace(/^#/, ""), body });
+      return { id: r.id, mentioned: r.mentioned };
     },
-    async setDelivery() {
-      throw unimplemented("Channels");
+    async setDelivery(workspace, channel, mode) {
+      await channels.setChannelDelivery({ workspace, channel: channel.replace(/^#/, ""), mode });
     },
-    async markRead() {
-      throw unimplemented("Channels");
+    async markRead(workspace, scope, upTo) {
+      await channels.markChannelRead({ workspace, scope: scopeTo(scope), upTo: upTo ?? "" });
     },
-    // eslint-disable-next-line require-yield
-    async *watchItems() {
-      throw unimplemented("Channels");
+    // The proto has no channel stream: poll each workspace's unread items and yield the new ones.
+    async *watchItems(signal) {
+      const seen = new Set<string>();
+      let first = true;
+      while (!signal.aborted) {
+        const wss = await myWorkspaces();
+        for (const workspace of wss) {
+          const r = await channels.readChannelMessages({ workspace, scope: "all", unreadOnly: true, limit: 50, full: true, markRead: false }, { signal }).catch(() => null);
+          for (const i of r?.items ?? []) {
+            if (seen.has(i.id)) continue;
+            seen.add(i.id);
+            if (!first) yield itemFrom(workspace, i);
+          }
+        }
+        first = false;
+        await new Promise((res) => {
+          const t = setTimeout(res, 5000);
+          signal.addEventListener("abort", () => (clearTimeout(t), res(undefined)), { once: true });
+        });
+      }
     },
     async mentionCandidates(workspace) {
       const rs = await listRooms(workspace);
-      return rs.map((r) => ({ handle: r.name, kind: "agent" as const, detail: r.role }));
+      const roles = [...new Set(rs.map((r) => r.role).filter(Boolean))];
+      const groups = [...new Set(rs.map((r) => r.group).filter(Boolean))];
+      return [
+        ...rs.map((r) => ({ handle: r.name, kind: "agent" as const, detail: r.role })),
+        ...roles.map((r) => ({ handle: `role:${r}`, kind: "group" as const, detail: `every ${r}` })),
+        ...groups.map((g) => ({ handle: `group:${g}`, kind: "group" as const, detail: `group ${g}` })),
+      ];
     },
-    async listVerdicts() {
-      throw unimplemented("Warden verdicts");
+    async listVerdicts(workspace, room) {
+      const r = await warden.listVerdicts({ workspace, room: room ?? "", limit: 200 });
+      return r.verdicts.map(verdictFrom);
     },
-    async decideVerdict() {
-      throw unimplemented("Warden verdicts");
+    async decideVerdict(id, decision) {
+      await warden.decideVerdict({ id, decision: decision === "dismissed" ? "dismiss" : "confirm" });
     },
   };
   return withErrors({ ...api, observatory } as Api);

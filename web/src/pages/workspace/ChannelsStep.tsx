@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { api } from "@/api";
+import type { WorkspaceDraft } from "@/api/types";
 import { deliveryModes, selectorKinds, type ChannelAccess, type ChannelMemberDraft, type ChatChannelDraft, type DeliveryMode } from "@/api/channels";
 import { Button, Card, Field, Input, Select } from "@/components/ui";
 import { defaultChatChannels, wallProblems } from "@/lib/workspace";
@@ -63,11 +65,20 @@ function SelectorEditor({ m, onChange, values, label }: { m: ChannelMemberDraft;
   );
 }
 
+/** The server's default channels for the draft (DefaultChannels); the local copy if that fails. */
+async function defaults(d: WorkspaceDraft): Promise<ChatChannelDraft[]> {
+  try {
+    return await api().defaultChannels(d);
+  } catch {
+    return defaultChatChannels(d);
+  }
+}
+
 /** Channels and storm control (§7.8). */
 export function ChannelsStep({ draft, set, existing }: DraftProps) {
   // A new workspace starts from the default channels.
   useEffect(() => {
-    if (!existing && draft.chatChannels.length === 0 && draft.rooms.length > 0) set({ ...draft, chatChannels: defaultChatChannels(draft) });
+    if (!existing && draft.chatChannels.length === 0 && draft.rooms.length > 0) void defaults(draft).then((chatChannels) => set({ ...draft, chatChannels }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const values: Record<string, string[]> = {
@@ -87,7 +98,7 @@ export function ChannelsStep({ draft, set, existing }: DraftProps) {
         title="Channels"
         actions={
           <div className="flex gap-2">
-            <Button onClick={() => set({ ...draft, chatChannels: defaultChatChannels(draft) })}>Reset to defaults</Button>
+            <Button onClick={() => void defaults(draft).then((chatChannels) => set({ ...draft, chatChannels }))}>Reset to defaults</Button>
             <Button onClick={() => set({ ...draft, chatChannels: [...draft.chatChannels, newChannel()] })}>Add channel</Button>
           </div>
         }

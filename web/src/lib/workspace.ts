@@ -1,5 +1,6 @@
 import type { GroupLink, RoomDraft, WorkspaceDraft, Presence, RoomSummary } from "@/api/types";
 import type { ChannelMemberDraft, ChatChannelDraft, StormDraft, WardenDraft } from "@/api/channels";
+import { emptySettings, mountSelectorPattern, validateSettings } from "@/api/settings";
 
 /** Default agent names (§8.3): Greek gods, in the order they're offered. */
 export const greekGods = [
@@ -95,6 +96,9 @@ export function emptyDraft(model: string): WorkspaceDraft {
     storm: defaultStorm(),
     warden: defaultWarden(),
     advisors: {},
+    roomDefaults: emptySettings(),
+    roleDefaults: {},
+    sharedVolumes: [],
   };
 }
 
@@ -207,6 +211,17 @@ export function validateDraft(d: WorkspaceDraft): string[] {
     if (c.allowedDelivery.length && !c.allowedDelivery.includes(c.defaultDelivery)) errs.push(`#${c.name}: the default delivery must be one of the allowed ones.`);
   }
   errs.push(...wallProblems(d));
+  errs.push(...validateSettings("workspace", d.roomDefaults));
+  for (const [role, rs] of Object.entries(d.roleDefaults)) errs.push(...validateSettings(`role ${role}`, rs));
+  for (const r of d.rooms) errs.push(...validateSettings(`room ${r.name}`, r.settings));
+  const vols = new Set<string>();
+  for (const v of d.sharedVolumes) {
+    if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(v.name)) errs.push(`Shared volume name "${v.name}" must be lower case letters, digits or -.`);
+    if (vols.has(v.name)) errs.push(`Shared volume "${v.name}" is defined twice.`);
+    vols.add(v.name);
+    if (!(v.sizeGi > 0)) errs.push(`Shared volume "${v.name}" needs a size.`);
+    for (const m of v.mounts) if (!mountSelectorPattern.test(m.select)) errs.push(`Shared volume "${v.name}": "${m.select}" is not everyone, role:, group: or room:.`);
+  }
   return errs;
 }
 

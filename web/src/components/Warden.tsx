@@ -29,8 +29,9 @@ export function QuarantineBadge() {
 /** The quarantine banner on a room page, with Release for operators. */
 export function QuarantineBanner({ room, canOperate }: { room: RoomSummary; canOperate: boolean }) {
   const qc = useQueryClient();
+  const [note, setNote] = useState("");
   const release = useMutation({
-    mutationFn: () => api().roomAction(room.workspace, room.name, { kind: "release" }),
+    mutationFn: () => api().roomAction(room.workspace, room.name, { kind: "release", note: note.trim() }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["room", room.workspace, room.name] }),
   });
   if (!room.quarantined) return null;
@@ -43,9 +44,20 @@ export function QuarantineBanner({ room, canOperate }: { room: RoomSummary; canO
         </p>
       </div>
       {canOperate && (
-        <Button variant="danger" busy={release.isPending} onClick={() => release.mutate()}>
-          Release
-        </Button>
+        <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+          <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs">
+            <span className="label">Why it is safe (kept in the audit log)</span>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="min-h-10 rounded-xs border border-border bg-surface px-3 text-sm"
+              placeholder="Reviewed the transcript; false positive"
+            />
+          </label>
+          <Button variant="danger" busy={release.isPending} disabled={!note.trim()} onClick={() => release.mutate()}>
+            Release
+          </Button>
+        </div>
       )}
       <ErrorText error={release.error} />
     </div>

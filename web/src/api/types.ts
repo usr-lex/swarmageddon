@@ -1,4 +1,5 @@
 import type { AdvisorDraft, ChatChannelDraft, Severity, StormDraft, WardenDraft, WardenMode } from "./channels";
+import type { EffectiveSettings, RoomSettings, SharedVolumeDraft } from "./settings";
 
 // Domain types the UI works with. They mirror the control center's Connect
 // API (proto/swarm/controlcenter/v1) and the CRDs (api/v1alpha1), flattened to
@@ -175,6 +176,8 @@ export interface RoomDraft {
   advisor?: AdvisorDraft | null;
   /** Overrides the workspace's warden mode; "" inherits. */
   wardenMode?: WardenMode | "";
+  /** The room's own level of layered settings (§6.6). */
+  settings?: RoomSettings;
 }
 
 export interface GroupLink {
@@ -240,6 +243,11 @@ export interface WorkspaceDraft {
   warden: WardenDraft;
   /** Advisor per role template name (ADR 0010). */
   advisors: Record<string, AdvisorDraft>;
+  /** Layered room settings (§6.6): the workspace level, and the role level by template name. */
+  roomDefaults: RoomSettings;
+  roleDefaults: Record<string, RoomSettings>;
+  /** Offered only when preflight found ReadWriteMany volumes. */
+  sharedVolumes: SharedVolumeDraft[];
   /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
   source?: unknown;
 }
@@ -259,6 +267,8 @@ export interface PlanResult {
   /** Whether the rooms fit the cluster, per the preflight estimate. */
   fits: boolean;
   fitNote: string;
+  /** Merged settings per planned room. */
+  effective: EffectiveSettings[];
 }
 
 export interface WorkspaceSummary {
@@ -402,7 +412,7 @@ export type RoomAction =
   | { kind: "rotate" }
   | { kind: "updateNow" }
   | { kind: "quarantine"; reason: string }
-  | { kind: "release" };
+  | { kind: "release"; note?: string };
 
 // Approvals and inbox
 

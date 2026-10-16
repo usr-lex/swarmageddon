@@ -46,3 +46,29 @@ export function serviceProgress(spec: PlatformSpec, conditions: Condition[]): Se
     return { condition: type, label, state, message: c?.message || c?.reason || "" };
   });
 }
+
+/** Labels for preflight check names (internal/operator/preflight). */
+const checkLabels: Record<string, string> = {
+  kubernetesVersion: "Kubernetes version",
+  architecture: "Architecture",
+  defaultStorageClass: "Default StorageClass",
+  volumeSharing: "Volume sharing (ReadWriteMany)",
+  volumeSizeEnforcement: "Volume size enforcement",
+  idmapVolumes: "idmap support for volumes",
+  networkPolicy: "NetworkPolicy enforcement",
+  podmanInUserNamespace: "Podman in a user namespace",
+  sysboxRuntimeClass: "Sysbox RuntimeClass",
+  privilegedAdmission: "Privileged pods admitted",
+  isolationTier: "Nested-container tier",
+  capacity: "Free CPU, memory, disk",
+  ingress: "Ingress",
+  clusterDNS: "Cluster DNS",
+  clusterCIDRs: "Cluster CIDRs",
+  secretsEncryption: "Secrets encryption at rest",
+};
+
+export const checkLabel = (name: string) => checkLabels[name] ?? name;
+
+/** Whether preflight found ReadWriteMany volumes, which shared volumes need. */
+export const hasRWX = (p: { preflight: { checks: { name: string; result: string }[] } } | undefined) =>
+  !!p?.preflight.checks.some((c) => c.name === "volumeSharing" && c.result === "pass");

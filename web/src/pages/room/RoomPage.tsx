@@ -8,11 +8,12 @@ import { Badge, ErrorText, Spinner } from "@/components/ui";
 import { useFleet } from "@/lib/live";
 import { ActivityTab, AgentTab, LogsTab, ResourcesTab, StorageTab } from "./tabs";
 import { Lifecycle } from "./Lifecycle";
+import { SettingsTab } from "./SettingsTab";
 import { TerminalView } from "@/components/TerminalView";
 import { DisplayView } from "@/components/DisplayView";
 import { QuarantineBadge, QuarantineBanner, VerdictBadge } from "@/components/Warden";
 
-export const roomTabs = ["agent", "shell", "display", "activity", "resources", "storage", "logs"] as const;
+export const roomTabs = ["agent", "shell", "display", "activity", "resources", "storage", "logs", "settings"] as const;
 export type RoomTab = (typeof roomTabs)[number];
 
 const tabLabels: Record<RoomTab, string> = {
@@ -23,6 +24,7 @@ const tabLabels: Record<RoomTab, string> = {
   resources: "Resources",
   storage: "Storage",
   logs: "Logs",
+  settings: "Settings",
 };
 const operatorOnly: RoomTab[] = ["shell", "display"];
 
@@ -94,6 +96,7 @@ export function RoomPage() {
           {current === "resources" && <ResourcesTab workspace={workspace} room={room} />}
           {current === "storage" && <StorageTab workspace={workspace} room={room} canOperate={canOperate} />}
           {current === "logs" && <LogsTab workspace={workspace} room={room} />}
+          {current === "settings" && <SettingsTab workspace={workspace} room={room} canOperate={canOperate} />}
         </Tabs.Content>
       </Tabs.Root>
     </div>

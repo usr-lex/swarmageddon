@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { api } from "@/api";
+import { api, ApiError } from "@/api";
+import { checkLabel } from "@/lib/platform";
 import type { CheckResult, IsolationTier } from "@/api/types";
 import { Badge, Button, Card, Checkbox, ErrorText, Spinner, type Tone } from "@/components/ui";
 import type { StepProps } from "./PlatformWizard";
@@ -20,6 +21,16 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
   const [tier, setTier] = useState<IsolationTier>(platform.spec.isolationTier || "auto");
   const [accepted, setAccepted] = useState(platform.spec.privilegedAccepted);
   const rerun = useMutation({ mutationFn: () => api().rerunPreflight() });
+  // Set when the control center can't store the tier itself and shows a kubectl command instead.
+  const [manual, setManual] = useState<string>();
+  const next = async () => {
+    try {
+      await save({ ...platform.spec, isolationTier: tier, privilegedAccepted: needsAccept && accepted }, "signin");
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "unimplemented") setManual(e.message);
+      else throw e;
+    }
+  };
   const failed = pf.checks.filter((c) => c.result === "fail");
   const needsAccept = tier === "privileged" || (tier === "auto" && pf.tier === "privileged");
   const canContinue = pf.completed && failed.length === 0 && (!needsAccept || accepted);
@@ -42,7 +53,7 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
                 {resultLabel[c.result]}
               </Badge>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{c.name}</p>
+                <p className="text-sm font-medium">{checkLabel(c.name)}</p>
                 {c.message && <p className="text-sm text-muted">{c.message}</p>}
                 {c.fix && c.result !== "pass" && (
                   <p className="mt-1 rounded bg-surface-2 p-2 text-sm">
@@ -96,13 +107,17 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
       </Card>
 
       {failed.length > 0 && <p className="text-sm text-bad">Fix the failed checks, then run them again.</p>}
+      {manual && (
+        <div role="status" className="space-y-2 border border-border bg-surface-2 p-3 text-sm">
+          <p>{manual.split("Run:")[0]}</p>
+          {manual.includes("Run:") && <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap">{manual.split("Run:")[1].trim()}</pre>}
+          <Button onClick={() => save({ ...platform.spec, isolationTier: "auto", privilegedAccepted: false }, "signin")} busy={saving}>
+            I ran it; continue
+          </Button>
+        </div>
+      )}
       <div className="flex justify-end">
-        <Button
-          variant="primary"
-          busy={saving}
-          disabled={!canContinue}
-          onClick={() => save({ ...platform.spec, isolationTier: tier, privilegedAccepted: needsAccept && accepted }, "signin")}
-        >
+        <Button variant="primary" busy={saving} disabled={!canContinue} onClick={() => void next().catch(() => undefined)}>
           Continue
         </Button>
       </div>

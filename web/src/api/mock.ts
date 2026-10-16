@@ -23,7 +23,8 @@ import type {
   User,
   WorkspaceDraft,
 } from "./types";
-import { defaultChatChannels, defaultRoles, defaultRoom, defaultStorm, defaultWarden, pickNames } from "@/lib/workspace";
+import { defaultChatChannels, defaultRoles, defaultRoom, defaultStorm, defaultWarden, pickNames, validateDraft } from "@/lib/workspace";
+import { effectiveFor, emptyMcp, emptySettings, secretKeyPattern, validateSettings, type RoomSettings } from "./settings";
 import { createMockObservatory, demoLinks, demoSwarm } from "./mockObservatory";
 import { demoPosts, demoVerdicts } from "./mockSeeds";
 import { topSeverity, type ChannelAccess, type ChannelInfo, type ChatChannelDraft, type DeliveryMode, type InboxItem, type Verdict } from "./channels";
@@ -50,6 +51,8 @@ interface State {
   readIds: string[];
   delivery: Record<string, DeliveryMode>;
   verdicts: Verdict[];
+  /** room-secrets per workspace: key -> value. */
+  roomSecrets: Record<string, Record<string, string>>;
 }
 
 const serviceConditions = [
@@ -106,32 +109,32 @@ function freshPlatform(): Platform {
     caFingerprint: "SHA256:5F:3A:9C:12:E8:71:0B:44:D2:6E:AA:91:7C:03:B8:55:1D:E0:42:7F:96:C3:28:6A:0F:B1:4D:E9:83:72:5C:10",
     preflight: {
       checks: [
-        { name: "Kubernetes version", result: "pass", message: "v1.36.1+k3s1", fix: "" },
-        { name: "Architecture", result: "pass", message: "amd64 (1 node)", fix: "" },
-        { name: "Default StorageClass", result: "pass", message: "local-path (default)", fix: "" },
+        { name: "kubernetesVersion", result: "pass", message: "v1.36.1+k3s1", fix: "" },
+        { name: "architecture", result: "pass", message: "amd64 (1 node)", fix: "" },
+        { name: "defaultStorageClass", result: "pass", message: "local-path (default)", fix: "" },
         {
-          name: "Volume sharing",
+          name: "volumeSharing",
           result: "warn",
           message: "local-path does not support ReadWriteMany.",
           fix: "Shared image store and shared folders stay off. Install an RWX provisioner (e.g. Longhorn) to enable them.",
         },
         {
-          name: "Volume size enforcement",
+          name: "volumeSizeEnforcement",
           result: "warn",
           message: "local-path does not enforce sizes.",
           fix: "Quotas are soft: the janitor and warnings enforce them. Use TopoLVM, OpenEBS LVM/ZFS, Longhorn or XFS project quotas for hard limits.",
         },
-        { name: "idmap support for volumes", result: "pass", message: "hostUsers: false pod wrote to a fresh claim.", fix: "" },
-        { name: "NetworkPolicy enforcement", result: "pass", message: "Denied connection was refused.", fix: "" },
-        { name: "Nested-container tier", result: "pass", message: "userns works; privileged pods are admitted.", fix: "" },
-        { name: "Free CPU, memory, disk", result: "pass", message: "15.2 CPU, 58 GiB memory, 820 GiB disk free.", fix: "" },
+        { name: "idmapVolumes", result: "pass", message: "hostUsers: false pod wrote to a fresh claim.", fix: "" },
+        { name: "networkPolicy", result: "pass", message: "Denied connection was refused.", fix: "" },
+        { name: "isolationTier", result: "pass", message: "userns works; privileged pods are admitted.", fix: "" },
+        { name: "capacity", result: "pass", message: "15.2 CPU, 58 GiB memory, 820 GiB disk free.", fix: "" },
         {
-          name: "Ingress and DNS",
+          name: "ingress",
           result: "warn",
           message: "Default IngressClass traefik; no hostname set.",
           fix: "Optional: set a hostname in the Hostname & TLS step and point DNS at the node.",
         },
-        { name: "Cluster CIDRs", result: "pass", message: "10.42.0.0/16, 10.43.0.0/16", fix: "" },
+        { name: "clusterCIDRs", result: "pass", message: "10.42.0.0/16, 10.43.0.0/16", fix: "" },
       ],
       tier: "userns",
       roomEstimate: 7,
@@ -161,6 +164,7 @@ function freshState(): State {
     readIds: [],
     delivery: {},
     verdicts: [],
+    roomSecrets: {},
   };
 }
 
@@ -168,6 +172,9 @@ function demoState(): State {
   const s = freshState();
   s.adminClaimed = true;
   s.platform.adminClaimed = true;
+  s.platform.preflight.checks = s.platform.preflight.checks.map((c) =>
+    c.name === "volumeSharing" ? { ...c, result: "pass", message: "a ReadWriteMany claim is shared between pods", fix: "" } : c,
+  );
   s.admin = { username: "admin", email: "admin@example.com", password: "admin" };
   s.me = { handle: "admin", email: "admin@example.com", displayName: "Admin", role: "admin", workspaces: ["acme"] };
   s.platform.spec.wizardStep = "done";
@@ -195,6 +202,9 @@ function demoState(): State {
     storm: defaultStorm(),
     warden: defaultWarden(),
     advisors: {},
+    roomDefaults: { env: { TZ: "UTC" }, secretEnv: [], mcpServers: {}, network: { mode: "limited", domains: ["api.github.com"], packageManagers: true } },
+    roleDefaults: { reviewer: { env: {}, secretEnv: [], mcpServers: { linear: { ...emptyMcp(), type: "http", url: "https://mcp.linear.app/mcp" } } } },
+    sharedVolumes: [{ name: "datasets", sizeGi: 20, storageClass: "", mounts: [{ select: "everyone", readOnly: true }, { select: "role:implementer", readOnly: false }] }],
   };
   draft.chatChannels = defaultChatChannels(draft);
   draft.warden = { ...defaultWarden(), model: "claude-haiku-5" };
@@ -324,6 +334,28 @@ export function createMockApi(mode: string): Api {
   };
   save();
 
+  s.roomSecrets ??= {};
+  const effectiveOf = (d: WorkspaceDraft) => d.rooms.map((r) => effectiveFor(r.name, r.role, d.roomDefaults, d.roleDefaults?.[r.role], r.settings));
+  const draftOf = (ws: string) => {
+    const d = s.workspaces[ws];
+    if (!d) throw new ApiError("not_found", `Workspace ${ws} not found.`);
+    return d;
+  };
+  const roomDraft = (ws: string, name: string) => {
+    const r = draftOf(ws).rooms.find((x) => x.name === name);
+    if (!r) throw new ApiError("not_found", `Room ${name} not found.`);
+    return r;
+  };
+  const mountsOf = (d: WorkspaceDraft, r: RoomDraft): Record<string, "ro" | "rw"> => {
+    const out: Record<string, "ro" | "rw"> = {};
+    for (const v of d.sharedVolumes ?? []) {
+      for (const m of v.mounts) {
+        const hit = m.select === "everyone" || m.select === `role:${r.role}` || m.select === `room:${r.name}` || (r.group && m.select === `group:${r.group}`);
+        if (hit && out[v.name] !== "rw") out[v.name] = m.readOnly ? "ro" : "rw";
+      }
+    }
+    return out;
+  };
   const platformHub = new Hub<Platform>();
   const fleetHub = new Hub<FleetEvent>();
   const approvalHub = new Hub<ApprovalEvent>();
@@ -616,7 +648,8 @@ export function createMockApi(mode: string): Api {
       const short = [cpu > 15 && "CPU", mem > 58 && "memory", disk > 820 && "disk"].filter(Boolean);
       return {
         changes,
-        problems: [],
+        problems: validateDraft(draft),
+        effective: effectiveOf(draft),
         fits: short.length === 0,
         fitNote: `${cpu} of 15 CPU, ${mem} of 58 GiB memory, ${disk} of 820 GiB disk${short.length ? `; short on ${short.join(", ")}` : ""}.`,
       };
@@ -648,6 +681,50 @@ export function createMockApi(mode: string): Api {
       if (s.platform.spec.wizardStep === "workspace") s.platform.spec.wizardStep = "done";
       audit("workspace.apply", `Workspace/${draft.name}`, `${draft.rooms.length} rooms`, draft.name);
       save();
+    },
+    async defaultChannels(draft) {
+      return defaultChatChannels(draft);
+    },
+    async listRoomSecrets(ws) {
+      requireMe();
+      return { secretName: "room-secrets", keys: Object.keys(s.roomSecrets[ws] ?? {}).sort() };
+    },
+    async setRoomSecret(ws, key, value) {
+      requireRole("admin", "operator");
+      if (!secretKeyPattern.test(key)) throw new ApiError("invalid_argument", "Keys are letters, digits, '.', '_' or '-'.");
+      (s.roomSecrets[ws] ??= {})[key] = value;
+      audit("roomSecret.set", `Secret/${ws}/room-secrets`, key, ws);
+      save();
+      return { name: "room-secrets", key };
+    },
+    async deleteRoomSecret(ws, key) {
+      requireRole("admin", "operator");
+      delete s.roomSecrets[ws]?.[key];
+      audit("roomSecret.delete", `Secret/${ws}/room-secrets`, key, ws);
+      save();
+    },
+    async getRoomSettings(ws, name) {
+      requireMe();
+      const d = draftOf(ws);
+      const r = roomDraft(ws, name);
+      return structuredClone({
+        workspace: d.roomDefaults ?? emptySettings(),
+        role: d.roleDefaults?.[r.role] ?? emptySettings(),
+        room: r.settings ?? emptySettings(),
+        effective: effectiveFor(r.name, r.role, d.roomDefaults, d.roleDefaults?.[r.role], r.settings),
+        sharedVolumes: mountsOf(d, r),
+      });
+    },
+    async updateRoomSettings(ws, name, settings: RoomSettings) {
+      requireRole("admin", "operator");
+      const probs = validateSettings(`room ${name}`, settings);
+      if (probs.length) throw new ApiError("invalid_argument", probs.join("; "));
+      const d = draftOf(ws);
+      const r = roomDraft(ws, name);
+      r.settings = structuredClone(settings);
+      audit("room.settings", `Room/${ws}/${name}`, "", ws);
+      save();
+      return effectiveFor(r.name, r.role, d.roomDefaults, d.roleDefaults?.[r.role], r.settings);
     },
     async *watchProvisioning(ws, signal) {
       const snap = (): RoomProgress[] =>
@@ -759,7 +836,7 @@ export function createMockApi(mode: string): Api {
         ],
         containers: [{ id: "c0ffee", name: "test-db", sizeBytes: 20e6, detail: "Exited (0) 2 days ago" }],
         engineVolumes: [{ id: "v1", name: "pgdata", sizeBytes: 300e6, detail: "unreferenced" }],
-        sharedDirs: [],
+        sharedDirs: Object.entries(s.workspaces[ws] ? mountsOf(s.workspaces[ws], roomDraft(ws, name)) : {}).map(([n, m]) => ({ name: n, readOnly: m === "ro" })),
       };
     },
     async prune(ws, name, kind) {
@@ -806,6 +883,7 @@ export function createMockApi(mode: string): Api {
           r.quarantineReason = action.reason || `Quarantined by ${s.me?.handle}`;
           break;
         case "release":
+          if (!action.note?.trim()) throw new ApiError("invalid_argument", "Say why it is safe to release the room.");
           r.quarantined = false;
           r.quarantineReason = "";
           break;

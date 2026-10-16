@@ -10,10 +10,12 @@ import { GroupsStep } from "./GroupsStep";
 import { ChannelsStep } from "./ChannelsStep";
 import { WardenStep } from "./WardenStep";
 import { ReviewStep } from "./ReviewStep";
+import { RoomSettingsStep, SharedVolumesStep } from "./RoomSettingsStep";
+import { hasRWX } from "@/lib/platform";
 import { ProvisioningProgress } from "./ProvisioningProgress";
 
-const steps = ["Basics", "Agents", "Resources", "Repositories", "Groups & links", "Channels", "Warden & advisors", "Notifications", "Review"] as const;
-type Step = (typeof steps)[number];
+const allSteps = ["Basics", "Agents", "Resources", "Repositories", "Groups & links", "Channels", "Warden & advisors", "Room settings", "Shared volumes", "Notifications", "Review"] as const;
+type Step = (typeof allSteps)[number];
 
 export interface DraftProps {
   draft: WorkspaceDraft;
@@ -27,7 +29,8 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
   const navigate = useNavigate();
   const models = useQuery({ queryKey: ["models"], queryFn: () => api().listModels() });
   const loaded = useQuery({ queryKey: ["workspaceDraft", existing], queryFn: () => api().getWorkspaceDraft(existing!), enabled: !!existing });
-  const platform = qc.getQueryData<Platform>(["platform"]);
+  const platform = useQuery({ queryKey: ["platform"], queryFn: () => api().getPlatform() }).data ?? qc.getQueryData<Platform>(["platform"]);
+  // Shared volumes need ReadWriteMany; hide the step when preflight found none (unless the workspace already has some).
   const firstRun = platform?.spec.wizardStep === "workspace";
   const [draft, setDraft] = useState<WorkspaceDraft>();
   const [step, setStep] = useState<Step>("Basics");
@@ -53,6 +56,8 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
   if (applied) return <ProvisioningProgress workspace={applied} />;
   if (!draft) return <Spinner label="Loading" />;
 
+  const rwx = hasRWX(platform) || draft.sharedVolumes.length > 0;
+  const steps = allSteps.filter((s) => s !== "Shared volumes" || rwx);
   const i = steps.indexOf(step);
   const errors = validateDraft(draft);
   const props: DraftProps = { draft, set: setDraft, existing: !!existing };
@@ -97,6 +102,8 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
         {step === "Groups & links" && <GroupsStep {...props} />}
         {step === "Channels" && <ChannelsStep {...props} />}
         {step === "Warden & advisors" && <WardenStep {...props} models={models.data ?? []} />}
+        {step === "Room settings" && <RoomSettingsStep {...props} />}
+        {step === "Shared volumes" && <SharedVolumesStep {...props} />}
         {step === "Notifications" && <NotifyStep {...props} />}
         {step === "Review" && (
           <ReviewStep

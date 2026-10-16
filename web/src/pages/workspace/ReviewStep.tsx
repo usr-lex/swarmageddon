@@ -3,6 +3,7 @@ import { api } from "@/api";
 import type { PlanChange } from "@/api/types";
 import { Badge, Button, Card, ErrorText, Spinner, type Tone } from "@/components/ui";
 import type { DraftProps } from "./WorkspaceWizard";
+import { EffectiveView } from "@/components/SettingsEditor";
 
 const opTone: Record<PlanChange["op"], Tone> = { create: "ok", update: "info", delete: "bad", unchanged: "muted" };
 
@@ -51,6 +52,20 @@ export function ReviewStep({ draft, errors, onApplied }: DraftProps & { errors: 
           ))}
         </ul>
       </Card>
+      {!!plan.data?.effective.length && (
+        <Card title="Room settings after apply">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {plan.data.effective.map((e) => (
+              <details key={e.room} className="border border-border p-2">
+                <summary className="cursor-pointer text-sm font-medium">
+                  {e.room} <span className="text-muted">· network {e.settings.network?.mode ?? "full"}</span>
+                </summary>
+                <EffectiveView effective={e} className="mt-2" />
+              </details>
+            ))}
+          </div>
+        </Card>
+      )}
       <ErrorText error={apply.error} />
       <div className="flex justify-end">
         <Button variant="primary" disabled={problems.length > 0 || !plan.data || changes.length === 0} busy={apply.isPending} onClick={() => apply.mutate()}>

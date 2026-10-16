@@ -34,7 +34,8 @@ import type {
   WorkspaceSummary,
 } from "./types";
 import type { ObservatoryApi } from "./observatory";
-import type { ChannelInfo, DeliveryMode, InboxItem, MentionCandidate, ReadPage, ReadScope, Verdict } from "./channels";
+import type { EffectiveSettings, RoomSecrets, RoomSettings, RoomSettingsView, SecretRef } from "./settings";
+import type { ChannelInfo, ChatChannelDraft, DeliveryMode, InboxItem, MentionCandidate, ReadPage, ReadScope, Verdict } from "./channels";
 
 /** Error with a Connect-like code, so pages can react to "unauthenticated". */
 export class ApiError extends Error {
@@ -87,6 +88,12 @@ export interface Api {
   suggestAgentNames(count: number, exclude: string[]): Promise<{ names: string[]; roles: string[] }>;
   planWorkspace(draft: WorkspaceDraft): Promise<PlanResult>;
   applyWorkspace(draft: WorkspaceDraft): Promise<void>;
+  /** The channels the operator would create for this draft when it has none. */
+  defaultChannels(draft: WorkspaceDraft): Promise<ChatChannelDraft[]>;
+  /** Keys (never values) of the workspace's room-secrets Secret. */
+  listRoomSecrets(workspace: string): Promise<RoomSecrets>;
+  setRoomSecret(workspace: string, key: string, value: string): Promise<SecretRef>;
+  deleteRoomSecret(workspace: string, key: string): Promise<void>;
   watchProvisioning(workspace: string, signal: AbortSignal): AsyncIterable<RoomProgress[]>;
 
   // Fleet and rooms (§8.4)
@@ -98,6 +105,9 @@ export interface Api {
   getStorage(workspace: string, room: string): Promise<Storage>;
   prune(workspace: string, room: string, kind: PruneKind): Promise<{ reclaimedBytes: number }>;
   roomAction(workspace: string, room: string, action: RoomAction): Promise<void>;
+  getRoomSettings(workspace: string, room: string): Promise<RoomSettingsView>;
+  /** Replaces the room's own level. */
+  updateRoomSettings(workspace: string, room: string, settings: RoomSettings): Promise<EffectiveSettings>;
 
   // Approvals (§8.5)
   listApprovals(): Promise<Approval[]>;
