@@ -97,6 +97,7 @@ func NewMCPServer(c roomv1connect.SupervisorServiceClient) *mcp.Server {
 		}
 		return text("Status set."), nil, nil
 	})
+	addChannelTools(s, c)
 	return s
 }
 

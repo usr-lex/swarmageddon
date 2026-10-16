@@ -82,6 +82,54 @@ type Room struct {
 	// Janitor thresholds (design §12); not rendered by the operator yet,
 	// zero values mean the defaults.
 	Janitor JanitorSettings `json:"janitor,omitempty"`
+	// Storm control (§7.8), advisor (ADR 0010) and warden (ADR 0011).
+	Storm   StormSettings   `json:"storm,omitempty"`
+	Advisor AdvisorSettings `json:"advisor,omitempty"`
+	Warden  WardenSettings  `json:"warden,omitempty"`
+}
+
+// StormSettings: how pushed items are injected (§7.8).
+type StormSettings struct {
+	// CoalesceBytes caps one injected message (default 4096).
+	CoalesceBytes int `json:"coalesceBytes,omitempty"`
+}
+
+// CoalesceLimit is CoalesceBytes or the default.
+func (s StormSettings) CoalesceLimit() int {
+	if s.CoalesceBytes > 0 {
+		return s.CoalesceBytes
+	}
+	return 4096
+}
+
+// AdvisorSettings configure `swarm advise` (ADR 0010). No model: no advisor.
+type AdvisorSettings struct {
+	Model           string `json:"model,omitempty"`
+	Effort          string `json:"effort,omitempty"`
+	MaxCallsPerHour int    `json:"maxCallsPerHour,omitempty"`
+}
+
+// WardenSettings configure the in-room warden layers (ADR 0011).
+type WardenSettings struct {
+	// Mode: off, monitor (default) or gate.
+	Mode  string `json:"mode,omitempty"`
+	Model string `json:"model,omitempty"`
+	// InterruptOnHigh interrupts the turn on a high trajectory verdict.
+	InterruptOnHigh bool `json:"interruptOnHigh,omitempty"`
+	// ReviewEveryToolCalls also reviews the trajectory every N tool calls (default 20).
+	ReviewEveryToolCalls int `json:"reviewEveryToolCalls,omitempty"`
+	// Rules added by the persona, on top of the built-ins.
+	Rules []WardenRule `json:"rules,omitempty"`
+}
+
+// WardenRule matches a tool call: Tool (exact, or "*") and Match (a regular
+// expression against the command or input); Action is allow, deny or escalate.
+type WardenRule struct {
+	Name   string `json:"name"`
+	Tool   string `json:"tool,omitempty"`
+	Match  string `json:"match"`
+	Action string `json:"action"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // JanitorSettings tunes the disk janitor.

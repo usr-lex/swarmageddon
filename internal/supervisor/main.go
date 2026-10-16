@@ -146,7 +146,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}
 
 	core := &Core{
-		Room: room, CLI: room.CLI, Messaging: msg, Log: log,
+		Room: room, CLI: room.CLI, Messaging: msg, Log: log, CoalesceBytes: room.Storm.CoalesceLimit(),
 		Volumes: []Volume{{Name: "home", Path: home}, {Name: "engine", Path: roomcfg.EngineDir}},
 	}
 	if !room.Janitor.Disabled {
@@ -208,7 +208,7 @@ func writeInstructions(room *roomcfg.Room, u *proc.User, roleText string, peers 
 	if room.CLI == roomcfg.CLIClaude {
 		text := Instructions(room, roleText, peers)
 		if persona, err := os.ReadFile(filepath.Join(roomcfg.PersonaDir, "claude-CLAUDE.md")); err == nil && len(strings.TrimSpace(string(persona))) > 0 {
-			text = strings.TrimRight(string(persona), "\n") + "\n" + TeamSection(peers)
+			text = strings.TrimRight(string(persona), "\n") + "\n\n## Messages and channels\n\n" + ChannelGuide(room) + TeamSection(peers)
 		}
 		if err := os.MkdirAll(roomcfg.ClaudeEtc, 0o755); err != nil {
 			return err

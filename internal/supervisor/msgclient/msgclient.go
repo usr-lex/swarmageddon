@@ -5,12 +5,10 @@ package msgclient
 
 import (
 	"bufio"
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,9 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
-
-	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	"github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1/messagingv1connect"
 )
 
@@ -197,84 +192,4 @@ func (d *Dedup) Add(id string) error {
 		err = cerr
 	}
 	return err
-}
-
-// Handler processes one delivery; nil means it may be acked.
-type Handler func(ctx context.Context, d *messagingv1.Delivery) error
-
-// Subscribe keeps a Subscribe stream open (reconnecting with backoff) and
-// passes each delivery to h, retrying h with backoff until it succeeds, then
-// acks. Messages and notices already in dedup are acked without h.
-func Subscribe(ctx context.Context, c messagingv1connect.MessagingServiceClient, dedup *Dedup, h Handler, log *slog.Logger) {
-	backoff := time.Second
-	for ctx.Err() == nil {
-		start := time.Now()
-		err := subscribeOnce(ctx, c, dedup, h, log)
-		if ctx.Err() != nil {
-			return
-		}
-		if time.Since(start) > time.Minute {
-			backoff = time.Second
-		}
-		log.Warn("messaging stream ended; reconnecting", "err", err, "in", backoff)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(backoff):
-		}
-		backoff = min(backoff*2, 30*time.Second)
-	}
-}
-
-func deliveryKey(d *messagingv1.Delivery) string {
-	switch {
-	case d.GetMessage() != nil:
-		return "m:" + d.GetMessage().GetId()
-	case d.GetNotice() != nil:
-		return "n:" + d.GetNotice().GetId()
-	}
-	return ""
-}
-
-func subscribeOnce(ctx context.Context, c messagingv1connect.MessagingServiceClient, dedup *Dedup, h Handler, log *slog.Logger) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	stream, err := c.Subscribe(ctx, connect.NewRequest(&messagingv1.SubscribeRequest{}))
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-	log.Info("subscribed to messaging")
-	for stream.Receive() {
-		d := stream.Msg()
-		key := deliveryKey(d)
-		if key == "" || dedup == nil || !dedup.Seen(key) {
-			backoff := time.Second
-			for {
-				err := h(ctx, d)
-				if err == nil {
-					break
-				}
-				log.Warn("delivering to the agent failed; retrying", "delivery", d.GetDeliveryId(), "err", err, "in", backoff)
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(backoff):
-				}
-				backoff = min(backoff*2, 30*time.Second)
-			}
-			if key != "" && dedup != nil {
-				if err := dedup.Add(key); err != nil {
-					log.Warn("dedup set", "err", err)
-				}
-			}
-		}
-		if _, err := c.Ack(ctx, connect.NewRequest(&messagingv1.AckRequest{DeliveryId: d.GetDeliveryId()})); err != nil {
-			return fmt.Errorf("ack: %w", err)
-		}
-	}
-	if err := stream.Err(); err != nil {
-		return err
-	}
-	return errors.New("stream closed by server")
 }

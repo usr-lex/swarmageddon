@@ -67,14 +67,16 @@ func TestSubscribeAcksAfterDeliveryAndDedups(t *testing.T) {
 	var mu sync.Mutex
 	var got []string
 	fails := 1
-	handler := func(_ context.Context, d *messagingv1.Delivery) error {
+	handler := func(_ context.Context, batch []*messagingv1.Delivery) error {
 		mu.Lock()
 		defer mu.Unlock()
 		if fails > 0 {
 			fails--
 			return errors.New("agent restarting")
 		}
-		got = append(got, d.GetMessage().GetBody())
+		for _, d := range batch {
+			got = append(got, d.GetMessage().GetBody())
+		}
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

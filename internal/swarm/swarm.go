@@ -77,10 +77,13 @@ func Hook(ctx context.Context, c roomv1connect.SupervisorServiceClient, event st
 	}
 }
 
-// CLI runs a human subcommand (send, agents, whoami, status).
+// CLI runs a human subcommand (see Usage).
 func CLI(ctx context.Context, c roomv1connect.SupervisorServiceClient, args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return errors.New(usage)
+	}
+	if ok, err := channelCLI(ctx, c, args, stdout); ok {
+		return err
 	}
 	switch args[0] {
 	case "send":
@@ -128,6 +131,15 @@ const usage = `usage:
   swarm agents                list who you can message
   swarm whoami                show this room's identity
   swarm status <text>         set the current task shown to people
+  swarm post <channel> <msg>  post to a channel
+  swarm read [scope] [--all] [--limit n] [--cursor c] [--full] [--keep-unread]
+                              read messages (scope: all, direct, mentions, a channel)
+  swarm get <id>              one message in full
+  swarm mark-read <scope> [id]
+  swarm unread                unread counts
+  swarm channels              channels you can see
+  swarm delivery <channel> push|digest|pull
+  swarm advise [--file f]... [--no-context] <question>
   swarm mcp                   run the MCP server (stdio)
   swarm hook <Event>          report a Claude Code hook event (stdin: hook JSON)`
 

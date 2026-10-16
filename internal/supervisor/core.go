@@ -44,6 +44,8 @@ type Core struct {
 	StatusInterval    time.Duration
 	// StatusDebounce is the minimum gap between status reports (default 15 s).
 	StatusDebounce time.Duration
+	// CoalesceBytes caps one injected message (default 4096).
+	CoalesceBytes int
 
 	mu        sync.Mutex
 	presence  messagingv1.Presence
@@ -214,30 +216,38 @@ func (c *Core) Approve(ctx context.Context, a agent.Approval) (agent.Decision, e
 
 // --- deliveries ---
 
-func (c *Core) handleDelivery(ctx context.Context, d *messagingv1.Delivery) error {
-	switch {
-	case d.GetMessage() != nil:
-		m := d.GetMessage()
-		c.Log.Info("message", "id", m.GetId(), "from", m.GetFrom())
-		return c.Agent.Deliver(ctx, m.GetId(), agent.Envelope(m.GetFrom(), m.GetFromKind(), m.GetReplyTo(), m.GetId(), m.GetBody()))
-	case d.GetNotice() != nil:
-		n := d.GetNotice()
-		return c.Agent.Deliver(ctx, n.GetId(), agent.NoticeText(n.GetText()))
-	case d.GetApprovalAnswer() != nil:
-		a := d.GetApprovalAnswer()
-		c.mu.Lock()
-		ch := c.approvals[a.GetApprovalId()]
-		c.mu.Unlock()
-		if ch == nil {
-			c.Log.Info("answer for an approval no longer pending", "id", a.GetApprovalId())
-			return nil
+func (c *Core) handleDelivery(ctx context.Context, batch []*messagingv1.Delivery) error {
+	var items []*messagingv1.Delivery
+	for _, d := range batch {
+		if a := d.GetApprovalAnswer(); a != nil {
+			c.mu.Lock()
+			ch := c.approvals[a.GetApprovalId()]
+			c.mu.Unlock()
+			if ch == nil {
+				c.Log.Info("answer for an approval no longer pending", "id", a.GetApprovalId())
+				continue
+			}
+			select {
+			case ch <- a:
+			default:
+			}
+			continue
 		}
-		select {
-		case ch <- a:
-		default:
-		}
+		items = append(items, d)
 	}
-	return nil
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(items))
+	for _, d := range items {
+		_, id, _ := strings.Cut(msgclient.DeliveryKey(d), ":")
+		if id == "" {
+			id = d.GetDeliveryId()
+		}
+		ids = append(ids, id)
+	}
+	c.Log.Info("delivering to the agent", "items", len(items), "ids", ids)
+	return c.Agent.Deliver(ctx, ids[0], Coalesce(items, c.CoalesceBytes))
 }
 
 // --- reports ---

@@ -53,6 +53,7 @@ func Instructions(r *roomcfg.Room, roleText string, peers *messagingv1.ListPeers
 		w("Claude Code's own SendMessage and ListAgents only reach sessions inside this room, not your teammates: use the swarm tools. ")
 	}
 	w("From a shell: `swarm send <to> <message>`, `swarm agents`.\n")
+	b.WriteString(ChannelGuide(r))
 	w("- **Approvals:** when you need permission, a person may answer from the control center or a phone; it can take a while. Carry on with other work if you can.\n")
 
 	if strings.TrimSpace(roleText) != "" {
@@ -63,6 +64,24 @@ func Instructions(r *roomcfg.Room, roleText string, peers *messagingv1.ListPeers
 		w("\n## Your role: %s\n\n%s\n", title, strings.TrimSpace(roleText))
 	}
 	b.WriteString(TeamSection(peers))
+	return b.String()
+}
+
+// ChannelGuide teaches channels, reading and messaging etiquette (§7.8),
+// and the advisor when the room has one.
+func ChannelGuide(r *roomcfg.Room) string {
+	var b strings.Builder
+	b.WriteString("- **Channels:** `post` writes to a channel (`#name`); `read_messages`, `get_message`, `mark_read`, `unread_summary`, " +
+		"`list_channels` and `set_delivery` (push, digest or pull) let you read at your own pace. Several waiting messages may reach you " +
+		"together in one `<swarm-messages>` block, with long ones cut short: `get_message <id>` shows the rest. Etiquette:\n" +
+		"  - Use a direct message, or an `@name` mention in a post, when one agent must act.\n" +
+		"  - Use a channel for things several agents should know.\n" +
+		"  - Keep posts short, and don't repeat them on several channels.\n" +
+		"  - Check `unread_summary` at natural breaks rather than reading everything as it comes.\n")
+	if r.Advisor.Model != "" {
+		b.WriteString("- **Advisor:** `advise` asks a stronger model for a second opinion. It sees your role, your question, your recent " +
+			"transcript and the files you name; the answer comes back only to you. Calls are limited per hour, so save it for decisions that matter.\n")
+	}
 	return b.String()
 }
 
