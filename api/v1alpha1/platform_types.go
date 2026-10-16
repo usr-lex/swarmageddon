@@ -244,6 +244,10 @@ type PlatformStatus struct {
 	CAFingerprint string `json:"caFingerprint,omitempty"`
 	// +optional
 	Preflight *PreflightStatus `json:"preflight,omitempty"`
+	// PreflightRerun is the swarmageddon.dev/rerun-preflight annotation value
+	// the operator last acted on; a different value runs preflight again.
+	// +optional
+	PreflightRerun string `json:"preflightRerun,omitempty"`
 	// +optional
 	Versions map[string]string `json:"versions,omitempty"`
 	// +optional

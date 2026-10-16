@@ -463,6 +463,11 @@ spec:
                     - privileged
                     type: string
                 type: object
+              preflightRerun:
+                description: |-
+                  PreflightRerun is the swarmageddon.dev/rerun-preflight annotation value
+                  the operator last acted on; a different value runs preflight again.
+                type: string
               url:
                 description: URL the control center is reachable on, as far as the
                   operator can tell.

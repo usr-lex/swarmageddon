@@ -43,6 +43,12 @@ type Execer interface {
 	Exec(ctx context.Context, namespace, pod, container string, cmd []string, stdin io.Reader, stdout io.Writer, resize <-chan Size) error
 }
 
+// Runner runs a command in a container without a TTY or stdin, for
+// commands whose output is parsed (transcripts, engine prunes).
+type Runner interface {
+	Run(ctx context.Context, namespace, pod, container string, cmd []string, stdout, stderr io.Writer) error
+}
+
 // Forwarder opens a connection to a port inside a pod.
 type Forwarder interface {
 	Forward(ctx context.Context, namespace, pod string, port int) (io.ReadWriteCloser, error)

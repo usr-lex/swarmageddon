@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
@@ -32,9 +33,13 @@ func (s *Server) platformProto(ctx context.Context, base string, p *v1alpha1.Pla
 			RegistryUpstreams: sp.Services.RegistryCache.Upstreams, NtfyEnabled: sp.Services.Ntfy.Enabled, Approved: sp.Wizard.ServicesApproved,
 		},
 		Hostname:   &ccv1.HostnameSettings{Hostname: sp.Hostname, TlsMode: string(sp.TLS.Mode)},
-		WizardStep: sp.Wizard.Step,
+		WizardStep: sp.Wizard.Step, IsolationTier: string(sp.IsolationTier), PrivilegedAccepted: sp.PrivilegedAccepted,
 		Status: &ccv1.PlatformStatus{AdminClaimed: p.Status.AdminClaimed, Url: p.Status.URL, CaFingerprint: p.Status.CAFingerprint,
-			Conditions: conditions(p.Status.Conditions), Versions: p.Status.Versions},
+			Conditions: conditions(p.Status.Conditions), Versions: p.Status.Versions,
+			PreflightRerun: p.Status.PreflightRerun, PreflightRerunRequested: p.Annotations[AnnotationRerunPreflight]},
+	}
+	if out.IsolationTier == "" {
+		out.IsolationTier = string(v1alpha1.TierAuto)
 	}
 	if sp.TLS.IssuerRef != nil {
 		out.Hostname.IssuerName, out.Hostname.IssuerKind = sp.TLS.IssuerRef.Name, sp.TLS.IssuerRef.Kind
@@ -364,6 +369,70 @@ func (s platformSvc) WatchPlatform(ctx context.Context, req *connect.Request[ccv
 		case <-t.C:
 		}
 	}
+}
+
+// AnnotationRerunPreflight asks the operator to run preflight again; its
+// value is a timestamp, and the operator records the value it handled in
+// status.preflightRerun.
+const AnnotationRerunPreflight = "swarmageddon.dev/rerun-preflight"
+
+// SetIsolation sets the isolation tier and the privileged acceptance, and
+// asks for a preflight re-run so the chosen tier shows in status.
+func (s platformSvc) SetIsolation(ctx context.Context, req *connect.Request[ccv1.SetIsolationRequest]) (*connect.Response[ccv1.SetIsolationResponse], error) {
+	tier := v1alpha1.IsolationTier(req.Msg.GetTier())
+	if tier == "" {
+		tier = v1alpha1.TierAuto
+	}
+	switch tier {
+	case v1alpha1.TierAuto, v1alpha1.TierUserns, v1alpha1.TierSysbox, v1alpha1.TierPrivileged:
+	default:
+		return nil, errInvalid("the tier must be auto, userns, sysbox or privileged")
+	}
+	accepted := req.Msg.GetPrivilegedAccepted()
+	if tier == v1alpha1.TierPrivileged && !accepted {
+		return nil, errInvalid("the privileged tier must be accepted explicitly: rooms are not isolated from the node")
+	}
+	p, err := s.update(ctx, req, "platform.isolation", func(p *v1alpha1.Platform) error {
+		changed := p.Spec.IsolationTier != tier || p.Spec.PrivilegedAccepted != accepted
+		p.Spec.IsolationTier, p.Spec.PrivilegedAccepted = tier, accepted
+		if changed {
+			setAnnotation(&p.ObjectMeta, AnnotationRerunPreflight, rerunValue())
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&ccv1.SetIsolationResponse{Platform: p}), nil
+}
+
+// RerunPreflight asks the operator to run the checks again.
+func (s platformSvc) RerunPreflight(ctx context.Context, req *connect.Request[ccv1.RerunPreflightRequest]) (*connect.Response[ccv1.RerunPreflightResponse], error) {
+	if _, err := requireRole(ctx, auth.RoleAdmin); err != nil {
+		return nil, err
+	}
+	v := rerunValue()
+	var before string
+	_, err := s.K.UpdatePlatform(ctx, func(p *v1alpha1.Platform) error {
+		before = p.Annotations[AnnotationRerunPreflight]
+		setAnnotation(&p.ObjectMeta, AnnotationRerunPreflight, v)
+		return nil
+	})
+	s.audit(ctx, req, "platform.rerunPreflight", "platform/default", "", before, v, err)
+	if err != nil {
+		return nil, kerr(err)
+	}
+	return connect.NewResponse(&ccv1.RerunPreflightResponse{Requested: v}), nil
+}
+
+// rerunValue is a fresh annotation value: the time, to the nanosecond.
+func rerunValue() string { return time.Now().UTC().Format(time.RFC3339Nano) }
+
+func setAnnotation(m *metav1.ObjectMeta, k, v string) {
+	if m.Annotations == nil {
+		m.Annotations = map[string]string{}
+	}
+	m.Annotations[k] = v
 }
 
 var _ = fmt.Sprint

@@ -45,7 +45,9 @@ import (
 
 // Annotations and condition types beyond the API package's.
 const (
-	// AnnotationRerunPreflight asks the operator to run preflight again.
+	// AnnotationRerunPreflight asks the operator to run preflight again
+	// whenever its value (the control center writes a timestamp) differs
+	// from status.preflightRerun.
 	AnnotationRerunPreflight = "swarmageddon.dev/rerun-preflight"
 	// ConditionSetupToken reports where the setup token is while admin is unclaimed.
 	ConditionSetupToken = "SetupToken"
@@ -543,14 +545,12 @@ The token is printed once. It is also in Secret %s/%s (key token).
 
 // preflight runs the checks until done. It returns how soon to look again.
 func (r *Reconciler) preflight(ctx context.Context, p *v1alpha1.Platform) (time.Duration, error) {
-	if _, rerun := p.Annotations[AnnotationRerunPreflight]; rerun {
+	if want := p.Annotations[AnnotationRerunPreflight]; want != "" && want != p.Status.PreflightRerun {
 		if err := r.Preflight.Cleanup(ctx); err != nil {
 			return 0, err
 		}
 		p.Status.Preflight = nil
-		if err := r.removeAnnotation(ctx, p, AnnotationRerunPreflight); err != nil {
-			return 0, err
-		}
+		p.Status.PreflightRerun = want
 		// Let the old probe pods go away before starting again.
 		setCond(p, v1alpha1.ConditionPreflightDone, false, "Restarting", "re-running preflight")
 		return 5 * time.Second, nil

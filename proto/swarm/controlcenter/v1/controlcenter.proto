@@ -151,6 +151,14 @@ service PlatformService {
   // WatchPlatform streams the Platform on every change: preflight results and
   // service progress.
   rpc WatchPlatform(WatchPlatformRequest) returns (stream WatchPlatformResponse);
+  // SetIsolation sets Platform.spec.isolationTier and privilegedAccepted
+  // (ADR 0001) and asks the operator to run preflight again, so status shows
+  // the tier rooms will get. Admin only, audited.
+  rpc SetIsolation(SetIsolationRequest) returns (SetIsolationResponse);
+  // RerunPreflight sets the annotation swarmageddon.dev/rerun-preflight to
+  // the current time; the operator runs the checks again and records the
+  // value in status (PlatformStatus.preflight_rerun). Admin only, audited.
+  rpc RerunPreflight(RerunPreflightRequest) returns (RerunPreflightResponse);
 }
 
 message Platform {
@@ -159,6 +167,9 @@ message Platform {
   HostnameSettings hostname = 3;
   string wizard_step = 4;
   PlatformStatus status = 5;
+  // auto, userns, sysbox or privileged (Platform.spec.isolationTier).
+  string isolation_tier = 6;
+  bool privileged_accepted = 7;
 }
 
 message OIDCProviderSettings {
@@ -263,6 +274,11 @@ message PlatformStatus {
   // One per step and per service (PostgresReady, ForgejoReady, ...).
   repeated Condition conditions = 8;
   map<string, string> versions = 9;
+  // The rerun-preflight annotation value the operator last acted on; equal
+  // to the annotation once the re-run has started.
+  string preflight_rerun = 10;
+  // The rerun-preflight annotation's current value.
+  string preflight_rerun_requested = 11;
 }
 
 message GetPlatformRequest {}
@@ -302,6 +318,22 @@ message SetWizardStepResponse {}
 message WatchPlatformRequest {}
 message WatchPlatformResponse {
   Platform platform = 1;
+}
+
+message SetIsolationRequest {
+  // auto, userns, sysbox or privileged.
+  string tier = 1;
+  // Must be true for the privileged tier: rooms are then not isolated from the node.
+  bool privileged_accepted = 2;
+}
+message SetIsolationResponse {
+  Platform platform = 1;
+}
+
+message RerunPreflightRequest {}
+message RerunPreflightResponse {
+  // The annotation value written.
+  string requested = 1;
 }
 
 // ---------------------------------------------------------------- Workspaces
@@ -468,6 +500,36 @@ message AgentPlan {
   // The room's own layer of settings (Room.spec env, secretEnv, mcpServers,
   // network); unset keeps the current ones.
   RoomSettingsPlan settings = 15;
+  // The room's own advisor (Room.spec.advisor, ADR 0010): unset inherits the
+  // role template's; an empty model turns the advisor off for this room.
+  AdvisorPlan advisor = 16;
+  // Room.spec.wardenMode: off, monitor or gate; empty inherits the workspace's.
+  string warden_mode = 17;
+}
+
+// AdvisorPlan is an AdvisorSpec (ADR 0010).
+message AdvisorPlan {
+  // Empty: no advisor.
+  string model = 1;
+  string effort = 2;
+  // 0: the default (10).
+  int32 max_calls_per_hour = 3;
+  // 0: the workspace's per-room budget.
+  int32 monthly_usd = 4;
+  // Claude's built-in advisor tool too (Claude rooms only; unauditable).
+  bool native = 5;
+}
+
+// WardenPlan is Workspace.spec.warden (ADR 0011).
+message WardenPlan {
+  // off, monitor or gate; empty: monitor.
+  string mode = 1;
+  // Empty: rules only.
+  string model = 2;
+  bool interrupt_on_high = 3;
+  bool quarantine_on_high = 4;
+  // 0: the default (20).
+  int32 monthly_usd = 5;
 }
 
 message RepositoryPlan {
@@ -558,6 +620,12 @@ message WorkspacePlan {
   map<string, RoomSettingsPlan> role_defaults = 27;
   // Workspace.spec.sharedVolumes; offer only when preflight found RWX.
   repeated SharedVolumePlan shared_volumes = 28;
+  // RoleTemplate.spec.advisor by template name. A role left out keeps its
+  // advisor; an empty model removes it.
+  map<string, AdvisorPlan> role_advisors = 29;
+  // Workspace.spec.warden. Set: replaces warden_mode and warden_model;
+  // unset: those two apply and the rest is kept.
+  WardenPlan warden = 30;
 }
 
 message ChannelMemberPlan {
@@ -769,6 +837,54 @@ service RoomService {
   rpc GetRoomSettings(GetRoomSettingsRequest) returns (GetRoomSettingsResponse);
   // UpdateRoomSettings replaces the room's own level; operators, audited.
   rpc UpdateRoomSettings(UpdateRoomSettingsRequest) returns (UpdateRoomSettingsResponse);
+  // WatchTranscript tails the room's session transcript read-only (the
+  // newest Claude Code or ore JSONL file, read by `tail -F` as the agent
+  // user through pods/exec) as simple items. Viewers of the workspace.
+  rpc WatchTranscript(WatchTranscriptRequest) returns (stream WatchTranscriptResponse);
+  // PruneEngine prunes the room's container engine as the agent user
+  // (docker ... prune). Operators, audited.
+  rpc PruneEngine(PruneEngineRequest) returns (PruneEngineResponse);
+}
+
+message WatchTranscriptRequest {
+  RoomRef room = 1;
+  // Lines of the file to start with; 0: 200, at most 2000.
+  int32 tail_lines = 2;
+}
+
+message TranscriptItem {
+  // Stable within a file: the CLI's entry id, else file line based.
+  string id = 1;
+  google.protobuf.Timestamp at = 2;
+  // user, assistant, tool (a call), tool_result or system.
+  string role = 3;
+  // Message text, clipped.
+  string text = 4;
+  // For tool calls and results.
+  string tool_name = 5;
+  // A one-line summary of the tool input, clipped.
+  string tool_input = 6;
+  // A summary of the tool result, clipped.
+  string tool_result = 7;
+}
+
+message WatchTranscriptResponse {
+  TranscriptItem item = 1;
+}
+
+message PruneEngineRequest {
+  RoomRef room = 1;
+  // containers, images (unused, not only dangling), volumes, buildCache or
+  // all (docker system prune).
+  string kind = 2;
+  // With kind all: also unused volumes (--volumes).
+  bool volumes = 3;
+}
+message PruneEngineResponse {
+  // The engine's output, clipped.
+  string output = 1;
+  // Parsed from "Total reclaimed space"; 0 when unknown.
+  int64 reclaimed_bytes = 2;
 }
 
 message GetRoomSettingsRequest {
@@ -1472,6 +1588,47 @@ service ChannelService {
   rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
   rpc GetUnreadSummary(GetUnreadSummaryRequest) returns (GetUnreadSummaryResponse);
   rpc SetChannelDelivery(SetChannelDeliveryRequest) returns (SetChannelDeliveryResponse);
+  // WatchChannelItems streams new posts and direct messages the person can
+  // read, in the given workspaces (empty: all they can see). The control
+  // center polls messaging's ReadMessages for the person every two seconds
+  // (pull-mode channels push nothing), so items arrive within about 2 s.
+  // Items unread when the stream starts are not sent; read them with
+  // ReadChannelMessages.
+  rpc WatchChannelItems(WatchChannelItemsRequest) returns (stream WatchChannelItemsResponse);
+  // ListMentionables lists who an @mention can name in a workspace: agents
+  // and people the person may reach (messaging ListPeers), plus the control
+  // center's users who can see the workspace.
+  rpc ListMentionables(ListMentionablesRequest) returns (ListMentionablesResponse);
+}
+
+message WatchChannelItemsRequest {
+  repeated string workspaces = 1;
+}
+message WatchChannelItemsResponse {
+  string workspace = 1;
+  ChannelItem item = 2;
+}
+
+message Mentionable {
+  // What goes after @: an agent name or a person's handle.
+  string handle = 1;
+  // agent or person.
+  string kind = 2;
+  string display_name = 3;
+  // Role title for agents.
+  string role = 4;
+  string group = 5;
+  Presence presence = 6;
+  // False for people the control center knows but messaging doesn't list
+  // as reachable from the caller.
+  bool reachable = 7;
+}
+
+message ListMentionablesRequest {
+  string workspace = 1;
+}
+message ListMentionablesResponse {
+  repeated Mentionable mentionables = 1;
 }
 
 message ChannelInfo {

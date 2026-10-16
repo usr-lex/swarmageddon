@@ -66,6 +66,27 @@ func (k *Kube) Exec(ctx context.Context, ns, pod, container string, cmd []string
 	})
 }
 
+// Run implements Runner: the same exec protocols, without a TTY or stdin.
+func (k *Kube) Run(ctx context.Context, ns, pod, container string, cmd []string, stdout, stderr io.Writer) error {
+	req := k.Client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Name(pod).SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{Container: container, Command: cmd, Stdout: true, Stderr: true}, scheme.ParameterCodec)
+	ws, err := remotecommand.NewWebSocketExecutor(k.Config, "GET", req.URL().String())
+	if err != nil {
+		return err
+	}
+	sp, err := remotecommand.NewSPDYExecutor(k.Config, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+	exec, err := remotecommand.NewFallbackExecutor(ws, sp, func(err error) bool {
+		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+	})
+	if err != nil {
+		return err
+	}
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: stdout, Stderr: stderr})
+}
+
 // Forward implements Forwarder: one data stream to port in the pod, over
 // SPDY (pods/portforward).
 func (k *Kube) Forward(ctx context.Context, ns, pod string, port int) (io.ReadWriteCloser, error) {
