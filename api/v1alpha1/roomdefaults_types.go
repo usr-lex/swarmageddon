@@ -80,7 +80,7 @@ const (
 
 // NetworkAccess is a room's network access (docs/design.md §11.2).
 type NetworkAccess struct {
-	// +kubebuilder:default=full
+	// Mode; empty inherits the earlier level's, and full when no level sets it.
 	// +optional
 	Mode NetworkMode `json:"mode,omitempty"`
 	// Domains reachable in limited mode: exact hosts or *.suffix, with an

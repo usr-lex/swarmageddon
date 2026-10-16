@@ -3647,7 +3647,8 @@ type AgentPlan struct {
 	Repos   []string `protobuf:"bytes,12,rep,name=repos,proto3" json:"repos,omitempty"`
 	WorkDir string   `protobuf:"bytes,13,opt,name=work_dir,json=workDir,proto3" json:"work_dir,omitempty"`
 	Paused  bool     `protobuf:"varint,14,opt,name=paused,proto3" json:"paused,omitempty"`
-	// The room's own layer of settings (Room.spec env, secretEnv, mcpServers, network).
+	// The room's own layer of settings (Room.spec env, secretEnv, mcpServers,
+	// network); unset keeps the current ones.
 	Settings      *RoomSettingsPlan `protobuf:"bytes,15,opt,name=settings,proto3" json:"settings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4168,10 +4169,12 @@ type WorkspacePlan struct {
 	// Warden (ADR 0011): off, monitor or gate; empty keeps the default.
 	WardenMode  string `protobuf:"bytes,24,opt,name=warden_mode,json=wardenMode,proto3" json:"warden_mode,omitempty"`
 	WardenModel string `protobuf:"bytes,25,opt,name=warden_model,json=wardenModel,proto3" json:"warden_model,omitempty"`
-	// Workspace.spec.roomDefaults. Its network replaces the deprecated internet flag.
+	// Workspace.spec.roomDefaults; unset keeps the current ones. Its network
+	// replaces the deprecated internet flag.
 	RoomDefaults *RoomSettingsPlan `protobuf:"bytes,26,opt,name=room_defaults,json=roomDefaults,proto3" json:"room_defaults,omitempty"`
-	// RoleTemplate.spec.roomDefaults by template name. A role left out has its
-	// defaults cleared. Templates must exist (the operator creates built-ins).
+	// RoleTemplate.spec.roomDefaults by template name. A role left out keeps
+	// its defaults; an empty plan clears them. Built-in templates are filled in
+	// once the operator has created them; custom ones must exist.
 	RoleDefaults map[string]*RoomSettingsPlan `protobuf:"bytes,27,rep,name=role_defaults,json=roleDefaults,proto3" json:"role_defaults,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Workspace.spec.sharedVolumes; offer only when preflight found RWX.
 	SharedVolumes []*SharedVolumePlan `protobuf:"bytes,28,rep,name=shared_volumes,json=sharedVolumes,proto3" json:"shared_volumes,omitempty"`

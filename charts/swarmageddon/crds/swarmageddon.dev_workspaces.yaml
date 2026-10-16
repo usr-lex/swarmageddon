@@ -501,8 +501,8 @@ spec:
                           type: string
                         type: array
                       mode:
-                        default: full
-                        description: NetworkMode is how much network a room gets.
+                        description: Mode; empty inherits the earlier level's, and
+                          full when no level sets it.
                         enum:
                         - none
                         - limited
