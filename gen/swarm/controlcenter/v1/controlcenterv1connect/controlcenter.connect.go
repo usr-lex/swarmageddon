@@ -65,6 +65,8 @@ const (
 	SpendServiceName = "swarm.controlcenter.v1.SpendService"
 	// UserServiceName is the fully-qualified name of the UserService service.
 	UserServiceName = "swarm.controlcenter.v1.UserService"
+	// ObservatoryServiceName is the fully-qualified name of the ObservatoryService service.
+	ObservatoryServiceName = "swarm.controlcenter.v1.ObservatoryService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -211,6 +213,31 @@ const (
 	// UserServiceSetUserDisabledProcedure is the fully-qualified name of the UserService's
 	// SetUserDisabled RPC.
 	UserServiceSetUserDisabledProcedure = "/swarm.controlcenter.v1.UserService/SetUserDisabled"
+	// ObservatoryServiceEdgesProcedure is the fully-qualified name of the ObservatoryService's Edges
+	// RPC.
+	ObservatoryServiceEdgesProcedure = "/swarm.controlcenter.v1.ObservatoryService/Edges"
+	// ObservatoryServiceNowProcedure is the fully-qualified name of the ObservatoryService's Now RPC.
+	ObservatoryServiceNowProcedure = "/swarm.controlcenter.v1.ObservatoryService/Now"
+	// ObservatoryServiceHeatmapProcedure is the fully-qualified name of the ObservatoryService's
+	// Heatmap RPC.
+	ObservatoryServiceHeatmapProcedure = "/swarm.controlcenter.v1.ObservatoryService/Heatmap"
+	// ObservatoryServiceAxesProcedure is the fully-qualified name of the ObservatoryService's Axes RPC.
+	ObservatoryServiceAxesProcedure = "/swarm.controlcenter.v1.ObservatoryService/Axes"
+	// ObservatoryServiceTimelineProcedure is the fully-qualified name of the ObservatoryService's
+	// Timeline RPC.
+	ObservatoryServiceTimelineProcedure = "/swarm.controlcenter.v1.ObservatoryService/Timeline"
+	// ObservatoryServiceWatchTimelineProcedure is the fully-qualified name of the ObservatoryService's
+	// WatchTimeline RPC.
+	ObservatoryServiceWatchTimelineProcedure = "/swarm.controlcenter.v1.ObservatoryService/WatchTimeline"
+	// ObservatoryServiceThroughputProcedure is the fully-qualified name of the ObservatoryService's
+	// Throughput RPC.
+	ObservatoryServiceThroughputProcedure = "/swarm.controlcenter.v1.ObservatoryService/Throughput"
+	// ObservatoryServiceReportsProcedure is the fully-qualified name of the ObservatoryService's
+	// Reports RPC.
+	ObservatoryServiceReportsProcedure = "/swarm.controlcenter.v1.ObservatoryService/Reports"
+	// ObservatoryServiceRequestReportProcedure is the fully-qualified name of the ObservatoryService's
+	// RequestReport RPC.
+	ObservatoryServiceRequestReportProcedure = "/swarm.controlcenter.v1.ObservatoryService/RequestReport"
 )
 
 // SetupServiceClient is a client for the swarm.controlcenter.v1.SetupService service.
@@ -2107,4 +2134,295 @@ func (UnimplementedUserServiceHandler) SetUserWorkspaces(context.Context, *conne
 
 func (UnimplementedUserServiceHandler) SetUserDisabled(context.Context, *connect.Request[v1.SetUserDisabledRequest]) (*connect.Response[v1.SetUserDisabledResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.UserService.SetUserDisabled is not implemented"))
+}
+
+// ObservatoryServiceClient is a client for the swarm.controlcenter.v1.ObservatoryService service.
+type ObservatoryServiceClient interface {
+	// Edges counts who talked to whom, and forge handoffs, in a window.
+	Edges(context.Context, *connect.Request[v1.EdgesRequest]) (*connect.Response[v1.EdgesResponse], error)
+	// Now is each agent's presence, task and last touched item.
+	Now(context.Context, *connect.Request[v1.NowRequest]) (*connect.Response[v1.NowResponse], error)
+	Heatmap(context.Context, *connect.Request[v1.HeatmapRequest]) (*connect.Response[v1.HeatmapResponse], error)
+	Axes(context.Context, *connect.Request[v1.AxesRequest]) (*connect.Response[v1.AxesResponse], error)
+	Timeline(context.Context, *connect.Request[v1.TimelineRequest]) (*connect.Response[v1.TimelineResponse], error)
+	// WatchTimeline streams new events as they are recorded.
+	WatchTimeline(context.Context, *connect.Request[v1.WatchTimelineRequest]) (*connect.ServerStreamForClient[v1.WatchTimelineResponse], error)
+	Throughput(context.Context, *connect.Request[v1.ThroughputRequest]) (*connect.Response[v1.ThroughputResponse], error)
+	// Reports lists the chronicler's reports, newest first.
+	Reports(context.Context, *connect.Request[v1.ReportsRequest]) (*connect.Response[v1.ReportsResponse], error)
+	// RequestReport asks the workspace's chronicler(s) for a report now, as a
+	// message from the signed-in person. Needs the operator role.
+	RequestReport(context.Context, *connect.Request[v1.RequestReportRequest]) (*connect.Response[v1.RequestReportResponse], error)
+}
+
+// NewObservatoryServiceClient constructs a client for the swarm.controlcenter.v1.ObservatoryService
+// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
+// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
+// the connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewObservatoryServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ObservatoryServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	observatoryServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("ObservatoryService").Methods()
+	return &observatoryServiceClient{
+		edges: connect.NewClient[v1.EdgesRequest, v1.EdgesResponse](
+			httpClient,
+			baseURL+ObservatoryServiceEdgesProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Edges")),
+			connect.WithClientOptions(opts...),
+		),
+		now: connect.NewClient[v1.NowRequest, v1.NowResponse](
+			httpClient,
+			baseURL+ObservatoryServiceNowProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Now")),
+			connect.WithClientOptions(opts...),
+		),
+		heatmap: connect.NewClient[v1.HeatmapRequest, v1.HeatmapResponse](
+			httpClient,
+			baseURL+ObservatoryServiceHeatmapProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Heatmap")),
+			connect.WithClientOptions(opts...),
+		),
+		axes: connect.NewClient[v1.AxesRequest, v1.AxesResponse](
+			httpClient,
+			baseURL+ObservatoryServiceAxesProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Axes")),
+			connect.WithClientOptions(opts...),
+		),
+		timeline: connect.NewClient[v1.TimelineRequest, v1.TimelineResponse](
+			httpClient,
+			baseURL+ObservatoryServiceTimelineProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Timeline")),
+			connect.WithClientOptions(opts...),
+		),
+		watchTimeline: connect.NewClient[v1.WatchTimelineRequest, v1.WatchTimelineResponse](
+			httpClient,
+			baseURL+ObservatoryServiceWatchTimelineProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("WatchTimeline")),
+			connect.WithClientOptions(opts...),
+		),
+		throughput: connect.NewClient[v1.ThroughputRequest, v1.ThroughputResponse](
+			httpClient,
+			baseURL+ObservatoryServiceThroughputProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Throughput")),
+			connect.WithClientOptions(opts...),
+		),
+		reports: connect.NewClient[v1.ReportsRequest, v1.ReportsResponse](
+			httpClient,
+			baseURL+ObservatoryServiceReportsProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("Reports")),
+			connect.WithClientOptions(opts...),
+		),
+		requestReport: connect.NewClient[v1.RequestReportRequest, v1.RequestReportResponse](
+			httpClient,
+			baseURL+ObservatoryServiceRequestReportProcedure,
+			connect.WithSchema(observatoryServiceMethods.ByName("RequestReport")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// observatoryServiceClient implements ObservatoryServiceClient.
+type observatoryServiceClient struct {
+	edges         *connect.Client[v1.EdgesRequest, v1.EdgesResponse]
+	now           *connect.Client[v1.NowRequest, v1.NowResponse]
+	heatmap       *connect.Client[v1.HeatmapRequest, v1.HeatmapResponse]
+	axes          *connect.Client[v1.AxesRequest, v1.AxesResponse]
+	timeline      *connect.Client[v1.TimelineRequest, v1.TimelineResponse]
+	watchTimeline *connect.Client[v1.WatchTimelineRequest, v1.WatchTimelineResponse]
+	throughput    *connect.Client[v1.ThroughputRequest, v1.ThroughputResponse]
+	reports       *connect.Client[v1.ReportsRequest, v1.ReportsResponse]
+	requestReport *connect.Client[v1.RequestReportRequest, v1.RequestReportResponse]
+}
+
+// Edges calls swarm.controlcenter.v1.ObservatoryService.Edges.
+func (c *observatoryServiceClient) Edges(ctx context.Context, req *connect.Request[v1.EdgesRequest]) (*connect.Response[v1.EdgesResponse], error) {
+	return c.edges.CallUnary(ctx, req)
+}
+
+// Now calls swarm.controlcenter.v1.ObservatoryService.Now.
+func (c *observatoryServiceClient) Now(ctx context.Context, req *connect.Request[v1.NowRequest]) (*connect.Response[v1.NowResponse], error) {
+	return c.now.CallUnary(ctx, req)
+}
+
+// Heatmap calls swarm.controlcenter.v1.ObservatoryService.Heatmap.
+func (c *observatoryServiceClient) Heatmap(ctx context.Context, req *connect.Request[v1.HeatmapRequest]) (*connect.Response[v1.HeatmapResponse], error) {
+	return c.heatmap.CallUnary(ctx, req)
+}
+
+// Axes calls swarm.controlcenter.v1.ObservatoryService.Axes.
+func (c *observatoryServiceClient) Axes(ctx context.Context, req *connect.Request[v1.AxesRequest]) (*connect.Response[v1.AxesResponse], error) {
+	return c.axes.CallUnary(ctx, req)
+}
+
+// Timeline calls swarm.controlcenter.v1.ObservatoryService.Timeline.
+func (c *observatoryServiceClient) Timeline(ctx context.Context, req *connect.Request[v1.TimelineRequest]) (*connect.Response[v1.TimelineResponse], error) {
+	return c.timeline.CallUnary(ctx, req)
+}
+
+// WatchTimeline calls swarm.controlcenter.v1.ObservatoryService.WatchTimeline.
+func (c *observatoryServiceClient) WatchTimeline(ctx context.Context, req *connect.Request[v1.WatchTimelineRequest]) (*connect.ServerStreamForClient[v1.WatchTimelineResponse], error) {
+	return c.watchTimeline.CallServerStream(ctx, req)
+}
+
+// Throughput calls swarm.controlcenter.v1.ObservatoryService.Throughput.
+func (c *observatoryServiceClient) Throughput(ctx context.Context, req *connect.Request[v1.ThroughputRequest]) (*connect.Response[v1.ThroughputResponse], error) {
+	return c.throughput.CallUnary(ctx, req)
+}
+
+// Reports calls swarm.controlcenter.v1.ObservatoryService.Reports.
+func (c *observatoryServiceClient) Reports(ctx context.Context, req *connect.Request[v1.ReportsRequest]) (*connect.Response[v1.ReportsResponse], error) {
+	return c.reports.CallUnary(ctx, req)
+}
+
+// RequestReport calls swarm.controlcenter.v1.ObservatoryService.RequestReport.
+func (c *observatoryServiceClient) RequestReport(ctx context.Context, req *connect.Request[v1.RequestReportRequest]) (*connect.Response[v1.RequestReportResponse], error) {
+	return c.requestReport.CallUnary(ctx, req)
+}
+
+// ObservatoryServiceHandler is an implementation of the swarm.controlcenter.v1.ObservatoryService
+// service.
+type ObservatoryServiceHandler interface {
+	// Edges counts who talked to whom, and forge handoffs, in a window.
+	Edges(context.Context, *connect.Request[v1.EdgesRequest]) (*connect.Response[v1.EdgesResponse], error)
+	// Now is each agent's presence, task and last touched item.
+	Now(context.Context, *connect.Request[v1.NowRequest]) (*connect.Response[v1.NowResponse], error)
+	Heatmap(context.Context, *connect.Request[v1.HeatmapRequest]) (*connect.Response[v1.HeatmapResponse], error)
+	Axes(context.Context, *connect.Request[v1.AxesRequest]) (*connect.Response[v1.AxesResponse], error)
+	Timeline(context.Context, *connect.Request[v1.TimelineRequest]) (*connect.Response[v1.TimelineResponse], error)
+	// WatchTimeline streams new events as they are recorded.
+	WatchTimeline(context.Context, *connect.Request[v1.WatchTimelineRequest], *connect.ServerStream[v1.WatchTimelineResponse]) error
+	Throughput(context.Context, *connect.Request[v1.ThroughputRequest]) (*connect.Response[v1.ThroughputResponse], error)
+	// Reports lists the chronicler's reports, newest first.
+	Reports(context.Context, *connect.Request[v1.ReportsRequest]) (*connect.Response[v1.ReportsResponse], error)
+	// RequestReport asks the workspace's chronicler(s) for a report now, as a
+	// message from the signed-in person. Needs the operator role.
+	RequestReport(context.Context, *connect.Request[v1.RequestReportRequest]) (*connect.Response[v1.RequestReportResponse], error)
+}
+
+// NewObservatoryServiceHandler builds an HTTP handler from the service implementation. It returns
+// the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewObservatoryServiceHandler(svc ObservatoryServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	observatoryServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("ObservatoryService").Methods()
+	observatoryServiceEdgesHandler := connect.NewUnaryHandler(
+		ObservatoryServiceEdgesProcedure,
+		svc.Edges,
+		connect.WithSchema(observatoryServiceMethods.ByName("Edges")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceNowHandler := connect.NewUnaryHandler(
+		ObservatoryServiceNowProcedure,
+		svc.Now,
+		connect.WithSchema(observatoryServiceMethods.ByName("Now")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceHeatmapHandler := connect.NewUnaryHandler(
+		ObservatoryServiceHeatmapProcedure,
+		svc.Heatmap,
+		connect.WithSchema(observatoryServiceMethods.ByName("Heatmap")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceAxesHandler := connect.NewUnaryHandler(
+		ObservatoryServiceAxesProcedure,
+		svc.Axes,
+		connect.WithSchema(observatoryServiceMethods.ByName("Axes")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceTimelineHandler := connect.NewUnaryHandler(
+		ObservatoryServiceTimelineProcedure,
+		svc.Timeline,
+		connect.WithSchema(observatoryServiceMethods.ByName("Timeline")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceWatchTimelineHandler := connect.NewServerStreamHandler(
+		ObservatoryServiceWatchTimelineProcedure,
+		svc.WatchTimeline,
+		connect.WithSchema(observatoryServiceMethods.ByName("WatchTimeline")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceThroughputHandler := connect.NewUnaryHandler(
+		ObservatoryServiceThroughputProcedure,
+		svc.Throughput,
+		connect.WithSchema(observatoryServiceMethods.ByName("Throughput")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceReportsHandler := connect.NewUnaryHandler(
+		ObservatoryServiceReportsProcedure,
+		svc.Reports,
+		connect.WithSchema(observatoryServiceMethods.ByName("Reports")),
+		connect.WithHandlerOptions(opts...),
+	)
+	observatoryServiceRequestReportHandler := connect.NewUnaryHandler(
+		ObservatoryServiceRequestReportProcedure,
+		svc.RequestReport,
+		connect.WithSchema(observatoryServiceMethods.ByName("RequestReport")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/swarm.controlcenter.v1.ObservatoryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case ObservatoryServiceEdgesProcedure:
+			observatoryServiceEdgesHandler.ServeHTTP(w, r)
+		case ObservatoryServiceNowProcedure:
+			observatoryServiceNowHandler.ServeHTTP(w, r)
+		case ObservatoryServiceHeatmapProcedure:
+			observatoryServiceHeatmapHandler.ServeHTTP(w, r)
+		case ObservatoryServiceAxesProcedure:
+			observatoryServiceAxesHandler.ServeHTTP(w, r)
+		case ObservatoryServiceTimelineProcedure:
+			observatoryServiceTimelineHandler.ServeHTTP(w, r)
+		case ObservatoryServiceWatchTimelineProcedure:
+			observatoryServiceWatchTimelineHandler.ServeHTTP(w, r)
+		case ObservatoryServiceThroughputProcedure:
+			observatoryServiceThroughputHandler.ServeHTTP(w, r)
+		case ObservatoryServiceReportsProcedure:
+			observatoryServiceReportsHandler.ServeHTTP(w, r)
+		case ObservatoryServiceRequestReportProcedure:
+			observatoryServiceRequestReportHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedObservatoryServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedObservatoryServiceHandler struct{}
+
+func (UnimplementedObservatoryServiceHandler) Edges(context.Context, *connect.Request[v1.EdgesRequest]) (*connect.Response[v1.EdgesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Edges is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Now(context.Context, *connect.Request[v1.NowRequest]) (*connect.Response[v1.NowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Now is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Heatmap(context.Context, *connect.Request[v1.HeatmapRequest]) (*connect.Response[v1.HeatmapResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Heatmap is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Axes(context.Context, *connect.Request[v1.AxesRequest]) (*connect.Response[v1.AxesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Axes is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Timeline(context.Context, *connect.Request[v1.TimelineRequest]) (*connect.Response[v1.TimelineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Timeline is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) WatchTimeline(context.Context, *connect.Request[v1.WatchTimelineRequest], *connect.ServerStream[v1.WatchTimelineResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.WatchTimeline is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Throughput(context.Context, *connect.Request[v1.ThroughputRequest]) (*connect.Response[v1.ThroughputResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Throughput is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) Reports(context.Context, *connect.Request[v1.ReportsRequest]) (*connect.Response[v1.ReportsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.Reports is not implemented"))
+}
+
+func (UnimplementedObservatoryServiceHandler) RequestReport(context.Context, *connect.Request[v1.RequestReportRequest]) (*connect.Response[v1.RequestReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.RequestReport is not implemented"))
 }

@@ -179,7 +179,9 @@ func TestTerminalRefusals(t *testing.T) {
 func TestVNC(t *testing.T) {
 	srv, _, audits, fwd := setup(t, &auth.Principal{Role: auth.RoleAdmin, Handle: "root"})
 	inR, inW := io.Pipe()
-	fwd.remote = rwc{Reader: strings.NewReader("RFB 003.008\n"), Writer: inW}
+	outR, outW := io.Pipe()
+	go outW.Write([]byte("RFB 003.008\n")) // the room's VNC server greets and stays open
+	fwd.remote = rwc{Reader: outR, Writer: inW}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, resp, err := websocket.Dial(ctx, wsURL(srv, "/ws/vnc?room=athena@acme"), &websocket.DialOptions{Subprotocols: []string{"binary"}})

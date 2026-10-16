@@ -1021,3 +1021,209 @@ message SetUserDisabledRequest {
 message SetUserDisabledResponse {
   User user = 1;
 }
+
+// ---------------------------------------------------------------- Observatory
+
+// ObservatoryService is the swarm observatory (docs/design.md §8.7). Viewers
+// of a workspace may use it. It never returns message bodies; reports are
+// the chronicler's own text.
+service ObservatoryService {
+  // Edges counts who talked to whom, and forge handoffs, in a window.
+  rpc Edges(EdgesRequest) returns (EdgesResponse);
+  // Now is each agent's presence, task and last touched item.
+  rpc Now(NowRequest) returns (NowResponse);
+  rpc Heatmap(HeatmapRequest) returns (HeatmapResponse);
+  rpc Axes(AxesRequest) returns (AxesResponse);
+  rpc Timeline(TimelineRequest) returns (TimelineResponse);
+  // WatchTimeline streams new events as they are recorded.
+  rpc WatchTimeline(WatchTimelineRequest) returns (stream WatchTimelineResponse);
+  rpc Throughput(ThroughputRequest) returns (ThroughputResponse);
+  // Reports lists the chronicler's reports, newest first.
+  rpc Reports(ReportsRequest) returns (ReportsResponse);
+  // RequestReport asks the workspace's chronicler(s) for a report now, as a
+  // message from the signed-in person. Needs the operator role.
+  rpc RequestReport(RequestReportRequest) returns (RequestReportResponse);
+}
+
+enum EdgeKind {
+  EDGE_KIND_UNSPECIFIED = 0;
+  // A message within a group or over an open link.
+  EDGE_KIND_MESSAGE = 1;
+  // A message over a mediated link.
+  EDGE_KIND_CROSSING = 2;
+  // A message to or from a person.
+  EDGE_KIND_HUMAN = 3;
+  // Review requested, assigned or mentioned in the forge.
+  EDGE_KIND_FORGE_HANDOFF = 4;
+}
+
+message Edge {
+  string from = 1;
+  string to = 2;
+  EdgeKind kind = 3;
+  // For forge handoffs: review_requested, assigned or mentioned.
+  string subkind = 4;
+  int64 count = 5;
+}
+
+message EdgesRequest {
+  string workspace = 1;
+  // Defaults: the last 24 hours.
+  google.protobuf.Timestamp since = 2;
+  google.protobuf.Timestamp until = 3;
+}
+message EdgesResponse {
+  repeated Edge edges = 1;
+}
+
+message ItemRef {
+  string repo = 1;
+  int32 number = 2;
+  string title = 3;
+  string url = 4;
+  google.protobuf.Timestamp at = 5;
+}
+
+message AgentNow {
+  string name = 1;
+  Presence presence = 2;
+  google.protobuf.Timestamp presence_since = 3;
+  string current_task = 4;
+  ItemRef last_item = 5;
+  string role = 6;
+}
+
+message NowRequest {
+  string workspace = 1;
+}
+message NowResponse {
+  // Waiting on a human first, then working, idle, offline.
+  repeated AgentNow agents = 1;
+}
+
+message HeatmapCell {
+  string actor = 1;
+  // YYYY-MM-DD (UTC).
+  string day = 2;
+  int64 count = 3;
+}
+
+message HeatmapRequest {
+  string workspace = 1;
+  // Empty: every actor (the UI sums for the whole swarm).
+  string actor = 2;
+  // Default 365.
+  int32 days = 3;
+}
+message HeatmapResponse {
+  repeated HeatmapCell cells = 1;
+}
+
+message AxesRow {
+  string actor = 1;
+  int64 commits = 2;
+  int64 pull_requests = 3;
+  int64 reviews = 4;
+  int64 issues = 5;
+  int64 messages = 6;
+}
+
+message AxesRequest {
+  string workspace = 1;
+  // Default: the last 30 days.
+  google.protobuf.Timestamp since = 2;
+}
+message AxesResponse {
+  repeated AxesRow rows = 1;
+}
+
+message ActivityEvent {
+  int64 id = 1;
+  google.protobuf.Timestamp at = 2;
+  string actor = 3;
+  // message, human, crossing, refusal, commit, pr_opened, pr_merged,
+  // pr_closed, review_approved, review_changes, review_comment,
+  // issue_opened, issue_closed, comment, ci_failed, ci_passed,
+  // review_requested, assigned, mentioned, presence, task, tokens.
+  string kind = 4;
+  string target = 5;
+  string repo = 6;
+  int32 number = 7;
+  string summary = 8;
+  string url = 9;
+  int64 value = 10;
+}
+
+message TimelineRequest {
+  string workspace = 1;
+  repeated string actors = 2;
+  repeated string kinds = 3;
+  string repo = 4;
+  // Page: events older than this ID (from next_before_id).
+  int64 before_id = 5;
+  int32 limit = 6;
+}
+message TimelineResponse {
+  repeated ActivityEvent events = 1;
+  // 0 when there are no more.
+  int64 next_before_id = 2;
+}
+
+message WatchTimelineRequest {
+  string workspace = 1;
+}
+message WatchTimelineResponse {
+  ActivityEvent event = 1;
+}
+
+message ThroughputDay {
+  string day = 1;
+  string actor = 2;
+  int64 merged = 3;
+  int64 ci_failures = 4;
+  int64 tokens = 5;
+}
+
+message ReviewLatency {
+  string day = 1;
+  double median_seconds = 2;
+  int64 reviews = 3;
+}
+
+message ThroughputRequest {
+  string workspace = 1;
+  // Default 30.
+  int32 days = 2;
+}
+message ThroughputResponse {
+  repeated ThroughputDay days = 1;
+  repeated ReviewLatency review_latency = 2;
+  // Spend this budget period per agent, from the gateway.
+  repeated RoomSpend spend = 3;
+}
+
+message Report {
+  int64 id = 1;
+  string sender = 2;
+  google.protobuf.Timestamp at = 3;
+  // Markdown.
+  string body = 4;
+}
+
+message ReportsRequest {
+  string workspace = 1;
+  int32 limit = 2;
+}
+message ReportsResponse {
+  repeated Report reports = 1;
+}
+
+message RequestReportRequest {
+  string workspace = 1;
+  // Optional extra words for the chronicler.
+  string note = 2;
+}
+message RequestReportResponse {
+  // Chronicler rooms the request was sent to.
+  repeated string sent_to = 1;
+}

@@ -73,6 +73,8 @@ type Handler struct {
 	Send  Sender
 	// CIRed raises the people-facing notification; optional.
 	CIRed func(ctx context.Context, ev notify.Event)
+	// Record stores observatory events (§8.7); optional.
+	Record func(ctx context.Context, evs ...store.Activity)
 	Audit func(ctx context.Context, ev store.AuditEvent)
 	Log   *slog.Logger
 
@@ -169,6 +171,9 @@ func (h *Handler) Handle(ctx context.Context, d Delivery) error {
 	repo := p.repo()
 	if repo == nil || !strings.EqualFold(repo.Owner.Login, wsObj.Spec.Forge.Org) {
 		return errors.New("delivery is not about this workspace's org")
+	}
+	if h.Record != nil {
+		h.Record(ctx, Activities(d, &p, time.Now().UTC())...)
 	}
 	if isCI(d) {
 		if !h.firstForRun(d.Workspace, p.Run) {
@@ -290,6 +295,19 @@ type issue struct {
 	Assignees   []user          `json:"assignees"`
 	HTMLURL     string          `json:"html_url"`
 	PullRequest json.RawMessage `json:"pull_request"`
+	Merged      bool            `json:"merged"`
+	MergedBy    *user           `json:"merged_by"`
+}
+
+type commit struct {
+	ID        string    `json:"id"`
+	Message   string    `json:"message"`
+	URL       string    `json:"url"`
+	Timestamp time.Time `json:"timestamp"`
+	Author    struct {
+		Username string `json:"username"`
+		Name     string `json:"name"`
+	} `json:"author"`
 }
 
 type comment struct {
@@ -339,6 +357,9 @@ type payload struct {
 	Repository        *repository `json:"repository"`
 	Sender            *user       `json:"sender"`
 	Run               *actionRun  `json:"run"`
+	Commits           []commit    `json:"commits"`
+	Pusher            *user       `json:"pusher"`
+	Ref               string      `json:"ref"`
 }
 
 func (p *payload) repo() *repository {
