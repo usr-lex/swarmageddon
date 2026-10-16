@@ -98,9 +98,9 @@ func CLI(ctx context.Context, c roomv1connect.SupervisorServiceClient, args []st
 			return err
 		}
 		tw := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(tw, "ADDRESS\tKIND\tROLE\tGROUP\tPRESENCE\tNOTE")
+		fmt.Fprintln(tw, "ADDRESS\tKIND\tROLE\tGROUP\tPRESENCE\tTASK\tNOTE")
 		for _, a := range res.Msg.GetAgents() {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", a.GetAddress(), a.GetKind(), a.GetTitle(), a.GetGroup(), a.GetPresence(), a.GetNote())
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", a.GetAddress(), a.GetKind(), a.GetTitle(), a.GetGroup(), a.GetPresence(), a.GetCurrentTask(), a.GetNote())
 		}
 		return tw.Flush()
 	case "whoami":

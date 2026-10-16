@@ -117,8 +117,8 @@ func newRoom(t *testing.T, ctx context.Context, cli string, a func(*supervisor.C
 	mc, _ := msgclient.New(srv.URL, msgclient.TLSFiles{})
 	dedup, _ := msgclient.LoadDedup(filepath.Join(t.TempDir(), "seen"), 1000)
 	core := &supervisor.Core{
-		Room:      &roomcfg.Room{Room: "athena", Workspace: "acme", CLI: cli, RoleTitle: "Canary"},
-		CLI:       cli, Messaging: mc, Dedup: dedup, StatusDebounce: 100 * time.Millisecond,
+		Room: &roomcfg.Room{Room: "athena", Workspace: "acme", CLI: cli, RoleTitle: "Canary"},
+		CLI:  cli, Messaging: mc, Dedup: dedup, StatusDebounce: 100 * time.Millisecond,
 		Log: slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelInfo})),
 	}
 	core.Agent = a(core)
@@ -207,6 +207,4 @@ func etcOverlay(t *testing.T, files map[string][]byte, binary string) string {
 	return wrapper
 }
 
-
 func dump(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }
-

@@ -39,7 +39,7 @@ func (h *hookAgent) Hook(_ context.Context, ev string, p []byte, env map[string]
 func setup(t *testing.T) (*msgfake.Server, *hookAgent, string, context.Context) {
 	fake := msgfake.New()
 	fake.Self = "athena@acme"
-	fake.Peers = []*messagingv1.Peer{{Address: "hermes@acme", Kind: "agent", Title: "Coordinator", Presence: messagingv1.Presence_PRESENCE_IDLE}}
+	fake.Peers = []*messagingv1.Peer{{Address: "hermes@acme", Kind: "agent", Title: "Coordinator", Presence: messagingv1.Presence_PRESENCE_IDLE, CurrentTask: "planning sprint"}}
 	_, h := messagingv1connect.NewMessagingServiceHandler(fake)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
@@ -76,7 +76,7 @@ func TestCLIAndHook(t *testing.T) {
 	}
 	out.Reset()
 	CLI(ctx, c, []string{"agents"}, &out)
-	if !strings.Contains(out.String(), "hermes@acme") || !strings.Contains(out.String(), "idle") {
+	if !strings.Contains(out.String(), "hermes@acme") || !strings.Contains(out.String(), "idle") || !strings.Contains(out.String(), "planning sprint") {
 		t.Errorf("agents: %s", out.String())
 	}
 	out.Reset()

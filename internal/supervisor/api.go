@@ -62,7 +62,7 @@ func (a *API) ListAgents(ctx context.Context, _ *connect.Request[roomv1.ListAgen
 	for _, p := range res.Msg.GetPeers() {
 		out.Agents = append(out.Agents, &roomv1.Agent{
 			Address: p.GetAddress(), Kind: p.GetKind(), Title: p.GetTitle(), Summary: p.GetSummary(),
-			Group: p.GetGroup(), Presence: PresenceName(p.GetPresence()), Note: p.GetNote(),
+			Group: p.GetGroup(), Presence: PresenceName(p.GetPresence()), Note: p.GetNote(), CurrentTask: p.GetCurrentTask(),
 		})
 	}
 	return connect.NewResponse(out), nil
