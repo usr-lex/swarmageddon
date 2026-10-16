@@ -80,16 +80,6 @@ spec:
             secretKeyRef:
               key: secretKey
               name: forgejo-secrets
-        - name: FORGEJO__security__INTERNAL_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: internalToken
-              name: forgejo-secrets
-        - name: FORGEJO__oauth2__JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: jwtSecret
-              name: forgejo-secrets
         - name: FORGEJO__server__ROOT_URL
           value: http://forgejo.swarmageddon-platform.svc:3000/
         - name: FORGEJO__server__DOMAIN
@@ -204,16 +194,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: secretKey
-              name: forgejo-secrets
-        - name: FORGEJO__security__INTERNAL_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: internalToken
-              name: forgejo-secrets
-        - name: FORGEJO__oauth2__JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: jwtSecret
               name: forgejo-secrets
         - name: FORGEJO__server__ROOT_URL
           value: http://forgejo.swarmageddon-platform.svc:3000/

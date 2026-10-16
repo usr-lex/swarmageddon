@@ -67,10 +67,6 @@ spec:
             - {name: FORGEJO__security__INSTALL_LOCK, value: "true"}
             - name: FORGEJO__security__SECRET_KEY
               valueFrom: {secretKeyRef: {name: forgejo-secrets, key: secretKey}}
-            - name: FORGEJO__security__INTERNAL_TOKEN
-              valueFrom: {secretKeyRef: {name: forgejo-secrets, key: internalToken}}
-            - name: FORGEJO__oauth2__JWT_SECRET
-              valueFrom: {secretKeyRef: {name: forgejo-secrets, key: jwtSecret}}
             - {name: FORGEJO__server__ROOT_URL, value: {{ quote .Forgejo.RootURL }}}
             - {name: FORGEJO__server__DOMAIN, value: {{ quote .Forgejo.Domain }}}
             - {name: FORGEJO__server__HTTP_PORT, value: "3000"}
