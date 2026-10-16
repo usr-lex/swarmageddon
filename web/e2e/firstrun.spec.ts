@@ -68,10 +68,23 @@ test("setup, first-run wizard, workspace wizard, fleet, approve", async ({ page 
   await expect(page.getByLabel("Name").first()).toHaveValue("announcements-clean");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Next" }).click(); // warden & advisors
-  await page.getByLabel("Mode").selectOption("gate");
+  await page.getByLabel("Mode", { exact: true }).selectOption("gate");
   await page.getByLabel("implementer: advisor model").selectOption("claude-opus-5-5");
   await page.getByLabel("Also Claude's native advisor").first().check();
   await expect(page.getByText(/Unauditable/)).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click(); // room settings
+  // No ReadWriteMany in this cluster: no shared volumes step.
+  await expect(page.getByRole("navigation", { name: "Workspace steps" })).not.toContainText("Shared volumes");
+  await page.getByLabel("Mode", { exact: true }).selectOption("limited");
+  await page.getByLabel(/Allowed domains/).fill("api.example.com");
+  await page.getByRole("tab", { name: "room" }).click();
+  await page.getByRole("button", { name: "+ Add", exact: true }).first().click();
+  await page.getByLabel("Environment name").fill("LOG_LEVEL");
+  await page.getByLabel("Environment value").fill("debug");
+  const eff = page.getByTestId("effective-settings");
+  await expect(eff).toContainText("limited");
+  await expect(eff).toContainText("api.example.com");
+  await expect(eff).toContainText("LOG_LEVEL=debug");
   await page.getByRole("button", { name: "Next" }).click(); // notifications
   await page.getByRole("button", { name: "Next" }).click(); // review
   const plan = page.getByRole("list", { name: "Planned changes" });
@@ -79,7 +92,11 @@ test("setup, first-run wizard, workspace wizard, fleet, approve", async ({ page 
   await expect(plan).toContainText("RunnerPool default");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByTestId("progress-athena")).toHaveAttribute("data-phase", "Running", { timeout: 15_000 });
-  await page.getByRole("link", { name: /Go to the fleet/ }).click();
+  // The workspace's home: the observatory.
+  await page.getByRole("link", { name: "Observatory" }).click();
+  await expect(page).toHaveURL(/\/w\/acme$/);
+  await expect(page.getByTestId("now-row")).toHaveCount(3);
+  await page.getByRole("link", { name: "Fleet" }).click();
 
   // Fleet: the room waiting on a human sorts first.
   await expect(page).toHaveURL(/\/fleet$/);
@@ -115,6 +132,16 @@ test("room page: tabs and lifecycle confirmation", async ({ page }) => {
   await page.getByRole("tab", { name: "Storage" }).click();
   await page.getByRole("button", { name: "Prune build cache" }).click();
   await expect(page.getByText(/Reclaimed/)).toBeVisible();
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const eff = page.getByTestId("effective-settings");
+  await expect(eff).toContainText("limited");
+  await expect(eff).toContainText("TZ=UTC");
+  await expect(page.getByText("/shared/datasets")).toBeVisible();
+  await page.getByRole("button", { name: "+ Add", exact: true }).first().click();
+  await page.getByLabel("Environment name").fill("FEATURE");
+  await page.getByLabel("Environment value").fill("on");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(eff).toContainText("FEATURE=on");
   await page.getByRole("tab", { name: "Logs" }).click();
   await expect(page.getByRole("log", { name: "Logs" })).toContainText("supervisor");
   await page.getByRole("button", { name: "Recreate" }).click();

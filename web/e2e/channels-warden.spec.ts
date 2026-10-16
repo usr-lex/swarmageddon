@@ -34,11 +34,12 @@ test("warden: badges, verdicts, quarantine and release", async ({ page }) => {
   await expect(heph).toContainText("warden critical");
 
   await page.goto("/rooms/acme/hephaestus?tab=activity");
-  await expect(page.getByTestId("quarantine-banner")).toContainText("SSH");
+  await expect(page.getByTestId("quarantine-banner")).toContainText(".ssh");
   const verdicts = page.getByTestId("verdict");
   await expect(verdicts.first()).toContainText("Gateway guard");
   await verdicts.nth(1).getByRole("button", { name: "Dismiss" }).click();
   await expect(verdicts.nth(1)).toContainText("dismissed by admin");
+  await page.getByTestId("quarantine-banner").getByLabel(/Why it is safe/).fill("Key rotated; reviewed the transcript");
   await page.getByTestId("quarantine-banner").getByRole("button", { name: "Release" }).click();
   await expect(page.getByTestId("quarantine-banner")).toHaveCount(0);
 

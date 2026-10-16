@@ -41,11 +41,11 @@ test("observatory: panels render live data and respond", async ({ page }, info) 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 
-  if (process.env.SHOTS) {
-    for (const theme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme: theme });
-      await page.waitForTimeout(1500);
-      await page.screenshot({ path: `${process.env.SHOTS}/obs-${info.project.name}-${theme}.png`, fullPage: true });
-    }
+  // Screenshots in both themes (SHOTS picks the directory).
+  const dir = process.env.SHOTS ?? "test-results/shots";
+  for (const theme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${dir}/obs-${info.project.name}-${theme}.png`, fullPage: true });
   }
 });

@@ -1,6 +1,7 @@
 import type { AdvisorDraft, WardenMode } from "@/api/channels";
 import { Card, Checkbox, Field, Input, Select } from "@/components/ui";
 import type { DraftProps } from "./WorkspaceWizard";
+import { apiMode } from "@/api";
 
 const noAdvisor = (): AdvisorDraft => ({ model: "", effort: "high", maxCallsPerHour: 10, native: false });
 const efforts = ["low", "medium", "high", "xhigh", "max"];
@@ -62,6 +63,12 @@ export function WardenStep({ draft, set, models }: DraftProps & { models: string
   const roleUsesClaude = (role: string) => draft.rooms.some((r) => r.role === role && r.cli === "claude");
   return (
     <div className="space-y-4">
+      {apiMode() === "real" && (
+        <p role="note" className="border border-border bg-surface-2 p-2 text-xs text-muted">
+          The control center stores the warden's mode and model. Interrupt and quarantine on high, the warden budget, per-room modes and advisors
+          aren't in its API yet: set them on the Workspace, RoleTemplate and Room resources.
+        </p>
+      )}
       <Card title="Warden">
         <p className="mb-3 text-sm text-muted">A small model that watches each agent for drift, overreach, loops and risky actions. Its verdicts show on the fleet and in each room's Activity tab.</p>
         <div className="grid gap-3 sm:grid-cols-3">
