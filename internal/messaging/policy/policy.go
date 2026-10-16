@@ -72,6 +72,25 @@ type Route struct {
 	// group or to or from a person.
 	Link     string
 	Mediated bool
+	// Group sends only: the link crossed to each recipient (by name), and
+	// the members the sender may not reach, which are skipped.
+	Group   bool
+	Links   map[string]string
+	Skipped []Skip
+}
+
+// Skip is a member of a group send that policy refused.
+type Skip struct {
+	Name    string
+	Refusal *Refusal
+}
+
+// LinkTo is the link crossed to reach recipient.
+func (r *Route) LinkTo(recipient string) string {
+	if r.Group {
+		return r.Links[recipient]
+	}
+	return r.Link
 }
 
 // Lookup finds a room or person by name. Rooms win over people.
@@ -102,11 +121,11 @@ func Check(ws *directory.Workspace, isPerson IsPerson, from Party, to, body stri
 	if t.Workspace != ws.Name {
 		return nil, refuse(Denied, "workspace", "messages stay inside workspace %s; %s is in workspace %s", ws.Name, t, t.Workspace)
 	}
-	if t.Group {
+	if t.Group() {
 		if from.Kind == System {
 			return nil, refuse(Invalid, "forge", "forge notices go to one agent at a time, not to groups")
 		}
-		return checkGroup(ws, from, t.Name, body)
+		return checkGroup(ws, from, t.Selector(), body)
 	}
 	if t.Name == Forge {
 		return nil, refuse(Invalid, "forge", "forge notices are one-way; reply on the issue or PR")
@@ -158,50 +177,51 @@ func Allowed(ws *directory.Workspace, from, to Party) (bool, string) {
 	return true, strings.Join(notes, "; ")
 }
 
-// checkGroup routes @group: everyone in the group the sender may reach.
-func checkGroup(ws *directory.Workspace, from Party, group, body string) (*Route, *Refusal) {
-	if !ws.HasGroup(group) {
-		return nil, refuse(NotFound, "unknown-group", "there is no group %s in workspace %s", group, ws.Name)
+// checkGroup routes a group send (@role:, @team:, @group:): a direct
+// message to each matching room the sender may reach, checked one by one.
+// Members across a mediated link, or that policy refuses otherwise, are
+// skipped; it is refused only if no one is left.
+func checkGroup(ws *directory.Workspace, from Party, sel, body string) (*Route, *Refusal) {
+	rooms, err := ws.MatchRooms(sel)
+	if err != nil {
+		return nil, refuse(NotFound, "unknown-group", "%v", err)
 	}
-	var route Route
-	var members []Party
-	for _, name := range ws.RoomNames() {
-		r := ws.Rooms[name]
-		if r.Group == group && name != from.Name {
-			members = append(members, Party{Name: name, Kind: Agent, Group: group})
-		}
-	}
-	if len(members) == 0 {
-		return nil, refuse(Invalid, "empty-group", "group %s has no one else in it", group)
-	}
-	if from.Kind == Agent && from.Group != group {
-		l := findLink(ws, from.Group, group)
-		if l != nil && l.Mode == v1alpha1.LinkMediated {
-			return nil, refuse(Denied, "mediated-group",
-				"group addresses can't cross the mediated link %s; name exactly one recipient%s",
-				linkName(l), recipientsHint(l))
-		}
-	}
-	for _, m := range members {
-		link, r := pair(ws, from, m)
-		if r != nil {
+	route := &Route{Group: true, Links: map[string]string{}}
+	n := 0
+	for _, name := range rooms {
+		if name == from.Name {
 			continue
 		}
-		if link != nil {
-			if r := checkPrefix(link, m.Name, body); r != nil {
-				return nil, r
-			}
-			if link.From != link.To {
-				route.Link = linkName(link)
-			}
+		n++
+		m := Party{Name: name, Kind: Agent, Group: ws.Rooms[name].Group}
+		var link *v1alpha1.GroupLink
+		var r *Refusal
+		if l := findLink(ws, from.Group, m.Group); from.Kind == Agent && m.Group != from.Group && l != nil && l.Mode == v1alpha1.LinkMediated {
+			r = refuse(Denied, "mediated-group",
+				"group sends can't cross the mediated link %s; name exactly one recipient%s", linkName(l), recipientsHint(l))
+		} else {
+			link, r = pair(ws, from, m)
+		}
+		if r == nil && link != nil {
+			r = checkPrefix(link, m.Name, body)
+		}
+		if r != nil {
+			route.Skipped = append(route.Skipped, Skip{Name: name, Refusal: r})
+			continue
+		}
+		if link != nil && link.From != link.To {
+			route.Links[name] = linkName(link)
 		}
 		route.Recipients = append(route.Recipients, m)
 	}
-	if len(route.Recipients) == 0 {
-		_, r := pair(ws, from, members[0])
-		return nil, r
+	if n == 0 {
+		return nil, refuse(Invalid, "empty-group", "%s has no one else in it", sel)
 	}
-	return &route, nil
+	if len(route.Recipients) == 0 {
+		r := route.Skipped[0].Refusal
+		return nil, &Refusal{Code: r.Code, Rule: r.Rule, Reason: fmt.Sprintf("you can't reach any of the %d members of %s: %s", n, sel, r.Reason)}
+	}
+	return route, nil
 }
 
 // pair checks reachability between two parties and returns the link that

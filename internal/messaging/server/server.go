@@ -35,6 +35,9 @@ type Server struct {
 	// returned to their sender as a notice.
 	ExpiryInterval time.Duration
 	ExpiryMargin   time.Duration
+	// DigestTick is how often the inbox stream's leader looks for due
+	// channel digests.
+	DigestTick time.Duration
 }
 
 var _ messagingv1connect.MessagingServiceHandler = (*Server)(nil)
@@ -42,7 +45,7 @@ var _ messagingv1connect.MessagingServiceHandler = (*Server)(nil)
 // New returns a Server.
 func New(dir directory.Directory, st *store.Store, log *slog.Logger) *Server {
 	return &Server{dir: dir, st: st, lim: policy.NewLimiter(), log: log,
-		ExpiryInterval: 30 * time.Second, ExpiryMargin: time.Minute}
+		ExpiryInterval: 30 * time.Second, ExpiryMargin: time.Minute, DigestTick: 10 * time.Second}
 }
 
 // removeDeleted deletes the streams of workspaces that no longer exist. A
@@ -80,8 +83,20 @@ func (s *Server) removeDeleted(ctx context.Context, missing map[string]bool) {
 }
 
 // Run keeps every workspace's streams in line with its resource and runs the
-// expiry scan, until ctx ends.
+// expiry scan and channel digests, until ctx ends.
 func (s *Server) Run(ctx context.Context) {
+	go func() {
+		t := time.NewTicker(s.DigestTick)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.runDigests(ctx)
+			}
+		}
+	}()
 	t := time.NewTicker(s.ExpiryInterval)
 	defer t.Stop()
 	missing := map[string]bool{}
@@ -202,6 +217,11 @@ var refusalCodes = map[policy.Code]connect.Code{
 
 // refused audits a refusal and returns it as a Connect error.
 func (s *Server) refused(ctx context.Context, from *party, to, id, body string, r *policy.Refusal) error {
+	s.auditRefusal(ctx, from, to, id, body, r)
+	return connect.NewError(refusalCodes[r.Code], r)
+}
+
+func (s *Server) auditRefusal(ctx context.Context, from *party, to, id, body string, r *policy.Refusal) {
 	rec := &messagingv1.AuditRecord{Kind: store.AuditRefusal, From: from.addr, To: to, MessageId: id,
 		Reason: r.Rule + ": " + r.Reason}
 	if from.ws.AuditBodies() {
@@ -211,7 +231,6 @@ func (s *Server) refused(ctx context.Context, from *party, to, id, body string, 
 		s.log.Warn("audit refusal", "err", err)
 	}
 	s.log.Info("refused", "from", from.addr, "to", to, "rule", r.Rule, "reason", r.Reason)
-	return connect.NewError(refusalCodes[r.Code], r)
 }
 
 // Send implements MessagingService.
@@ -227,7 +246,7 @@ func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.Send
 	replyTo := ""
 	if m.ReplyTo != "" {
 		t, err := policy.ParseAddress(m.ReplyTo, from.ws.Name)
-		if err != nil || t.Group {
+		if err != nil || t.Group() {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reply_to must be name or name@workspace: %q", m.ReplyTo))
 		}
 		replyTo = t.String()
@@ -243,6 +262,22 @@ func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.Send
 	if r != nil {
 		return nil, s.refused(ctx, from, m.To, m.Id, m.Body, r)
 	}
+	if route.Group {
+		// Group sends count against the sender's fan-out budget (§7.8).
+		for _, sk := range route.Skipped {
+			s.auditRefusal(ctx, from, policy.Address(sk.Name, from.ws.Name), m.Id, m.Body, sk.Refusal)
+		}
+		if n, per := len(route.Recipients), from.ws.FanoutPerMinute(); !s.lim.AllowN("fanout/"+from.addr, n, per, time.Now()) {
+			return nil, s.refused(ctx, from, m.To, m.Id, m.Body, &policy.Refusal{Code: policy.Exhausted, Rule: "fanout",
+				Reason: fmt.Sprintf("%s reaches %d recipients, over %s's fan-out budget of %d a minute; wait, or post to a channel instead",
+					m.To, n, from.addr, per)})
+		}
+	}
+	if t, err := policy.ParseAddress(m.To, from.ws.Name); err == nil {
+		if r := s.sameBody(ctx, from, t.String(), m.Body, m.Id); r != nil {
+			return nil, s.refused(ctx, from, m.To, m.Id, m.Body, r)
+		}
+	}
 	sentAt := timestamppb.Now()
 	allDup := true
 	for _, rcpt := range route.Recipients {
@@ -250,7 +285,7 @@ func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.Send
 		msg := &messagingv1.Message{Id: m.Id, From: from.addr, To: to, ReplyTo: replyTo, Body: m.Body,
 			SentAt: sentAt, FromKind: string(from.p.Kind)}
 		dup, err := s.st.Deliver(ctx, from.ws.Name, rcpt.Name, m.Id+"/"+rcpt.Name,
-			&messagingv1.Delivery{Item: &messagingv1.Delivery_Message{Message: msg}})
+			&messagingv1.Delivery{Urgent: from.p.Kind == policy.Human, Item: &messagingv1.Delivery_Message{Message: msg}})
 		if err != nil {
 			return nil, unavailable(err)
 		}
@@ -258,23 +293,23 @@ func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.Send
 			continue
 		}
 		allDup = false
-		s.auditMessage(ctx, from, to, m, route)
+		s.auditMessage(ctx, from, to, m, route.LinkTo(rcpt.Name), route.Mediated)
 	}
 	return connect.NewResponse(&messagingv1.SendResponse{Id: m.Id, Duplicate: allDup}), nil
 }
 
-func (s *Server) auditMessage(ctx context.Context, from *party, to string, m *messagingv1.SendRequest, route *policy.Route) {
-	rec := &messagingv1.AuditRecord{Kind: store.AuditMessage, From: from.addr, To: to, MessageId: m.Id, Link: route.Link}
+func (s *Server) auditMessage(ctx context.Context, from *party, to string, m *messagingv1.SendRequest, link string, mediated bool) {
+	rec := &messagingv1.AuditRecord{Kind: store.AuditMessage, From: from.addr, To: to, MessageId: m.Id, Link: link}
 	if from.ws.AuditBodies() {
 		rec.Body = m.Body
 	}
 	if err := s.st.Audit(ctx, from.ws.Name, rec); err != nil {
 		s.log.Warn("audit message", "err", err)
 	}
-	if route.Mediated {
+	if mediated {
 		// Every crossing of a mediated link is logged in full (§7.4).
 		cr := &messagingv1.AuditRecord{Kind: store.AuditCrossing, From: from.addr, To: to, MessageId: m.Id,
-			Link: route.Link, Body: m.Body}
+			Link: link, Body: m.Body}
 		if err := s.st.Audit(ctx, from.ws.Name, cr); err != nil {
 			s.log.Warn("audit crossing", "err", err)
 		}
@@ -294,9 +329,7 @@ func (s *Server) Subscribe(ctx context.Context, req *connect.Request[messagingv1
 	if err := stream.Send(nil); err != nil { // send headers now, so clients see the stream open
 		return err
 	}
-	err = s.st.Subscribe(ctx, me.ws.Name, me.p.Name, func(_ string, d *messagingv1.Delivery) error {
-		return stream.Send(d)
-	})
+	err = s.st.Subscribe(ctx, me.ws.Name, me.p.Name, s.budget(me, stream.Send))
 	if err != nil && ctx.Err() == nil {
 		return unavailable(err)
 	}
@@ -317,6 +350,7 @@ func (s *Server) Ack(ctx context.Context, req *connect.Request[messagingv1.AckRe
 		}
 		return nil, unavailable(err)
 	}
+	s.markPushedRead(actx, me, req.Msg.DeliveryId)
 	return connect.NewResponse(&messagingv1.AckResponse{}), nil
 }
 
@@ -411,8 +445,8 @@ func (s *Server) QueryAudit(ctx context.Context, req *connect.Request[messagingv
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("workspace is required"))
 	}
 	for _, k := range m.Kinds {
-		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence, store.AuditVerdict}, k) {
-			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, crossing, refusal, presence or verdict", k))
+		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence, store.AuditVerdict, store.AuditPost}, k) {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, post, crossing, refusal, presence or verdict", k))
 		}
 	}
 	q := store.AuditQuery{Workspace: m.Workspace, Kinds: m.Kinds, Address: m.Address, Limit: int(m.Limit)}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,10 +25,29 @@ func (s *Store) Deliver(ctx context.Context, ws, recipient, msgID string, d *mes
 // ErrBadDelivery is returned by Ack for a delivery id the caller doesn't own.
 var ErrBadDelivery = errors.New("not a delivery of this inbox")
 
+// Pending is an inbox item handed out by Subscribe.
+type Pending struct {
+	Delivery *messagingv1.Delivery
+	// Entry is the stored message (sequence, headers, time).
+	Entry *Entry
+	// Delivered counts deliveries of this item (more than 1: a redelivery);
+	// Waiting is how many items wait behind it.
+	Delivered, Waiting uint64
+	msg                jetstream.Msg
+}
+
+// Ack acknowledges the item on the server's side, for items the service
+// itself decides not to push.
+func (p *Pending) Ack(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return p.msg.DoubleAck(ctx)
+}
+
 // Subscribe streams a recipient's inbox to fn, one unacked delivery at a
 // time, through the recipient's durable consumer, until ctx ends or fn fails.
 // The delivery id is the JetStream ack subject, so Ack works on any replica.
-func (s *Store) Subscribe(ctx context.Context, ws, name string, fn func(deliveryID string, d *messagingv1.Delivery) error) error {
+func (s *Store) Subscribe(ctx context.Context, ws, name string, fn func(*Pending) error) error {
 	stream, err := s.js.Stream(ctx, InboxStream(ws))
 	if err != nil {
 		return err
@@ -77,7 +97,12 @@ func (s *Store) Subscribe(ctx context.Context, ws, name string, fn func(delivery
 		}
 		d.DeliveryId = m.Reply()
 		last = m
-		if err := fn(m.Reply(), &d); err != nil {
+		p := &Pending{Delivery: &d, Entry: &Entry{Subject: m.Subject(), Header: m.Headers(), Data: m.Data()}, msg: m}
+		if meta, err := m.Metadata(); err == nil {
+			p.Entry.Seq, p.Entry.Time = meta.Sequence.Stream, meta.Timestamp
+			p.Delivered, p.Waiting = meta.NumDelivered, meta.NumPending
+		}
+		if err := fn(p); err != nil {
 			return err
 		}
 	}
@@ -91,6 +116,22 @@ func (s *Store) Ack(ctx context.Context, ws, name, deliveryID string) error {
 	}
 	_, err := s.nc.RequestWithContext(ctx, deliveryID, []byte("+ACK"))
 	return err
+}
+
+// DeliverySeq is the inbox stream sequence of a delivery id, or 0.
+func DeliverySeq(deliveryID string) uint64 {
+	t := strings.Split(deliveryID, ".")
+	var tok string
+	switch {
+	case len(t) == 9:
+		tok = t[5]
+	case len(t) >= 11:
+		tok = t[7]
+	default:
+		return 0
+	}
+	n, _ := strconv.ParseUint(tok, 10, 64)
+	return n
 }
 
 // parseAckSubject reads the stream and consumer from a JetStream ack subject:
@@ -173,7 +214,7 @@ func (s *Store) notifyExpired(ctx context.Context, ws, recipient string, m *mess
 	if !ok || sws != ws {
 		return
 	}
-	notice := &messagingv1.Delivery{Item: &messagingv1.Delivery_Notice{Notice: &messagingv1.Notice{
+	notice := &messagingv1.Delivery{Urgent: true, Item: &messagingv1.Delivery_Notice{Notice: &messagingv1.Notice{
 		Id: ulid.Make().String(),
 		Text: fmt.Sprintf("Not delivered: %s@%s did not pick up your message within %s, so it expired. It began: %q",
 			recipient, ws, maxAge, preview(m.GetBody())),

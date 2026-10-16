@@ -106,7 +106,7 @@ func run() error {
 			stop()
 		}
 	}()
-	defer hsrv.Close()
+	defer func() { _ = hsrv.Close() }()
 
 	// NATS and the store.
 	node, err := store.StartNode(store.NodeConfig{

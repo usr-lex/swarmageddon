@@ -60,6 +60,8 @@ func testDirectory() *directory.Static {
 				{From: "dirty", To: "clean", Mode: v1alpha1.LinkMediated, Senders: []string{"hecate"}, Recipients: []string{"hermes", "proteus"}, RequirePrefix: "to {recipient}:"},
 			},
 			Limits: v1alpha1.MessageLimits{RatePerMinute: 1000},
+			// The push budget has its own test (TestChannels).
+			Storm: v1alpha1.StormControl{PushPerMinute: 1000},
 		},
 		Rooms: map[string]directory.Room{
 			"hermes":  {Name: "hermes", Group: "clean", Title: "Coordinator", Summary: "Plans the work."},
@@ -87,7 +89,7 @@ func startCluster(t *testing.T, n int, dir directory.Directory) []*replica {
 	if testing.Verbose() {
 		out = os.Stderr
 	}
-	log := slog.New(slog.NewTextHandler(out, nil))
+	log := slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	ports := make([]int, n)
 	var routes []string
 	for i := range ports {
@@ -126,6 +128,7 @@ func startCluster(t *testing.T, n int, dir directory.Directory) []*replica {
 		r.st.AckWait = 5 * time.Second
 		srv := New(dir, r.st, log)
 		srv.ExpiryInterval, srv.ExpiryMargin = 500*time.Millisecond, 2*time.Second
+		srv.DigestTick = 300 * time.Millisecond
 		rctx, stop := context.WithCancel(context.Background())
 		r.stop = stop
 		go srv.Run(rctx)

@@ -140,9 +140,28 @@ supervisor runs `/usr/local/libexec/podman-ulimits` before starting Podman.
 ## Messaging storage
 
 One JetStream stream per workspace and kind, so retention is that stream's
-`MaxAge`: `INBOX_<ws>` (`inbox.<ws>.<name>`), `AUDIT_<ws>`
-(`audit.<ws>.{message,crossing,refusal,presence,verdict}`) and `APPROVALS_<ws>`
-(`approval.<ws>.<room>`); KV buckets `presence`, `status` and `people`. Each
-recipient has a durable consumer named after it. `Nats-Msg-Id` is
-`<id>/<recipient>`. Names match `^[a-z0-9][a-z0-9_-]{0,62}$`; `forge` and
-`status` are reserved system addresses.
+`MaxAge`: `INBOX_<ws>` (`inbox.<ws>.<name>`), `CHANNELS_<ws>`
+(`chan.<ws>.<channel>`, retained like messages), `AUDIT_<ws>`
+(`audit.<ws>.{message,post,crossing,refusal,presence,verdict}`) and
+`APPROVALS_<ws>` (`approval.<ws>.<room>`). Each recipient has a durable
+consumer named after it. `Nats-Msg-Id` is `<id>/<recipient>` for direct
+messages, `<id>` for posts, `post/<id>/<reader>` for a pushed post or
+mention, `digest/<channel>/<reader>/<last seq>` for digests and
+`overflow/<notice id>` for push-budget notices. A pushed post in an inbox
+carries its `CHANNELS` sequence in the `Swarm-Chan-Seq` header.
+
+KV buckets:
+
+| Bucket | Key | Value |
+|---|---|---|
+| `presence`, `status`, `people` | `<ws>.<name>` | as before |
+| `cursors` | `<ws>.<member>.<scope>` (scope `direct` or a channel) | JSON `{"upto": seq, "extra": [seq...]}`: read up to `upto` plus `extra`, in the inbox (direct) or `CHANNELS` (channel) sequence space |
+| `delivery` | `<ws>.<member>.<channel>` | `push`, `digest` or `pull`; unset means the channel default |
+| `digests` | `<ws>.<member>.<channel>` | JSON `{"seq", "sent"}`: last post covered, when the last digest went |
+| `dupes` | `<ws>.<sender>.<hash of target and body>` | first message id; bucket TTL 10 min (duplicate-body suppression) |
+
+`cursors`, `delivery`, `digests` and `dupes` are read through the stream
+leader (`$JS.API.STREAM.MSG.GET`), not direct gets, so a replica reads its
+own writes. Digests run only on the `INBOX_<ws>` stream leader. Names match
+`^[a-z0-9][a-z0-9_-]{0,62}$`; `forge` and `status` are reserved system
+addresses; `all`, `direct` and `mentions` can't be channel names.
