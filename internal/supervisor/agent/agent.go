@@ -41,6 +41,43 @@ type Events interface {
 	Approve(ctx context.Context, a Approval) (Decision, error)
 }
 
+// ToolCall describes a side-effecting call for the warden.
+type ToolCall struct {
+	// Tool as the CLI names it (Claude: Bash, Edit, mcp__x__y; ore: exec, patch).
+	Tool string
+	// Command is the shell command, or the file path for file tools.
+	Command string
+	// Input is the full input, JSON.
+	Input string
+}
+
+// Guard results.
+const (
+	GuardNone     = ""         // no objection; the normal permission flow applies
+	GuardAllow    = "allow"    // a rule allows it; the judge is skipped, the normal permission flow still applies
+	GuardDeny     = "deny"     // blocked; Reason is shown to the agent
+	GuardEscalate = "escalate" // a person must approve
+)
+
+// GuardResult is the warden's answer for a tool call.
+type GuardResult struct {
+	Action string
+	Reason string
+}
+
+// Guardian is implemented by Events that run the warden (ADR 0011);
+// drivers check for it with a type assertion.
+type Guardian interface {
+	// Guard checks a call before it runs (rules, and the judge in gate
+	// mode). Calls arriving together (parallel tool calls) are judged as
+	// one batch.
+	Guard(ctx context.Context, call ToolCall) GuardResult
+	// Observe records a call that ran, for trajectory review.
+	Observe(call ToolCall, failed bool)
+	// TurnEnded triggers a trajectory review.
+	TurnEnded()
+}
+
 // Approval is a permission request from the CLI.
 type Approval struct {
 	Tool    string

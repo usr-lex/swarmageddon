@@ -33,6 +33,7 @@ type Server struct {
 	status    []*messagingv1.RoomStatusReport
 	approvals []*messagingv1.ApprovalRequest
 	withdrawn []*messagingv1.WithdrawApprovalRequest
+	verdicts  []*messagingv1.Verdict
 	bcast     chan struct{}
 }
 
@@ -179,4 +180,20 @@ func (s *Server) WithdrawApproval(_ context.Context, r *connect.Request[messagin
 	s.mu.Unlock()
 	s.notify()
 	return connect.NewResponse(&messagingv1.WithdrawApprovalResponse{}), nil
+}
+
+// ReportVerdict records a verdict.
+func (s *Server) ReportVerdict(_ context.Context, r *connect.Request[messagingv1.ReportVerdictRequest]) (*connect.Response[messagingv1.ReportVerdictResponse], error) {
+	s.mu.Lock()
+	s.verdicts = append(s.verdicts, r.Msg.GetVerdict())
+	s.mu.Unlock()
+	s.notify()
+	return connect.NewResponse(&messagingv1.ReportVerdictResponse{}), nil
+}
+
+// Verdicts returns the reported verdicts.
+func (s *Server) Verdicts() []*messagingv1.Verdict {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*messagingv1.Verdict(nil), s.verdicts...)
 }

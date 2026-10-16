@@ -53,6 +53,8 @@ type Driver struct {
 	runSeq     int           // increments per CLI start
 	firstAt    int           // runSeq for which the first turn was sent
 	pending    map[*context.CancelFunc]string
+	// escalated holds the warden's reason for calls it escalated, by toolKey.
+	escalated map[string]string
 	transcript string
 }
 
@@ -337,7 +339,65 @@ func (d *Driver) Hook(ctx context.Context, event string, payload []byte, env map
 	case "PermissionRequest":
 		return d.permission(ctx, in)
 	}
+	if g, ok := ev.(agent.Guardian); ok {
+		switch event {
+		case "PreToolUse":
+			return d.guard(ctx, g, in)
+		case "PostToolUse", "PostToolUseFailure":
+			g.Observe(ToolCall(in.ToolName, in.ToolInput), event == "PostToolUseFailure")
+		case "Stop", "StopFailure":
+			g.TurnEnded()
+		}
+	}
 	return nil, nil
+}
+
+// ToolCall describes a Claude tool call for the warden.
+func ToolCall(tool string, input json.RawMessage) agent.ToolCall {
+	var m map[string]any
+	_ = json.Unmarshal(input, &m)
+	call := agent.ToolCall{Tool: tool, Input: string(input)}
+	for _, k := range []string{"command", "file_path", "notebook_path", "path", "url"} {
+		if v, ok := m[k].(string); ok && v != "" {
+			call.Command = v
+			break
+		}
+	}
+	return call
+}
+
+// PreToolOutput is the PreToolUse hook's answer.
+type PreToolOutput struct {
+	HookSpecificOutput struct {
+		HookEventName            string `json:"hookEventName"`
+		PermissionDecision       string `json:"permissionDecision"`
+		PermissionDecisionReason string `json:"permissionDecisionReason,omitempty"`
+	} `json:"hookSpecificOutput"`
+}
+
+// guard runs the warden before a tool call: deny returns the reason to the
+// agent; escalate answers "ask", which reaches PermissionRequest and so the
+// approvals inbox, with the warden's reason attached.
+func (d *Driver) guard(ctx context.Context, g agent.Guardian, in HookInput) ([]byte, error) {
+	res := g.Guard(ctx, ToolCall(in.ToolName, in.ToolInput))
+	var out PreToolOutput
+	out.HookSpecificOutput.HookEventName = "PreToolUse"
+	switch res.Action {
+	case agent.GuardDeny:
+		out.HookSpecificOutput.PermissionDecision = "deny"
+	case agent.GuardEscalate:
+		out.HookSpecificOutput.PermissionDecision = "ask"
+		d.mu.Lock()
+		if d.escalated == nil {
+			d.escalated = map[string]string{}
+		}
+		d.escalated[toolKey(in.ToolName, in.ToolInput)] = res.Reason
+		d.mu.Unlock()
+	default:
+		return nil, nil
+	}
+	out.HookSpecificOutput.PermissionDecisionReason = "Warden: " + res.Reason
+	return json.Marshal(out)
 }
 
 func (d *Driver) sessionStart(in HookInput, env map[string]string) {
@@ -386,6 +446,12 @@ func (d *Driver) permission(ctx context.Context, in HookInput) ([]byte, error) {
 		Detail:       string(in.ToolInput),
 		SessionScope: len(in.PermissionSuggestions) > 0,
 	}
+	d.mu.Lock()
+	if r, ok := d.escalated[toolKey(in.ToolName, in.ToolInput)]; ok {
+		a.Reason = "Escalated by the warden: " + r
+		delete(d.escalated, toolKey(in.ToolName, in.ToolInput))
+	}
+	d.mu.Unlock()
 	// Claude doesn't stop this hook when the dialog is answered in the TUI
 	// (checked with 2.1.301), so a later hook event for the same call, or
 	// the turn moving on, cancels it, which withdraws the request.

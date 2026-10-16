@@ -22,6 +22,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/supervisor/janitor"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/msgclient"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/warden"
 )
 
 // Volume is a mounted volume whose use is reported.
@@ -49,6 +50,8 @@ type Core struct {
 	CoalesceBytes int
 	// Advisor serves `swarm advise`; nil when the room has none.
 	Advisor *advisor.Advisor
+	// Warden runs the in-room warden layers; nil when it is off.
+	Warden *warden.Warden
 
 	mu        sync.Mutex
 	presence  messagingv1.Presence

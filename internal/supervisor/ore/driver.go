@@ -413,6 +413,19 @@ func (d *Driver) onNotification(method string, params json.RawMessage) {
 		if !waiting {
 			d.Events.Presence(messagingv1.Presence_PRESENCE_IDLE)
 		}
+		if g, ok := d.Events.(agent.Guardian); ok {
+			g.TurnEnded()
+		}
+	case "item/completed":
+		var n struct {
+			Item json.RawMessage `json:"item"`
+		}
+		_ = json.Unmarshal(params, &n)
+		if g, ok := d.Events.(agent.Guardian); ok {
+			if call, failed, ok := ItemCall(n.Item); ok {
+				g.Observe(call, failed)
+			}
+		}
 	case "thread/status/changed":
 		var n struct {
 			Status struct {
@@ -513,6 +526,24 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 		d.Log.Info("unhandled app-server request; left to the TUI", "method", method)
 		return
 	}
+	if g, ok := d.Events.(agent.Guardian); ok {
+		call := agent.ToolCall{Tool: a.Tool, Command: a.Summary, Input: a.Detail}
+		if a.Tool == "exec" && p.Command != nil {
+			call.Command = *p.Command
+		}
+		if c2, _, ok := ItemCall(json.RawMessage(a.Detail)); ok && a.Tool == "patch" {
+			call = c2
+		}
+		switch res := g.Guard(ctx, call); res.Action {
+		case agent.GuardDeny:
+			if err := c.Respond(ctx, id, map[string]any{"decision": "decline"}); err != nil {
+				d.Log.Warn("declining for the warden", "err", err)
+			}
+			return
+		case agent.GuardEscalate:
+			a.Reason = strings.TrimSpace(a.Reason + "\nEscalated by the warden: " + res.Reason)
+		}
+	}
 	actx, cancel := context.WithCancel(ctx)
 	d.mu.Lock()
 	d.approvals[string(id)] = cancel
@@ -559,4 +590,38 @@ func oneLine(s string) string {
 		s = s[:197] + "..."
 	}
 	return s
+}
+
+// ItemCall describes a completed thread item for the warden: commands,
+// file changes and MCP calls; ok is false for other items.
+func ItemCall(item json.RawMessage) (call agent.ToolCall, failed, ok bool) {
+	var it struct {
+		Type     string `json:"type"`
+		Command  string `json:"command"`
+		Status   string `json:"status"`
+		ExitCode *int   `json:"exitCode"`
+		Changes  []struct {
+			Path string `json:"path"`
+		} `json:"changes"`
+		Server    string          `json:"server"`
+		Tool      string          `json:"tool"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if json.Unmarshal(item, &it) != nil {
+		return call, false, false
+	}
+	failed = it.Status == "failed" || it.Status == "declined" || (it.ExitCode != nil && *it.ExitCode != 0)
+	switch it.Type {
+	case "commandExecution":
+		return agent.ToolCall{Tool: "exec", Command: it.Command}, failed, true
+	case "fileChange":
+		var paths []string
+		for _, c := range it.Changes {
+			paths = append(paths, c.Path)
+		}
+		return agent.ToolCall{Tool: "patch", Command: strings.Join(paths, " "), Input: string(item)}, failed, true
+	case "mcpToolCall":
+		return agent.ToolCall{Tool: "mcp__" + it.Server + "__" + it.Tool, Command: string(it.Arguments), Input: string(it.Arguments)}, failed, true
+	}
+	return call, false, false
 }

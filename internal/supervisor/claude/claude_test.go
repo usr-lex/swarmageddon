@@ -278,3 +278,54 @@ func TestHooksAndDelivery(t *testing.T) {
 		t.Fatal("PostToolUse did not resolve the pending request")
 	}
 }
+
+type guardEvents struct {
+	fakeEvents
+	observed []agent.ToolCall
+	failed   []bool
+	turns    int
+}
+
+func (g *guardEvents) Guard(_ context.Context, c agent.ToolCall) agent.GuardResult {
+	switch c.Command {
+	case "kill 1":
+		return agent.GuardResult{Action: agent.GuardDeny, Reason: "no"}
+	case "git push -f":
+		return agent.GuardResult{Action: agent.GuardEscalate, Reason: "force push"}
+	}
+	return agent.GuardResult{}
+}
+func (g *guardEvents) Observe(c agent.ToolCall, failed bool) {
+	g.observed = append(g.observed, c)
+	g.failed = append(g.failed, failed)
+}
+func (g *guardEvents) TurnEnded() { g.turns++ }
+
+func TestWardenHooks(t *testing.T) {
+	var reason string
+	ev := &guardEvents{fakeEvents: fakeEvents{approve: func(_ context.Context, a agent.Approval) (agent.Decision, error) {
+		reason = a.Reason
+		return agent.Decision{Allow: true}, nil
+	}}}
+	d := &Driver{Name: "athena", Home: t.TempDir(), Events: ev}
+	out, _ := d.Hook(context.Background(), "PreToolUse", []byte(`{"tool_name":"Bash","tool_input":{"command":"kill 1"}}`), nil)
+	if string(out) != `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Warden: no"}}` {
+		t.Errorf("deny: %s", out)
+	}
+	out, _ = d.Hook(context.Background(), "PreToolUse", []byte(`{"tool_name":"Bash","tool_input":{"command":"git push -f"}}`), nil)
+	if !strings.Contains(string(out), `"permissionDecision":"ask"`) {
+		t.Errorf("escalate: %s", out)
+	}
+	d.Hook(context.Background(), "PermissionRequest", []byte(`{"tool_name":"Bash","tool_input":{"command":"git push -f"}}`), nil)
+	if reason != "Escalated by the warden: force push" {
+		t.Errorf("approval reason %q", reason)
+	}
+	if out, _ := d.Hook(context.Background(), "PreToolUse", []byte(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`), nil); out != nil {
+		t.Errorf("no objection: %s", out)
+	}
+	d.Hook(context.Background(), "PostToolUseFailure", []byte(`{"tool_name":"Edit","tool_input":{"file_path":"/w/a.go"}}`), nil)
+	d.Hook(context.Background(), "Stop", []byte(`{}`), nil)
+	if len(ev.observed) != 1 || ev.observed[0].Command != "/w/a.go" || !ev.failed[0] || ev.turns != 1 {
+		t.Errorf("observed %+v %v turns %d", ev.observed, ev.failed, ev.turns)
+	}
+}

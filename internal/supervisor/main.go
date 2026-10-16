@@ -180,6 +180,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}
 	core.Dedup = dedup
 	core.Agent = newAgent(room, user, work, roleText, core, log)
+	core.Warden = NewWarden(room, core, readSecret(KeyWarden), roleText, work)
 	if room.Advisor.Model != "" {
 		core.Advisor = &advisor.Advisor{
 			LLM:        &llm.Client{BaseURL: room.GatewayURL, Key: readSecret(KeyAdvisor), Model: room.Advisor.Model, Effort: room.Advisor.Effort},
