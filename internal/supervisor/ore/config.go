@@ -122,7 +122,7 @@ func Config(p Policy) ([]byte, error) {
 		"args":                        []string{"mcp"},
 		"default_tools_approval_mode": "approve",
 	}
-	if tools := p.MCPTools["swarm"]; len(tools) > 0 && !(len(tools) == 1 && tools[0] == "*") {
+	if tools := p.MCPTools["swarm"]; len(tools) > 0 && (len(tools) != 1 || tools[0] != "*") {
 		swarm["enabled_tools"] = tools
 	}
 	if len(p.SwarmEnv) > 0 {

@@ -108,12 +108,12 @@ func ServeUnix(ctx context.Context, path string, gid int, h http.Handler) error 
 		return err
 	}
 	if err := os.Chmod(path, 0o660); err != nil {
-		l.Close()
+		_ = l.Close()
 		return err
 	}
 	if gid >= 0 && os.Getuid() == 0 {
 		if err := os.Chown(path, 0, gid); err != nil {
-			l.Close()
+			_ = l.Close()
 			return err
 		}
 	}
