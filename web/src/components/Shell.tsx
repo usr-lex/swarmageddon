@@ -151,7 +151,10 @@ function ThemeSwitch() {
       aria-label={`Theme: ${theme}. Switch to ${next}`}
       title={`Theme: ${theme}`}
     >
-      {theme === "dark" ? "☾" : theme === "light" ? "☀" : "◐"}
+      <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+        <circle cx="10" cy="10" r="7" fill={theme === "dark" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" />
+        {theme === "system" && <path d="M10 3 A7 7 0 0 1 10 17 Z" fill="currentColor" />}
+      </svg>
     </button>
   );
 }

@@ -98,7 +98,7 @@ export function HostnameStep({ platform, save, saving }: StepProps) {
             <a className="text-accent underline" href={caURL} download="swarmageddon-ca.crt">
               Download the CA certificate
             </a>{" "}
-            <span className="text-muted">(fingerprint {platform.caFingerprint})</span>
+            <span className="font-mono text-xs break-all text-muted">(fingerprint {platform.caFingerprint})</span>
           </p>
           <Tabs.Root defaultValue={guessOS()}>
             <Tabs.List aria-label="Operating system" className="flex flex-wrap gap-1 border-b border-border">
@@ -129,7 +129,7 @@ export function HostnameStep({ platform, save, saving }: StepProps) {
 
       <div className="flex justify-end gap-2">
         <Button busy={saving} onClick={() => save(spec, "workspace")}>
-          Skip for now
+          Skip this step
         </Button>
         <Button type="submit" variant="primary" busy={saving}>
           Save and continue
