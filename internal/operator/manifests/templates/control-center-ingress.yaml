@@ -1,0 +1,31 @@
+# The control center behind the cluster's default IngressClass (design §3.2):
+# no host rule, so https://<node-ip>/ works. TLS terminates at the ingress
+# with our certificate and is re-encrypted to the control center.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: control-center
+  namespace: {{ .SystemNamespace }}
+  labels: {swarmageddon.dev/component: control-center, app.kubernetes.io/name: control-center}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  ingressClassName: {{ .Ingress.ClassName }}
+  tls:
+    - secretName: control-center-tls
+{{- if .Ingress.Hostname }}
+      hosts: [{{ quote .Ingress.Hostname }}]
+{{- end }}
+  rules:
+    - {{ if .Ingress.Hostname }}host: {{ quote .Ingress.Hostname }}
+      {{ end }}http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: control-center
+                port: {number: 443}

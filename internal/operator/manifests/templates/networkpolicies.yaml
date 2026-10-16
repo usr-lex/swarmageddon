@@ -1,0 +1,118 @@
+# Ingress rules for the platform namespace. Only workspaces (rooms and
+# runners) and the system namespace (operator, control center) reach the
+# services they use; NATS routes only connect messaging pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: postgres}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 5432, protocol: TCP}]
+      from:
+        - podSelector:
+            matchExpressions:
+              - {key: swarmageddon.dev/component, operator: In, values: [forgejo, gateway, postgres-bootstrap]}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forgejo
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: forgejo}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 3000, protocol: TCP}, {port: 2222, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: messaging
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: messaging}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8443, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+    - ports: [{port: 8080, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+    - ports: [{port: 6222, protocol: TCP}, {port: 8443, protocol: TCP}]
+      from:
+        - podSelector:
+            matchLabels: {swarmageddon.dev/component: messaging}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: gateway}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 4000, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: registry-cache
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: registry-cache}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 5000, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+---
+# ntfy is reached by phones through an ingress controller, wherever that runs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntfy
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: ntfy}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8080, protocol: TCP}]
