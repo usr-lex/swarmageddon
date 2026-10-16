@@ -109,6 +109,22 @@ spec:
                 required:
                 - org
                 type: object
+              forgeNotifications:
+                description: |-
+                  ForgeNotifications lists the forge events delivered to agents as messages
+                  (docs/design.md §9.7). Empty: all of them.
+                items:
+                  description: ForgeEvent is a kind of forge activity delivered to
+                    agents.
+                  enum:
+                  - assigned
+                  - reviewRequested
+                  - mentioned
+                  - reviewSubmitted
+                  - commented
+                  - ciFailed
+                  type: string
+                type: array
               groups:
                 items:
                   properties:
