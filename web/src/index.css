@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Instrument-panel theme (§8.7): paper-like light first, a dark twin, ink for
+ * primary actions, hairline borders, one warm accent ("alert") for things
+ * that need a person.
+ */
+:root {
+  --bg: #f3f2ee;
+  --surface: #fbfbf8;
+  --surface-2: #ecebe5;
+  --border: #d9d7cf;
+  --grid: #e6e4dd;
+  --fg: #1b1b19;
+  --muted: #74726a;
+  --accent: #1b1b19;
+  --accent-fg: #fbfbf8;
+  --alert: #e2552b;
+  --ok: #3f8a5c;
+  --warn: #c98316;
+  --bad: #d23f2a;
+  --info: #45689c;
+  /* Chart roles. Two validated categorical slots (blue, aqua; dataviz
+     validator, adjacent and all pairs) plus a neutral; orange is reserved
+     for alerts. */
+  --viz-1: #2a78d6;
+  --viz-2: #1baf7a;
+  --viz-neutral: #a3a097;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0e0e0d;
+  --surface: #151513;
+  --surface-2: #1d1d1a;
+  --border: #2e2d29;
+  --grid: #22211e;
+  --fg: #e8e6df;
+  --muted: #8d8b83;
+  --accent: #e8e6df;
+  --accent-fg: #0e0e0d;
+  --alert: #ff6b3d;
+  --ok: #6cbf8a;
+  --warn: #e9a63b;
+  --bad: #ff6b55;
+  --info: #84a6d6;
+  --viz-1: #3987e5;
+  --viz-2: #199e70;
+  --viz-neutral: #6f6d66;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-grid: var(--grid);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-alert: var(--alert);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-neutral: var(--viz-neutral);
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum";
+}
+
+:focus-visible {
+  outline: 2px solid var(--alert);
+  outline-offset: 2px;
+}
+
+/* Quiet monospaced uppercase labels. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* A panel with hairline border and corner ticks. */
+.panel {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  border-color: var(--fg);
+  opacity: 0.55;
+}
+.panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+/* A subtle grid behind dashboards. */
+.gridded {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+/* Tasteful motion for live updates. */
+@keyframes flash {
+  from {
+    background-color: color-mix(in srgb, var(--alert) 14%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.flash {
+  animation: flash 1.6s ease-out;
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash,
+  .live-dot {
+    animation: none;
+  }
+  * {
+    transition: none !important;
+  }
+}
+
+.xterm {
+  padding: 6px;
+}
+
+/* Chronicler reports. */
+.report h3,
+.report h4,
+.report h5 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 0.4rem;
+}
+.report p {
+  margin: 0.35rem 0;
+}
+.report ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1rem;
+  list-style: square;
+}
+.report li::marker {
+  color: var(--muted);
+}
+.report code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 0 0.25em;
+}
+.report strong {
+  font-weight: 600;
+}
