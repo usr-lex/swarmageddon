@@ -13,4 +13,4 @@ A record is never edited after it is accepted; a later record supersedes it.
 | [0006](0006-claude-code-integration.md) | Claude Code integration | Proposed |
 | [0007](0007-ore-integration.md) | ore integration through its app-server | Proposed |
 | [0008](0008-platform-state-store.md) | Platform state: Kubernetes for bootstrap, one PostgreSQL for the rest | Proposed |
-| [0009](0009-forgejo-cli-for-agents.md) | Forgejo CLI for agents | Proposed |
+| [0009](0009-forgejo-cli-for-agents.md) | Forgejo CLI for agents: `tea` | Proposed |

@@ -64,7 +64,8 @@ Option 2.
   LiteLLM. Forgejo is single-replica anyway, so the platform as a whole does
   not survive losing the node that holds them; **messaging does** (ADR 0002),
   so agents already running keep talking to each other, and rooms keep
-  working, while the database's node is down. Rooms lose the forge and the
-  model gateway until it is back. A highly available PostgreSQL can replace
+  working, while the database's node is down. Rooms lose the forge until it is
+  back, and new model gateway keys can't be checked (LiteLLM caches keys it
+  has seen; how long it keeps working is to be measured in M3). A highly available PostgreSQL can replace
   this later behind the same connection Secrets without changing any
   component.
