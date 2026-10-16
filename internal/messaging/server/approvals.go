@@ -112,6 +112,9 @@ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messag
 		defer mu.Unlock()
 		return stream.Send(ev)
 	}
+	if err := stream.Send(nil); err != nil {
+		return err
+	}
 	watching := map[string]bool{}
 	watch := func(name string) {
 		ws, ok := s.dir.Workspace(name)
@@ -164,6 +167,9 @@ func (s *Server) WatchPresence(ctx context.Context, req *connect.Request[messagi
 				known = append(known, policy.Address(r, n))
 			}
 		}
+	}
+	if err := stream.Send(nil); err != nil {
+		return err
 	}
 	if err := s.st.WatchPresence(ctx, req.Msg.Workspaces, known, stream.Send); err != nil && ctx.Err() == nil {
 		return unavailable(err)

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -58,12 +59,12 @@ func (s *Store) WatchPresence(ctx context.Context, workspaces []string, known []
 			keys = append(keys, ws+".*")
 		}
 	}
-	pw, err := s.presence.WatchFiltered(ctx, keys)
+	pw, err := s.presence.WatchFiltered(ctx, slices.Clone(keys)) // it rewrites the slice
 	if err != nil {
 		return err
 	}
 	defer pw.Stop()
-	sw, err := s.status.WatchFiltered(ctx, keys)
+	sw, err := s.status.WatchFiltered(ctx, slices.Clone(keys))
 	if err != nil {
 		return err
 	}

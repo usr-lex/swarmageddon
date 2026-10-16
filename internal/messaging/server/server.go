@@ -250,6 +250,9 @@ func (s *Server) Subscribe(ctx context.Context, req *connect.Request[messagingv1
 	if err != nil {
 		return err
 	}
+	if err := stream.Send(nil); err != nil { // send headers now, so clients see the stream open
+		return err
+	}
 	err = s.st.Subscribe(ctx, me.ws.Name, me.p.Name, func(_ string, d *messagingv1.Delivery) error {
 		return stream.Send(d)
 	})

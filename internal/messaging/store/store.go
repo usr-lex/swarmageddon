@@ -56,7 +56,8 @@ type Store struct {
 
 	presence, status, people jetstream.KeyValue
 
-	mu      sync.Mutex
+	ensureMu sync.Mutex // serializes EnsureWorkspace
+	mu       sync.Mutex
 	applied map[string]WorkspaceConfig
 	known   map[string]bool // people known to exist, "<ws>.<handle>"
 }
@@ -103,7 +104,7 @@ func Open(ctx context.Context, node *Node, log *slog.Logger, opts Options) (*Sto
 // leader while a cluster forms or a replica restarts.
 func retry[T any](ctx context.Context, f func(context.Context) (T, error)) (T, error) {
 	for {
-		actx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		actx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		v, err := f(actx)
 		cancel()
 		if err == nil {
@@ -126,6 +127,16 @@ func (s *Store) EnsureWorkspace(ctx context.Context, ws string, cfg WorkspaceCon
 	if ok && prev == cfg {
 		return nil
 	}
+	s.ensureMu.Lock()
+	defer s.ensureMu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	s.mu.Lock()
+	prev, ok = s.applied[ws]
+	s.mu.Unlock()
+	if ok && prev == cfg {
+		return nil
+	}
 	streams := []jetstream.StreamConfig{
 		{Name: InboxStream(ws), Subjects: []string{"inbox." + ws + ".*"}, MaxAge: cfg.MessageRetention,
 			Duplicates: dedup(DedupWindow, cfg.MessageRetention)},
@@ -139,7 +150,7 @@ func (s *Store) EnsureWorkspace(ctx context.Context, ws string, cfg WorkspaceCon
 		sc.Replicas = s.node.replicas
 		sc.Retention = jetstream.LimitsPolicy
 		sc.Discard = jetstream.DiscardOld
-		if _, err := s.js.CreateOrUpdateStream(ctx, sc); err != nil {
+		if _, err := retry(ctx, func(ctx context.Context) (struct{}, error) { return struct{}{}, s.ensureStream(ctx, sc) }); err != nil {
 			return fmt.Errorf("stream %s: %w", sc.Name, err)
 		}
 	}
@@ -147,6 +158,32 @@ func (s *Store) EnsureWorkspace(ctx context.Context, ws string, cfg WorkspaceCon
 	s.applied[ws] = cfg
 	s.mu.Unlock()
 	return nil
+}
+
+// ensureStream creates sc, or updates it if its settings differ. Other
+// replicas may be creating it at the same moment.
+func (s *Store) ensureStream(ctx context.Context, sc jetstream.StreamConfig) error {
+	for range 3 {
+		st, err := s.js.Stream(ctx, sc.Name)
+		if errors.Is(err, jetstream.ErrStreamNotFound) {
+			_, err = s.js.CreateStream(ctx, sc)
+			if errors.Is(err, jetstream.ErrStreamNameAlreadyInUse) {
+				continue
+			}
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		c := st.CachedInfo().Config
+		if c.MaxAge == sc.MaxAge && c.Duplicates == sc.Duplicates && c.Replicas == sc.Replicas {
+			return nil
+		}
+		c.MaxAge, c.Duplicates, c.Replicas = sc.MaxAge, sc.Duplicates, sc.Replicas
+		_, err = s.js.UpdateStream(ctx, c)
+		return err
+	}
+	return errors.New("stream keeps changing")
 }
 
 func dedup(want, maxAge time.Duration) time.Duration {
