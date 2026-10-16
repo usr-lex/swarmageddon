@@ -46,7 +46,8 @@ export interface MessageMeta {
   from: string;
   to: string;
   kind: EdgeKind;
-  bytes: number;
+  /** Size, when known. */
+  bytes?: number;
 }
 
 export interface NowRow {

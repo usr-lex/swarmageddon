@@ -58,21 +58,24 @@ const kindStyle: Record<TranscriptEntry["kind"], string> = {
 
 function Transcript({ workspace, room }: { workspace: string; room: string }) {
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
+  const [error, setError] = useState<unknown>(null);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setEntries([]);
+    setError(null);
     const ctl = new AbortController();
     void consume(
       (s) => api().watchTranscript(workspace, room, s),
       (e) => setEntries((old) => (old.some((x) => x.id === e.id) ? old : [...old.slice(-999), e])),
       ctl.signal,
+      setError,
     );
     return () => ctl.abort();
   }, [workspace, room]);
   useEffect(() => end.current?.scrollIntoView?.({ block: "end" }), [entries.length]);
   return (
     <div className="h-[60vh] min-h-64 overflow-y-auto rounded-xs border border-border p-2" aria-label="Transcript" aria-live="polite" role="log">
-      {entries.length === 0 && <Spinner label="Waiting for the transcript" />}
+      {entries.length === 0 && (error ? <ErrorText error={error} /> : <Spinner label="Waiting for the transcript" />)}
       <ol className="space-y-2">
         {entries.map((e) => (
           <li key={e.id} className={cx("rounded-xs border p-2 text-sm whitespace-pre-wrap break-words", kindStyle[e.kind])}>
@@ -242,7 +245,7 @@ export function StorageTab({ workspace, room, canOperate }: { workspace: string;
     );
   return (
     <div className="space-y-4">
-      {!s.quotaEnforced && (
+      {s.quotaEnforced === false && (
         <p className="rounded-xs border border-warn/40 bg-warn/10 p-3 text-sm">
           This StorageClass doesn't enforce volume sizes. Quotas are soft: the janitor prunes and you get warnings at 80% and 90%.
         </p>
@@ -277,9 +280,9 @@ export function StorageTab({ workspace, room, canOperate }: { workspace: string;
           {pruneButton("all", "Prune everything unused")}
         </div>
       )}
-      <EngineList title="Images" items={s.images} />
-      <EngineList title="Containers" items={s.containers} />
-      <EngineList title="Engine volumes" items={s.engineVolumes} />
+      {s.images && <EngineList title="Images" items={s.images} />}
+      {s.containers && <EngineList title="Containers" items={s.containers} />}
+      {s.engineVolumes && <EngineList title="Engine volumes" items={s.engineVolumes} />}
       <Card title="Shared directories">
         {s.sharedDirs.length === 0 ? (
           <p className="text-sm text-muted">None.</p>

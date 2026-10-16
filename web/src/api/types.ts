@@ -364,11 +364,13 @@ export interface EngineItem {
 }
 
 export interface Storage {
-  quotaEnforced: boolean;
+  /** Undefined when unknown. */
+  quotaEnforced?: boolean;
   volumes: Volume[];
-  images: EngineItem[];
-  containers: EngineItem[];
-  engineVolumes: EngineItem[];
+  /** Engine contents, when the backend reports them. */
+  images?: EngineItem[];
+  containers?: EngineItem[];
+  engineVolumes?: EngineItem[];
   sharedDirs: { name: string; readOnly: boolean }[];
 }
 

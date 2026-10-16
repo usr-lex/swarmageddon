@@ -200,7 +200,7 @@ function PairMessages({ workspace, window, a, b, onClose }: { workspace: string;
             <span>
               {m.from} → {m.to}
             </span>
-            <span className="ml-auto text-muted tabular-nums">{m.bytes} B</span>
+            {m.bytes !== undefined && <span className="ml-auto text-muted tabular-nums">{m.bytes} B</span>}
           </li>
         ))}
       </ul>

@@ -11,7 +11,7 @@
     "e2e": "playwright test",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "generate": "buf generate ../proto --template buf.gen.yaml --path ../proto/swarm/controlcenter --path ../proto/swarm/messaging"
+    "generate": "buf generate ../proto --template buf.gen.yaml --path ../proto/swarm/controlcenter"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.16.0",
