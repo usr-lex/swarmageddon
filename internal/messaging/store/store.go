@@ -56,7 +56,8 @@ type Store struct {
 	// AckWait is how long a delivery waits for its ack before redelivery.
 	AckWait time.Duration
 
-	presence, status, people jetstream.KeyValue
+	presence, status, people           jetstream.KeyValue
+	cursors, delivery, digests, dupes jetstream.KeyValue
 
 	ensureMu sync.Mutex // serializes EnsureWorkspace
 	mu       sync.Mutex
@@ -87,6 +88,10 @@ func Open(ctx context.Context, node *Node, log *slog.Logger, opts Options) (*Sto
 		{&s.presence, jetstream.KeyValueConfig{Bucket: BucketPresence, TTL: opts.PresenceTTL, LimitMarkerTTL: 10 * time.Minute}},
 		{&s.status, jetstream.KeyValueConfig{Bucket: BucketStatus}},
 		{&s.people, jetstream.KeyValueConfig{Bucket: BucketPeople}},
+		{&s.cursors, jetstream.KeyValueConfig{Bucket: BucketCursors}},
+		{&s.delivery, jetstream.KeyValueConfig{Bucket: BucketDelivery}},
+		{&s.digests, jetstream.KeyValueConfig{Bucket: BucketDigests}},
+		{&s.dupes, jetstream.KeyValueConfig{Bucket: BucketDupes, TTL: DedupWindow}},
 	}
 	for _, b := range buckets {
 		b.cfg.Replicas = node.replicas
@@ -142,6 +147,8 @@ func (s *Store) EnsureWorkspace(ctx context.Context, ws string, cfg WorkspaceCon
 	streams := []jetstream.StreamConfig{
 		{Name: InboxStream(ws), Subjects: []string{"inbox." + ws + ".*"}, MaxAge: cfg.MessageRetention,
 			Duplicates: dedup(DedupWindow, cfg.MessageRetention)},
+		{Name: ChannelStream(ws), Subjects: []string{"chan." + ws + ".*"}, MaxAge: cfg.MessageRetention,
+			Duplicates: dedup(DedupWindow, cfg.MessageRetention)},
 		{Name: AuditStream(ws), Subjects: []string{"audit." + ws + ".*"}, MaxAge: cfg.AuditRetention,
 			Duplicates: dedup(2*time.Minute, cfg.AuditRetention)},
 		{Name: ApprovalStream(ws), Subjects: []string{"approval." + ws + ".*"}, MaxAge: cfg.ApprovalRetention,
@@ -167,7 +174,7 @@ func (s *Store) WorkspaceStreams(ctx context.Context) ([]string, error) {
 	seen := map[string]bool{}
 	names := s.js.StreamNames(ctx)
 	for n := range names.Name() {
-		for _, prefix := range []string{"INBOX_", "AUDIT_", "APPROVALS_"} {
+		for _, prefix := range []string{"INBOX_", "CHANNELS_", "AUDIT_", "APPROVALS_"} {
 			if strings.HasPrefix(n, prefix) {
 				seen[strings.TrimPrefix(n, prefix)] = true
 			}
@@ -185,9 +192,13 @@ func (s *Store) WorkspaceStreams(ctx context.Context) ([]string, error) {
 }
 
 // RemoveWorkspace deletes a workspace's streams: its inboxes, audit log and
-// approvals. Used once the Workspace resource is gone.
+// approvals, channels and read positions. Used once the Workspace resource
+// is gone.
 func (s *Store) RemoveWorkspace(ctx context.Context, ws string) error {
-	for _, name := range []string{InboxStream(ws), AuditStream(ws), ApprovalStream(ws)} {
+	if err := s.purgeKeys(ctx, ws); err != nil {
+		return err
+	}
+	for _, name := range []string{InboxStream(ws), ChannelStream(ws), AuditStream(ws), ApprovalStream(ws)} {
 		if err := s.js.DeleteStream(ctx, name); err != nil && !errors.Is(err, jetstream.ErrStreamNotFound) {
 			return fmt.Errorf("delete stream %s: %w", name, err)
 		}

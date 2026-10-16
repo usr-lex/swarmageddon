@@ -77,11 +77,11 @@ func TestCheck(t *testing.T) {
 			code: Denied, rule: "mediated-recipient", reason: "hecate may only message hermes and proteus"},
 		{name: "not the keeper", from: agent("argus"), to: "proteus", body: "to proteus: raw output",
 			code: Denied, rule: "mediated-sender", reason: "only hecate may message proteus"},
-		{name: "no group address across a mediated link", from: agent("hermes"), to: "@dirty", body: "all",
+		{name: "no group address across a mediated link", from: agent("hermes"), to: "@group:dirty", body: "all",
 			code: Denied, rule: "mediated-group", reason: "name exactly one recipient: metis"},
 		// within a group
 		{name: "within group", from: agent("hermes"), to: "themis", body: "hi", want: []string{"themis"}},
-		{name: "group fan-out within group", from: agent("hermes"), to: "@clean", body: "hi", want: []string{"proteus", "themis"}},
+		{name: "group fan-out within group", from: agent("hermes"), to: "@group:clean", body: "hi", want: []string{"proteus", "themis"}},
 		{name: "within group closed", ws: func(w *directory.Workspace) { w.Messaging.DefaultLinks = v1alpha1.DefaultNone },
 			from: agent("hermes"), to: "themis", body: "hi", code: Denied, rule: "within-group", reason: "rooms in clean can't message each other"},
 		{name: "within group closed but self link open", ws: func(w *directory.Workspace) {
@@ -93,20 +93,20 @@ func TestCheck(t *testing.T) {
 		// open links and required prefixes
 		{name: "open link with prefix", from: agent("atlas"), to: "themis", body: "[ops] deploy at 5", want: []string{"themis"}, link: "ops->clean"},
 		{name: "open link without prefix", from: agent("atlas"), to: "themis", body: "deploy at 5", code: Invalid, rule: "prefix", reason: `"[ops]"`},
-		{name: "open link group fan-out", from: agent("atlas"), to: "@clean", body: "[ops] hi", want: []string{"hermes", "proteus", "themis"}, link: "ops->clean"},
+		{name: "open link group fan-out", from: agent("atlas"), to: "@group:clean", body: "[ops] hi", want: []string{"hermes", "proteus", "themis"}, link: "ops->clean"},
 		{name: "closed link", from: agent("themis"), to: "atlas", body: "hi", code: Denied, rule: "link-none", reason: "the link clean->ops is closed"},
 		{name: "no link", from: agent("metis"), to: "atlas", body: "hi", code: Denied, rule: "no-link", reason: "metis may message rooms in dirty and clean"},
 		// people
 		{name: "agent to person", from: agent("metis"), to: "alice", body: "question", want: []string{"alice"}},
 		{name: "person to agent across groups", from: alice, to: "metis", body: "hi", want: []string{"metis"}},
-		{name: "person to group", from: alice, to: "@dirty", body: "hi", want: []string{"argus", "hecate", "metis"}},
+		{name: "person to group", from: alice, to: "@group:dirty", body: "hi", want: []string{"argus", "hecate", "metis"}},
 		{name: "person to person", from: alice, to: "bob@acme", body: "hi", want: []string{"bob"}},
 		{name: "humans not reachable", ws: func(w *directory.Workspace) { f := false; w.Messaging.HumansReachable = &f },
 			from: agent("metis"), to: "alice", body: "hi", code: Denied, rule: "humans"},
 		// forge notices (§9.7)
 		{name: "forge bypasses links", from: Party{Name: "forge", Kind: System}, to: "metis", body: "hermes requested your review", want: []string{"metis"}},
 		{name: "forge to a person", from: Party{Name: "forge", Kind: System}, to: "alice", body: "x", code: Invalid, rule: "forge"},
-		{name: "forge to a group", from: Party{Name: "forge", Kind: System}, to: "@clean", body: "x", code: Invalid, rule: "forge"},
+		{name: "forge to a group", from: Party{Name: "forge", Kind: System}, to: "@group:clean", body: "x", code: Invalid, rule: "forge"},
 		{name: "forge size limit", from: Party{Name: "forge", Kind: System}, to: "metis", body: strings.Repeat("x", 101), code: Invalid, rule: "size"},
 		{name: "agents can't reply to forge", from: agent("hermes"), to: "forge", body: "thanks", code: Invalid, rule: "forge",
 			reason: "forge notices are one-way; reply on the issue or PR"},
@@ -120,7 +120,7 @@ func TestCheck(t *testing.T) {
 		{name: "forge can't send to status", from: Party{Name: "forge", Kind: System}, to: "status", body: "x", code: Invalid, rule: "forge"},
 		// addressing and limits
 		{name: "unknown recipient", from: agent("hermes"), to: "zeus", body: "hi", code: NotFound, rule: "unknown-recipient"},
-		{name: "unknown group", from: agent("hermes"), to: "@olympus", body: "hi", code: NotFound, rule: "unknown-group"},
+		{name: "unknown group", from: agent("hermes"), to: "@group:olympus", body: "hi", code: NotFound, rule: "unknown-group"},
 		{name: "other workspace", from: agent("hermes"), to: "metis@other", body: "hi", code: Denied, rule: "workspace"},
 		{name: "federation reserved", from: agent("hermes"), to: "metis@acme.east", body: "hi", code: Invalid, rule: "address"},
 		{name: "bad address", from: agent("hermes"), to: "Metis!", body: "hi", code: Invalid, rule: "address"},
@@ -153,8 +153,8 @@ func TestCheck(t *testing.T) {
 			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
 				t.Fatalf("recipients = %v; want %v", got, tc.want)
 			}
-			if route.Link != tc.link || route.Mediated != tc.mediated {
-				t.Fatalf("link = %q mediated=%v; want %q %v", route.Link, route.Mediated, tc.link, tc.mediated)
+			if route.LinkTo(got[0]) != tc.link || route.Mediated != tc.mediated {
+				t.Fatalf("link = %q mediated=%v; want %q %v", route.LinkTo(got[0]), route.Mediated, tc.link, tc.mediated)
 			}
 		})
 	}
@@ -176,14 +176,14 @@ func TestAllowed(t *testing.T) {
 
 func TestParseAddress(t *testing.T) {
 	for in, want := range map[string]string{
-		"metis": "metis@acme", "metis@beta": "metis@beta", "@clean": "@clean@acme", "@clean@beta": "@clean@beta",
+		"metis": "metis@acme", "metis@beta": "metis@beta", "@group:clean": "@group:clean@acme", "@role:reviewer@beta": "@role:reviewer@beta",
 	} {
 		got, err := ParseAddress(in, "acme")
 		if err != nil || got.String() != want {
 			t.Errorf("ParseAddress(%q) = %v, %v; want %s", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"", "@", "a@b@c", "a.b", "a@", "UPPER"} {
+	for _, in := range []string{"", "@", "a@b@c", "a.b", "a@", "UPPER", "@clean", "@everyone:x", "@group:"} {
 		if _, err := ParseAddress(in, "acme"); err == nil {
 			t.Errorf("ParseAddress(%q) succeeded", in)
 		}
