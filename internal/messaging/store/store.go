@@ -61,8 +61,17 @@ type Store struct {
 	known   map[string]bool // people known to exist, "<ws>.<handle>"
 }
 
+// Options tune a Store; zero values take the defaults.
+type Options struct {
+	// PresenceTTL is how long a presence report lasts without a refresh.
+	PresenceTTL time.Duration
+}
+
 // Open waits for JetStream and creates the KV buckets.
-func Open(ctx context.Context, node *Node, log *slog.Logger) (*Store, error) {
+func Open(ctx context.Context, node *Node, log *slog.Logger, opts Options) (*Store, error) {
+	if opts.PresenceTTL == 0 {
+		opts.PresenceTTL = PresenceTTL
+	}
 	if err := node.WaitJetStream(ctx); err != nil {
 		return nil, err
 	}
@@ -72,7 +81,7 @@ func Open(ctx context.Context, node *Node, log *slog.Logger) (*Store, error) {
 		kv  *jetstream.KeyValue
 		cfg jetstream.KeyValueConfig
 	}{
-		{&s.presence, jetstream.KeyValueConfig{Bucket: BucketPresence, TTL: PresenceTTL, LimitMarkerTTL: 10 * time.Minute}},
+		{&s.presence, jetstream.KeyValueConfig{Bucket: BucketPresence, TTL: opts.PresenceTTL, LimitMarkerTTL: 10 * time.Minute}},
 		{&s.status, jetstream.KeyValueConfig{Bucket: BucketStatus}},
 		{&s.people, jetstream.KeyValueConfig{Bucket: BucketPeople}},
 	}

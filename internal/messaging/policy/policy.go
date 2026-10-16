@@ -13,9 +13,17 @@ import (
 type Kind string
 
 const (
-	Agent Kind = "agent"
-	Human Kind = "human"
+	Agent  Kind = "agent"
+	Human  Kind = "human"
+	System Kind = "system"
 )
+
+// Forge is the name of the system sender that relays forge activity
+// (design §9.7). Only the control center may send as it; it is one-way.
+const Forge = "forge"
+
+// ForgeRatePerMinute is the forge sender's rate limit per workspace.
+const ForgeRatePerMinute = 120
 
 // Party is a sender or recipient inside one workspace.
 type Party struct {
@@ -61,6 +69,9 @@ type Route struct {
 
 // Lookup finds a room or person by name. Rooms win over people.
 func Lookup(ws *directory.Workspace, isPerson IsPerson, name string) (Party, bool) {
+	if name == Forge {
+		return Party{Name: Forge, Kind: System}, true
+	}
 	if r, ok := ws.Rooms[name]; ok {
 		return Party{Name: name, Kind: Agent, Group: r.Group}, true
 	}
@@ -85,7 +96,13 @@ func Check(ws *directory.Workspace, isPerson IsPerson, from Party, to, body stri
 		return nil, refuse(Denied, "workspace", "messages stay inside workspace %s; %s is in workspace %s", ws.Name, t, t.Workspace)
 	}
 	if t.Group {
+		if from.Kind == System {
+			return nil, refuse(Invalid, "forge", "forge notices go to one agent at a time, not to groups")
+		}
 		return checkGroup(ws, from, t.Name, body)
+	}
+	if t.Name == Forge {
+		return nil, refuse(Invalid, "forge", "forge notices are one-way; reply on the issue or PR")
 	}
 	rcpt, ok := Lookup(ws, isPerson, t.Name)
 	if !ok {
@@ -183,6 +200,16 @@ func checkGroup(ws *directory.Workspace, from Party, group, body string) (*Route
 // pair checks reachability between two parties and returns the link that
 // governs it (nil when none applies: within a group by default, or people).
 func pair(ws *directory.Workspace, from, to Party) (*v1alpha1.GroupLink, *Refusal) {
+	if from.Kind == System {
+		// The forge's own permissions already decided visibility (§9.7).
+		if to.Kind != Agent {
+			return nil, refuse(Invalid, "forge", "forge notices go to agents only; %s is a person", to.Name)
+		}
+		return nil, nil
+	}
+	if to.Kind == System {
+		return nil, refuse(Invalid, "forge", "forge notices are one-way; reply on the issue or PR")
+	}
 	if from.Kind == Human || to.Kind == Human {
 		if from.Kind == Human && to.Kind == Human {
 			return nil, nil

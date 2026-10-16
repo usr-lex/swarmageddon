@@ -103,6 +103,14 @@ func TestCheck(t *testing.T) {
 		{name: "person to person", from: alice, to: "bob@acme", body: "hi", want: []string{"bob"}},
 		{name: "humans not reachable", ws: func(w *directory.Workspace) { f := false; w.Messaging.HumansReachable = &f },
 			from: agent("metis"), to: "alice", body: "hi", code: Denied, rule: "humans"},
+		// forge notices (§9.7)
+		{name: "forge bypasses links", from: Party{Name: "forge", Kind: System}, to: "metis", body: "hermes requested your review", want: []string{"metis"}},
+		{name: "forge to a person", from: Party{Name: "forge", Kind: System}, to: "alice", body: "x", code: Invalid, rule: "forge"},
+		{name: "forge to a group", from: Party{Name: "forge", Kind: System}, to: "@clean", body: "x", code: Invalid, rule: "forge"},
+		{name: "forge size limit", from: Party{Name: "forge", Kind: System}, to: "metis", body: strings.Repeat("x", 101), code: Invalid, rule: "size"},
+		{name: "agents can't reply to forge", from: agent("hermes"), to: "forge", body: "thanks", code: Invalid, rule: "forge",
+			reason: "forge notices are one-way; reply on the issue or PR"},
+		{name: "people can't reply to forge", from: alice, to: "forge@acme", body: "thanks", code: Invalid, rule: "forge"},
 		// addressing and limits
 		{name: "unknown recipient", from: agent("hermes"), to: "zeus", body: "hi", code: NotFound, rule: "unknown-recipient"},
 		{name: "unknown group", from: agent("hermes"), to: "@olympus", body: "hi", code: NotFound, rule: "unknown-group"},
