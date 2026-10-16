@@ -38,6 +38,10 @@ type WorkspaceSpec struct {
 	// ApprovalTimeout after which an unanswered approval leaves the inbox. Default 24h.
 	// +optional
 	ApprovalTimeout *metav1.Duration `json:"approvalTimeout,omitempty"`
+	// ForgeNotifications lists the forge events delivered to agents as messages
+	// (docs/design.md §9.7). Empty: all of them.
+	// +optional
+	ForgeNotifications []ForgeEvent `json:"forgeNotifications,omitempty"`
 	// DeletedRoomRetention keeps a removed room's volumes this long. Default 168h.
 	// +optional
 	DeletedRoomRetention *metav1.Duration `json:"deletedRoomRetention,omitempty"`
@@ -218,6 +222,19 @@ type RepositorySpec struct {
 	// +optional
 	StatusChecks []string `json:"statusChecks,omitempty"`
 }
+
+// ForgeEvent is a kind of forge activity delivered to agents.
+// +kubebuilder:validation:Enum=assigned;reviewRequested;mentioned;reviewSubmitted;commented;ciFailed
+type ForgeEvent string
+
+const (
+	ForgeAssigned        ForgeEvent = "assigned"
+	ForgeReviewRequested ForgeEvent = "reviewRequested"
+	ForgeMentioned       ForgeEvent = "mentioned"
+	ForgeReviewSubmitted ForgeEvent = "reviewSubmitted"
+	ForgeCommented       ForgeEvent = "commented"
+	ForgeCIFailed        ForgeEvent = "ciFailed"
+)
 
 // UpdateMode is when rooms move to a new image.
 // +kubebuilder:validation:Enum=whenIdle;manual;window
