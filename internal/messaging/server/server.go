@@ -22,6 +22,9 @@ import (
 
 // Server is the Connect handler.
 type Server struct {
+	// Answers Unimplemented for methods this server doesn't implement yet.
+	messagingv1connect.UnimplementedMessagingServiceHandler
+
 	dir directory.Directory
 	st  *store.Store
 	lim *policy.Limiter
@@ -42,12 +45,48 @@ func New(dir directory.Directory, st *store.Store, log *slog.Logger) *Server {
 		ExpiryInterval: 30 * time.Second, ExpiryMargin: time.Minute}
 }
 
+// removeDeleted deletes the streams of workspaces that no longer exist. A
+// workspace must be missing from a synced directory on two scans in a row,
+// so a slow or restarting watch never costs a workspace its messages.
+func (s *Server) removeDeleted(ctx context.Context, missing map[string]bool) {
+	if !s.dir.Ready() {
+		return
+	}
+	have, err := s.st.WorkspaceStreams(ctx)
+	if err != nil {
+		s.log.Warn("list streams", "err", err)
+		return
+	}
+	now := map[string]bool{}
+	for _, ws := range have {
+		if _, ok := s.dir.Workspace(ws); ok {
+			continue
+		}
+		if missing[ws] {
+			if err := s.st.RemoveWorkspace(ctx, ws); err != nil {
+				s.log.Warn("remove deleted workspace", "workspace", ws, "err", err)
+				now[ws] = true
+				continue
+			}
+			s.log.Info("removed the streams of a deleted workspace", "workspace", ws)
+			continue
+		}
+		now[ws] = true
+	}
+	clear(missing)
+	for ws := range now {
+		missing[ws] = true
+	}
+}
+
 // Run keeps every workspace's streams in line with its resource and runs the
 // expiry scan, until ctx ends.
 func (s *Server) Run(ctx context.Context) {
 	t := time.NewTicker(s.ExpiryInterval)
 	defer t.Stop()
+	missing := map[string]bool{}
 	for {
+		s.removeDeleted(ctx, missing)
 		for _, name := range s.dir.Workspaces() {
 			ws, ok := s.dir.Workspace(name)
 			if !ok {
@@ -372,8 +411,8 @@ func (s *Server) QueryAudit(ctx context.Context, req *connect.Request[messagingv
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("workspace is required"))
 	}
 	for _, k := range m.Kinds {
-		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence}, k) {
-			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, crossing, refusal or presence", k))
+		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence, store.AuditVerdict}, k) {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, crossing, refusal, presence or verdict", k))
 		}
 	}
 	q := store.AuditQuery{Workspace: m.Workspace, Kinds: m.Kinds, Address: m.Address, Limit: int(m.Limit)}

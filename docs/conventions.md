@@ -87,7 +87,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 
 | Binary | Flags |
 |---|---|
-| `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version` |
+| `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version`; env `POD_NAMESPACE`. `operator welcome` (the chart's welcome Job): waits for Platform `default` `status.url` and Secret `setup-token`, prints the URL, the token, `status.caFingerprint` and the port-forward fallback, exits 0 |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
 | `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
@@ -100,11 +100,17 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 `messaging`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
 the operator in `internal/operator/images/images.go`.
 
+Each image's ENTRYPOINT is its binary (`images/service/Dockerfile` is the
+shared default; a `cmd/<name>/Dockerfile` overrides it), so manifests pass only
+`args`. The chart runs the operator, control center and welcome Job as uid
+65532 with a read-only root filesystem and a writable `/tmp`. The room
+supervisor runs `/usr/local/libexec/podman-ulimits` before starting Podman.
+
 ## Messaging storage
 
 One JetStream stream per workspace and kind, so retention is that stream's
 `MaxAge`: `INBOX_<ws>` (`inbox.<ws>.<name>`), `AUDIT_<ws>`
-(`audit.<ws>.{message,crossing,refusal,presence}`) and `APPROVALS_<ws>`
+(`audit.<ws>.{message,crossing,refusal,presence,verdict}`) and `APPROVALS_<ws>`
 (`approval.<ws>.<room>`); KV buckets `presence`, `status` and `people`. Each
 recipient has a durable consumer named after it. `Nats-Msg-Id` is
 `<id>/<recipient>`. Names match `^[a-z0-9][a-z0-9_-]{0,62}$`; `forge` and

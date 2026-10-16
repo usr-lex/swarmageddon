@@ -17,6 +17,7 @@ const (
 	AuditCrossing = "crossing"
 	AuditRefusal  = "refusal"
 	AuditPresence = "presence"
+	AuditVerdict  = "verdict"
 )
 
 // Audit appends a record to audit.<ws>.<rec.Kind>.

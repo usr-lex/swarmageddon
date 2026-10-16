@@ -1,0 +1,2082 @@
+# swarmageddon 0.1.0: rendered from charts/swarmageddon by 'make install-yaml'. Do not edit.
+---
+# Source: swarmageddon/crds/swarmageddon.dev_platforms.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: platforms.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: Platform
+    listKind: PlatformList
+    plural: platforms
+    singular: platform
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.adminClaimed
+      name: Admin
+      type: boolean
+    - jsonPath: .status.url
+      name: URL
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Platform is the installation. There is one, named "default".
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'PlatformSpec is the installation: services, sign-in, hostname
+              and TLS.'
+            properties:
+              auditRetention:
+                description: Retention for the control center's audit log. 0 keeps
+                  it forever.
+                type: string
+              auth:
+                properties:
+                  defaultRole:
+                    description: DefaultRole for signed-in users no mapping matches.
+                      Empty refuses them.
+                    enum:
+                    - admin
+                    - operator
+                    - viewer
+                    type: string
+                  local:
+                    properties:
+                      disabled:
+                        description: Disabled turns off local accounts once an identity
+                          provider works.
+                        type: boolean
+                    type: object
+                  oidc:
+                    items:
+                      properties:
+                        clientID:
+                          type: string
+                        clientSecretRef:
+                          description: Secret in the system namespace with key clientSecret.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        displayName:
+                          type: string
+                        groupsClaim:
+                          default: groups
+                          type: string
+                        issuer:
+                          type: string
+                        name:
+                          description: Name shown on the sign-in page; also the provider's
+                            ID in URLs.
+                          pattern: ^[a-z0-9-]+$
+                          type: string
+                        scopes:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - clientID
+                      - clientSecretRef
+                      - issuer
+                      - name
+                      type: object
+                    type: array
+                  roleMappings:
+                    description: RoleMappings map identity-provider groups to roles.
+                      The highest matching role wins.
+                    items:
+                      properties:
+                        group:
+                          type: string
+                        role:
+                          description: Role is a control center role.
+                          enum:
+                          - admin
+                          - operator
+                          - viewer
+                          type: string
+                      required:
+                      - group
+                      - role
+                      type: object
+                    type: array
+                  saml:
+                    items:
+                      properties:
+                        displayName:
+                          type: string
+                        groupsAttribute:
+                          default: groups
+                          type: string
+                        metadataConfigMapRef:
+                          description: ConfigMap in the system namespace with key
+                            metadata.xml.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        metadataURL:
+                          type: string
+                        name:
+                          pattern: ^[a-z0-9-]+$
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
+              egress:
+                properties:
+                  clusterCIDRs:
+                    description: ClusterCIDRs overrides detection of the pod, service
+                      and node ranges rooms may not reach.
+                    items:
+                      type: string
+                    type: array
+                  extraDeniedCIDRs:
+                    description: ExtraDeniedCIDRs are also kept from rooms.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              hostname:
+                description: |-
+                  Hostname the control center (and Forgejo, under forge.<hostname>) is served on.
+                  Empty: reach it by node IP, NodePort or port-forward.
+                type: string
+              isolationTier:
+                default: auto
+                description: IsolationTier is how rooms nest containers (ADR 0001).
+                enum:
+                - auto
+                - userns
+                - sysbox
+                - privileged
+                type: string
+              privilegedAccepted:
+                description: PrivilegedAccepted must be true for rooms to run privileged;
+                  isolation does not hold then.
+                type: boolean
+              services:
+                description: Services lists the platform services and their sizes.
+                  Deployed once Wizard.ServicesApproved is set.
+                properties:
+                  forgejo:
+                    properties:
+                      oidcLogin:
+                        description: OIDCLogin lets people sign in to Forgejo with
+                          the first OIDC provider.
+                        type: boolean
+                      storage:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  gateway:
+                    properties:
+                      providers:
+                        items:
+                          properties:
+                            apiKeySecretRef:
+                              description: Secret in the platform namespace with key
+                                apiKey. Optional for local servers.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            baseURL:
+                              description: Base URL, for openaiCompatible (e.g. a
+                                local vLLM) or a proxy.
+                              type: string
+                            kind:
+                              description: ProviderKind is a model provider's API.
+                              enum:
+                              - anthropic
+                              - openai
+                              - openaiCompatible
+                              type: string
+                            models:
+                              description: Models this provider serves, as the gateway
+                                exposes them.
+                              items:
+                                type: string
+                              type: array
+                            name:
+                              pattern: ^[a-z0-9-]+$
+                              type: string
+                          required:
+                          - kind
+                          - models
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  messaging:
+                    properties:
+                      replicas:
+                        description: Replicas; 0 picks 3, or 1 on a single-node cluster.
+                        format: int32
+                        type: integer
+                      storage:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  ntfy:
+                    properties:
+                      enabled:
+                        type: boolean
+                      storage:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  postgres:
+                    properties:
+                      storage:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  registryCache:
+                    properties:
+                      storage:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      upstreams:
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+              tls:
+                properties:
+                  issuerRef:
+                    description: cert-manager issuer, when Mode is certManager.
+                    properties:
+                      kind:
+                        default: ClusterIssuer
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  mode:
+                    default: selfSigned
+                    description: TLSMode chooses where the control center's certificate
+                      comes from.
+                    enum:
+                    - selfSigned
+                    - certManager
+                    type: string
+                type: object
+              wizard:
+                description: Wizard records how far the first-run wizard got, so it
+                  can be resumed.
+                properties:
+                  servicesApproved:
+                    description: ServicesApproved starts deploying the platform services.
+                    type: boolean
+                  step:
+                    description: Step the wizard was on, for resuming.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: PlatformStatus is the operator's view of the installation.
+            properties:
+              adminClaimed:
+                type: boolean
+              caFingerprint:
+                description: SHA-256 fingerprint of the control center's CA, to check
+                  before typing the setup token.
+                type: string
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                format: int64
+                type: integer
+              preflight:
+                properties:
+                  checks:
+                    items:
+                      properties:
+                        fix:
+                          description: What to do about a warning or failure.
+                          type: string
+                        message:
+                          type: string
+                        name:
+                          type: string
+                        result:
+                          description: CheckResult is the outcome of one preflight
+                            check.
+                          enum:
+                          - pass
+                          - warn
+                          - fail
+                          - pending
+                          type: string
+                      required:
+                      - name
+                      - result
+                      type: object
+                    type: array
+                  clusterCIDRs:
+                    description: Detected ranges rooms may not reach.
+                    items:
+                      type: string
+                    type: array
+                  completedAt:
+                    format: date-time
+                    type: string
+                  roomEstimate:
+                    description: About how many rooms of the default size fit.
+                    format: int32
+                    type: integer
+                  tier:
+                    description: The isolation tier preflight chose (or the spec forced).
+                    enum:
+                    - auto
+                    - userns
+                    - sysbox
+                    - privileged
+                    type: string
+                type: object
+              url:
+                description: URL the control center is reachable on, as far as the
+                  operator can tell.
+                type: string
+              versions:
+                additionalProperties:
+                  type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+---
+# Source: swarmageddon/crds/swarmageddon.dev_roletemplates.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: roletemplates.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: RoleTemplate
+    listKind: RoleTemplateList
+    plural: roletemplates
+    singular: roletemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.title
+      name: Title
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RoleTemplate is a persona rooms are created from.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              RoleTemplateSpec is a persona: role text plus CLI policy. Personas are
+              guardrails, not security (docs/design.md §6.4).
+            properties:
+              autoApprove:
+                description: AutoApprove rules the control center applies to approval
+                  requests.
+                items:
+                  properties:
+                    decision:
+                      default: allow
+                      description: ApprovalDecision is what an automatic rule answers.
+                      enum:
+                      - allow
+                      - deny
+                      type: string
+                    match:
+                      description: Match is a regular expression against the command
+                        or file path.
+                      type: string
+                    tool:
+                      description: 'Tool name (Claude: Bash, Edit, ...; ore: exec,
+                        patch). "*" for any.'
+                      type: string
+                  required:
+                  - tool
+                  type: object
+                type: array
+              claudeCode:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  deny:
+                    items:
+                      type: string
+                    type: array
+                  hooks:
+                    description: Hooks in Claude Code's settings.json format, added
+                      after the platform's own.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  managedRulesOnly:
+                    description: ManagedRulesOnly sets allowManagedPermissionRulesOnly.
+                    type: boolean
+                  permissionMode:
+                    description: PermissionMode is Claude Code's permission mode.
+                    enum:
+                    - default
+                    - acceptEdits
+                    - auto
+                    - plan
+                    - bypassPermissions
+                    type: string
+                type: object
+              firstTurn:
+                description: 'FirstTurn is the prompt a room gets when it starts.
+                  Empty: the built-in one.'
+                type: string
+              forgeTeams:
+                description: ForgeTeams the room's forge user joins (implementers,
+                  reviewers, mergers, ci).
+                items:
+                  type: string
+                type: array
+              ore:
+                properties:
+                  approvalPolicy:
+                    default: on-request
+                    description: OreApprovalPolicy is ore's approval_policy.
+                    enum:
+                    - on-request
+                    - on-failure
+                    - never
+                    type: string
+                  approvalsReviewer:
+                    default: user
+                    enum:
+                    - user
+                    - auto_review
+                    type: string
+                  bypass:
+                    description: Bypass runs ore without approvals or sandbox.
+                    type: boolean
+                  mcpTools:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: 'MCPTools: per server, the tools enabled. Empty:
+                      all.'
+                    type: object
+                  rules:
+                    description: Rules in execpolicy syntax (prefix_rule(...)), one
+                      file.
+                    type: string
+                  sandboxMode:
+                    description: 'SandboxMode: read-only, workspace-write or danger-full-access.'
+                    type: string
+                type: object
+              roleText:
+                description: RoleText is written to the agent.
+                type: string
+              summary:
+                description: One line, shown in teammates' team lists.
+                type: string
+              title:
+                type: string
+            required:
+            - roleText
+            - title
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+
+---
+# Source: swarmageddon/crds/swarmageddon.dev_rooms.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: rooms.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: Room
+    listKind: RoomList
+    plural: rooms
+    singular: room
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.cli
+      name: CLI
+      type: string
+    - jsonPath: .spec.role
+      name: Role
+      type: string
+    - jsonPath: .spec.group
+      name: Group
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Room is one agent's persistent environment.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              RoomSpec describes one worker's room. It lives in its workspace's namespace;
+              the room's name is the agent's name.
+            properties:
+              cli:
+                default: claude
+                description: CLI is the agent CLI a room runs.
+                enum:
+                - claude
+                - ore
+                type: string
+              displayName:
+                type: string
+              effort:
+                description: Effort, e.g. low, medium, high, xhigh, max.
+                type: string
+              env:
+                additionalProperties:
+                  type: string
+                description: Env adds non-secret environment variables.
+                type: object
+              group:
+                type: string
+              image:
+                description: Image overrides the room image (for development).
+                type: string
+              model:
+                description: 'Model, as the gateway names it. Empty: the workspace
+                  default.'
+                type: string
+              paused:
+                description: Paused scales the room to zero; its volumes stay.
+                type: boolean
+              repos:
+                description: Repos (owner/name in the forge) cloned into ~/work on
+                  first start.
+                items:
+                  type: string
+                type: array
+              resources:
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              role:
+                description: Role names a RoleTemplate in the same namespace.
+                type: string
+              sharedDirs:
+                items:
+                  properties:
+                    name:
+                      description: Name of a ReadWriteMany PersistentVolumeClaim in
+                        the workspace namespace; mounted at /srv/shared/<name>.
+                      type: string
+                    readOnly:
+                      type: boolean
+                  required:
+                  - name
+                  type: object
+                type: array
+              sudo:
+                default: true
+                description: Sudo gives the agent passwordless sudo inside the room.
+                type: boolean
+              volumes:
+                properties:
+                  engine:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  home:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storageClassName:
+                    type: string
+                type: object
+              workDir:
+                description: WorkDir the agent starts in, relative to its home. Default
+                  "work".
+                type: string
+            required:
+            - cli
+            - role
+            type: object
+          status:
+            properties:
+              address:
+                description: Address on the messaging service, name@workspace.
+                type: string
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              credentialsRotatedAt:
+                format: date-time
+                type: string
+              forgeUser:
+                type: string
+              imageVersion:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: RoomPhase summarizes a room's lifecycle.
+                enum:
+                - Provisioning
+                - Running
+                - Paused
+                - Updating
+                - Failed
+                type: string
+              updateAvailable:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+---
+# Source: swarmageddon/crds/swarmageddon.dev_runnerpools.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: runnerpools.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: RunnerPool
+    listKind: RunnerPoolList
+    plural: runnerpools
+    singular: runnerpool
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.running
+      name: Running
+      type: integer
+    - jsonPath: .status.waiting
+      name: Waiting
+      type: integer
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RunnerPool is a workspace's CI capacity.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RunnerPoolSpec runs ephemeral one-job Forgejo Actions runners
+              for a workspace.
+            properties:
+              group:
+                description: Group limits the pool to repositories owned by this group's
+                  team.
+                type: string
+              image:
+                description: Image overrides the runner image.
+                type: string
+              labels:
+                description: Labels jobs select with runs-on.
+                items:
+                  type: string
+                minItems: 1
+                type: array
+              maxConcurrent:
+                default: 4
+                format: int32
+                type: integer
+              minFreeDiskGB:
+                default: 5
+                description: MinFreeDiskGB on the node below which jobs wait instead
+                  of starting.
+                format: int32
+                type: integer
+              repos:
+                description: 'Repos limits the pool to these repositories of the workspace''s
+                  org; empty: the whole org.'
+                items:
+                  type: string
+                type: array
+              resources:
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  ephemeralStorage:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+            required:
+            - labels
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                format: int64
+                type: integer
+              running:
+                format: int32
+                type: integer
+              waiting:
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+---
+# Source: swarmageddon/crds/swarmageddon.dev_workspaces.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: workspaces.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: Workspace
+    listKind: WorkspaceList
+    plural: workspaces
+    shortNames:
+    - ws
+    singular: workspace
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.forge.org
+      name: Org
+      type: string
+    - jsonPath: .status.namespace
+      name: Namespace
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Workspace is a team of agents.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              WorkspaceSpec is a team: its forge org, groups, messaging policy, models
+              and notifications. The workspace owns the namespace ws-<name>.
+            properties:
+              allowedCIDRs:
+                description: AllowedCIDRs rooms may reach even inside denied ranges
+                  (e.g. a model server on the LAN).
+                items:
+                  type: string
+                type: array
+              approvalTimeout:
+                description: ApprovalTimeout after which an unanswered approval leaves
+                  the inbox. Default 24h.
+                type: string
+              deletedRoomRetention:
+                description: DeletedRoomRetention keeps a removed room's volumes this
+                  long. Default 168h.
+                type: string
+              displayName:
+                type: string
+              forge:
+                properties:
+                  org:
+                    description: Org is the Forgejo organization the workspace's agents
+                      work in.
+                    pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+                    type: string
+                  requiredApprovals:
+                    default: 1
+                    format: int32
+                    type: integer
+                  signedCommits:
+                    default: true
+                    type: boolean
+                  teams:
+                    description: Extra teams and their members (room names). Built-in
+                      teams come from role templates.
+                    items:
+                      properties:
+                        members:
+                          items:
+                            type: string
+                          type: array
+                        name:
+                          type: string
+                        permission:
+                          default: write
+                          description: TeamPermission is a Forgejo team permission.
+                          enum:
+                          - read
+                          - write
+                          - admin
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                required:
+                - org
+                type: object
+              groups:
+                items:
+                  properties:
+                    description:
+                      type: string
+                    name:
+                      pattern: ^[a-z][a-z0-9-]*$
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              internet:
+                default: true
+                description: 'Room egress: false cuts rooms off from the internet;
+                  platform services stay reachable.'
+                type: boolean
+              isolationTier:
+                default: inherit
+                type: string
+              messaging:
+                properties:
+                  defaultLinks:
+                    default: withinGroup
+                    description: DefaultLinks is how rooms in the same group reach
+                      each other.
+                    enum:
+                    - withinGroup
+                    - none
+                    type: string
+                  humansReachable:
+                    default: true
+                    description: People with the operator role may message agents;
+                      agents may message people.
+                    type: boolean
+                  limits:
+                    properties:
+                      maxBytes:
+                        default: 65536
+                        format: int32
+                        type: integer
+                      ratePerMinute:
+                        default: 30
+                        format: int32
+                        type: integer
+                    type: object
+                  links:
+                    description: Links between groups. "" names the default group
+                      (rooms without a group).
+                    items:
+                      description: GroupLink lets messages flow one way, from one
+                        group to another.
+                      properties:
+                        from:
+                          type: string
+                        mode:
+                          description: LinkMode is how one group may reach another.
+                          enum:
+                          - open
+                          - mediated
+                          - none
+                          type: string
+                        recipients:
+                          description: 'Mediated: only these rooms in To may receive.
+                            Empty: anyone.'
+                          items:
+                            type: string
+                          type: array
+                        requirePrefix:
+                          description: RequirePrefix the message must start with;
+                            {recipient} is replaced by the recipient's name.
+                          type: string
+                        senders:
+                          description: 'Mediated: only these rooms in From may send.
+                            Empty: anyone.'
+                          items:
+                            type: string
+                          type: array
+                        to:
+                          type: string
+                      required:
+                      - from
+                      - mode
+                      - to
+                      type: object
+                    type: array
+                  retention:
+                    description: RetentionSettings are TTLs; 0 keeps forever.
+                    properties:
+                      audit:
+                        type: string
+                      auditBodies:
+                        default: true
+                        description: AuditBodies keeps message bodies in the audit
+                          log; false keeps metadata only.
+                        type: boolean
+                      messages:
+                        type: string
+                      transcripts:
+                        type: string
+                    type: object
+                type: object
+              models:
+                properties:
+                  budgets:
+                    properties:
+                      perRoomMonthlyUSD:
+                        description: Monthly budget per room in USD; 0 is unlimited.
+                        format: int32
+                        type: integer
+                    type: object
+                  default:
+                    type: string
+                type: object
+              notifications:
+                properties:
+                  channels:
+                    items:
+                      properties:
+                        kind:
+                          description: ChannelKind is a notification channel.
+                          enum:
+                          - webPush
+                          - ntfy
+                          - slack
+                          - discord
+                          - email
+                          type: string
+                        secretName:
+                          description: Secret in the system namespace holding key
+                            url (Slack, Discord) or smtp settings (email).
+                          type: string
+                        topic:
+                          description: ntfy topic.
+                          type: string
+                      required:
+                      - kind
+                      type: object
+                    type: array
+                  events:
+                    items:
+                      description: NotificationEvent is something people get notified
+                        about.
+                      enum:
+                      - approvalWaiting
+                      - idleWithOpenWork
+                      - ciRed
+                      - budget
+                      - diskLow
+                      - roomCrashed
+                      type: string
+                    type: array
+                type: object
+              owners:
+                description: Owners are control center users (by email or handle)
+                  who operate this workspace.
+                items:
+                  type: string
+                type: array
+              repositories:
+                items:
+                  properties:
+                    group:
+                      description: 'Group whose team owns it; empty: the default teams.'
+                      type: string
+                    importURL:
+                      description: ImportURL to clone from instead of creating an
+                        empty repository.
+                      type: string
+                    mirrorSecretName:
+                      type: string
+                    name:
+                      pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+                      type: string
+                    pushMirror:
+                      description: PushMirror to GitHub (or any git URL); credentials
+                        from MirrorSecretName (key token).
+                      type: string
+                    statusChecks:
+                      description: StatusChecks required on the default branch.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - name
+                  type: object
+                type: array
+              updatePolicy:
+                properties:
+                  mode:
+                    default: whenIdle
+                    description: UpdateMode is when rooms move to a new image.
+                    enum:
+                    - whenIdle
+                    - manual
+                    - window
+                    type: string
+                  window:
+                    description: Window, for mode window, e.g. "Sat 02:00-06:00" (UTC).
+                    type: string
+                type: object
+            required:
+            - forge
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              namespace:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+---
+# Source: swarmageddon/templates/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+---
+# Source: swarmageddon/templates/control-center-rbac.yaml
+# The control center's own RBAC (docs/design.md §11.3). Its access inside
+# workspace namespaces comes from RoleBindings the operator creates there.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: control-center
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+---
+# Source: swarmageddon/templates/operator-rbac.yaml
+# The operator is the trusted component (docs/design.md §11.3): it manages our
+# CRDs, namespaces and the kinds below in the namespaces it creates. RBAC
+# can't scope a ClusterRole to labelled namespaces, so this is cluster-wide;
+# no wildcards.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: swarmageddon-operator
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+---
+# Source: swarmageddon/templates/welcome.yaml
+# Prints how to get in, for `kubectl apply` installs (docs/design.md §3.1):
+#   kubectl -n swarmageddon-system logs -f job/welcome
+# `operator welcome` waits for Platform "default" to report status.url and for
+# Secret setup-token, then prints the URL, the token, the CA fingerprint and a
+# port-forward fallback. It may read only those two objects.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: welcome
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+---
+# Source: swarmageddon/templates/control-center-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-control-center
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+rules:
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms, workspaces]
+    verbs: [get, list, watch, create, update, patch]
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms/status, workspaces/status]
+    verbs: [get]
+---
+# Source: swarmageddon/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-operator
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+rules:
+  # Our resources.
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms, workspaces, rooms, roletemplates, runnerpools]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["swarmageddon.dev"]
+    resources:
+      - platforms/status
+      - workspaces/status
+      - rooms/status
+      - roletemplates/status
+      - runnerpools/status
+      - platforms/finalizers
+      - workspaces/finalizers
+      - rooms/finalizers
+      - runnerpools/finalizers
+    verbs: [get, update, patch]
+  # Namespaces it creates and labels swarmageddon.dev/managed=true.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Managed kinds.
+  - apiGroups: [""]
+    resources: [configmaps, secrets, services, serviceaccounts, persistentvolumeclaims, pods, resourcequotas, limitranges]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  # Granted on to the control center in workspace namespaces (RBAC requires
+  # the operator to hold what it grants).
+  - apiGroups: [""]
+    resources: [pods/exec, pods/portforward]
+    verbs: [create]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: [pods, nodes]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create, patch]
+  - apiGroups: ["events.k8s.io"]
+    resources: [events]
+    verbs: [create, patch]
+  - apiGroups: ["apps"]
+    resources: [statefulsets, deployments, daemonsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["batch"]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [networkpolicies, ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["policy"]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Preflight and exposure: read the cluster.
+  - apiGroups: [""]
+    resources: [nodes, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [ingressclasses]
+    verbs: [get, list, watch]
+  - apiGroups: ["storage.k8s.io"]
+    resources: [storageclasses, csidrivers]
+    verbs: [get, list, watch]
+  - apiGroups: ["node.k8s.io"]
+    resources: [runtimeclasses]
+    verbs: [get, list, watch]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+  # Hostname and TLS through cert-manager, when it's installed.
+  - apiGroups: ["cert-manager.io"]
+    resources: [certificates]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["cert-manager.io"]
+    resources: [issuers, clusterissuers]
+    verbs: [get, list, watch]
+  # Leader election.
+  - apiGroups: ["coordination.k8s.io"]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+# Source: swarmageddon/templates/welcome.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-welcome
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+rules:
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [platforms]
+    resourceNames: [default]
+    verbs: [get, list, watch]
+---
+# Source: swarmageddon/templates/control-center-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-control-center
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swarmageddon-control-center
+subjects:
+  - kind: ServiceAccount
+    name: control-center
+    namespace: swarmageddon-system
+---
+# Source: swarmageddon/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-operator
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swarmageddon-operator
+subjects:
+  - kind: ServiceAccount
+    name: swarmageddon-operator
+    namespace: swarmageddon-system
+---
+# Source: swarmageddon/templates/welcome.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swarmageddon-welcome
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swarmageddon-welcome
+subjects:
+  - kind: ServiceAccount
+    name: welcome
+    namespace: swarmageddon-system
+---
+# Source: swarmageddon/templates/control-center-rbac.yaml
+# Its own Secrets in the system namespace, by name. `create` can't be limited
+# by name in RBAC, so it may create Secrets here but read and change only these.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: control-center
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      - setup-token
+      - control-center-tls
+      - control-center-client
+      - control-center-session
+      - control-center-db
+      - local-admin
+      - vapid
+    verbs: [get, list, watch, update, patch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [platform-ca-bundle]
+    verbs: [get, list, watch]
+---
+# Source: swarmageddon/templates/welcome.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: welcome
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [setup-token]
+    verbs: [get, list, watch]
+---
+# Source: swarmageddon/templates/control-center-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: control-center
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: control-center
+subjects:
+  - kind: ServiceAccount
+    name: control-center
+    namespace: swarmageddon-system
+---
+# Source: swarmageddon/templates/welcome.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: welcome
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: welcome
+subjects:
+  - kind: ServiceAccount
+    name: welcome
+    namespace: swarmageddon-system
+---
+# Source: swarmageddon/templates/control-center.yaml
+# ClusterIP by default; the operator creates an Ingress, or switches this to
+# NodePort when there's no default IngressClass (docs/design.md §3.2).
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-center
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+    app.kubernetes.io/name: control-center
+spec:
+  selector:
+    app.kubernetes.io/name: control-center
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+---
+# Source: swarmageddon/templates/control-center.yaml
+# The control center. The operator creates its certificates at startup; the
+# Secret volumes are optional so the pod starts first, and kubelet fills them
+# in once they exist. The control center waits for its files.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-center
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+    app.kubernetes.io/name: control-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: control-center
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: swarmageddon
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.1.0"
+        helm.sh/chart: swarmageddon-0.1.0
+        app.kubernetes.io/name: control-center
+    spec:
+      serviceAccountName: control-center
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: control-center
+          image: ghcr.io/usr-lex/swarmageddon/control-center:0.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --listen=:8443
+            - --health=:8080
+            - --tls-cert=/etc/swarm/tls/tls.crt
+            - --tls-key=/etc/swarm/tls/tls.key
+            - --messaging-url=https://messaging.swarmageddon-platform.svc:8443
+            - --client-cert=/etc/swarm/client/tls.crt
+            - --client-key=/etc/swarm/client/tls.key
+            - --ca=/etc/swarm/ca/ca.crt
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: https
+              containerPort: 8443
+            - name: health
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/swarm/tls
+              readOnly: true
+            - name: client
+              mountPath: /etc/swarm/client
+              readOnly: true
+            - name: ca
+              mountPath: /etc/swarm/ca
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tls
+          secret:
+            secretName: control-center-tls
+            optional: true
+        - name: client
+          secret:
+            secretName: control-center-client
+            optional: true
+        - name: ca
+          configMap:
+            name: platform-ca-bundle
+            optional: true
+        - name: tmp
+          emptyDir: {}
+---
+# Source: swarmageddon/templates/operator.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swarmageddon-operator
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+    app.kubernetes.io/name: swarmageddon-operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: swarmageddon-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: swarmageddon
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.1.0"
+        helm.sh/chart: swarmageddon-0.1.0
+        app.kubernetes.io/name: swarmageddon-operator
+    spec:
+      serviceAccountName: swarmageddon-operator
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: ghcr.io/usr-lex/swarmageddon/operator:0.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8080
+            - --room-image=ghcr.io/usr-lex/swarmageddon/room:0.1.0
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: IMAGE_REGISTRY
+              value: "ghcr.io/usr-lex/swarmageddon"
+            - name: IMAGE_TAG
+              value: "0.1.0"
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: swarmageddon/templates/welcome.yaml
+# A Job's pod template is immutable: re-applying install.yaml for an upgrade
+# while this Job still exists fails for this object only. The TTL removes it
+# an hour after it finishes.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: welcome
+  namespace: swarmageddon-system
+  labels:
+    app.kubernetes.io/part-of: swarmageddon
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.1.0"
+    helm.sh/chart: swarmageddon-0.1.0
+    app.kubernetes.io/name: welcome
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: swarmageddon
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "0.1.0"
+        helm.sh/chart: swarmageddon-0.1.0
+        app.kubernetes.io/name: welcome
+    spec:
+      serviceAccountName: welcome
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: welcome
+          image: ghcr.io/usr-lex/swarmageddon/operator:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["welcome"]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

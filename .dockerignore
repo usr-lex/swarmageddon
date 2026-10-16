@@ -1,0 +1,12 @@
+# Build context for every image is the repository root; keep it small.
+.git
+.claude
+bin
+dist
+.cache
+hack/.k3d
+web/node_modules
+**/*.test
+deploy
+charts
+docs
