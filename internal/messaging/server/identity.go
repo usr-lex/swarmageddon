@@ -21,12 +21,16 @@ const (
 	HeaderDevIdentity = "x-swarm-dev-identity"
 	// ControlCenterCN is the control center's certificate CN.
 	ControlCenterCN = "control-center"
+	// WardenCN is the gateway guard's certificate CN (ADR 0011).
+	WardenCN = "warden"
 )
 
 // Caller is who is calling, from the connection's client certificate.
 type Caller struct {
 	// ControlCenter is the control center's principal.
 	ControlCenter bool
+	// Warden is the gateway guard's principal; it may only report verdicts.
+	Warden bool
 	// Workspace and Name are the room, or the party the control center acts
 	// for; empty for the control center acting as itself.
 	Workspace, Name string
@@ -35,6 +39,9 @@ type Caller struct {
 
 // Address is name@workspace, or "control-center".
 func (c Caller) Address() string {
+	if c.Warden {
+		return WardenCN
+	}
 	if c.Name == "" {
 		return ControlCenterCN
 	}
@@ -92,6 +99,9 @@ func parseCaller(cn, onBehalf string) (Caller, error) {
 	}
 	if onBehalf != "" {
 		return Caller{}, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("only the control center may use %s", HeaderOnBehalfOf))
+	}
+	if cn == WardenCN {
+		return Caller{Warden: true}, nil
 	}
 	name, ws, err := policy.SplitAddress(cn)
 	if err != nil || policy.IsSystem(name) {

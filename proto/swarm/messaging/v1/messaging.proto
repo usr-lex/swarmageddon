@@ -37,6 +37,11 @@ service MessagingService {
   // Room telemetry for the control center: current task, usage, disk.
   rpc ReportStatus(ReportStatusRequest) returns (ReportStatusResponse);
 
+  // ReportVerdict records a warden verdict (ADR 0011) in the audit log
+  // (kind "verdict"). Rooms report their own (source "room"); the gateway
+  // guard (principal "warden") reports for any room (source "gateway").
+  rpc ReportVerdict(ReportVerdictRequest) returns (ReportVerdictResponse);
+
   // Control center only.
   rpc WatchPresence(WatchPresenceRequest) returns (stream PresenceEvent);
   rpc QueryAudit(QueryAuditRequest) returns (stream AuditRecord);
@@ -224,7 +229,7 @@ message PresenceEvent {
 
 message QueryAuditRequest {
   string workspace = 1;
-  // message, crossing, refusal, presence; empty: all.
+  // message, crossing, refusal, presence, verdict; empty: all.
   repeated string kinds = 2;
   google.protobuf.Timestamp since = 3;
   google.protobuf.Timestamp until = 4;
@@ -245,3 +250,36 @@ message AuditRecord {
   // For crossings: the link, e.g. "clean->dirty".
   string link = 8;
 }
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
+}
+
+message Verdict {
+  // ULID.
+  string id = 1;
+  // Room address.
+  string room = 2;
+  // rules, judge, trajectory or gateway.
+  string layer = 3;
+  Severity severity = 4;
+  // Rule name, or "model" for a model judgement.
+  string rule = 5;
+  string reason = 6;
+  // The tool call or transcript excerpt it is about.
+  string evidence = 7;
+  // What was done: allowed, denied, escalated, gated, interrupted, quarantined.
+  string action = 8;
+  // room (self-report) or gateway.
+  string source = 9;
+  google.protobuf.Timestamp at = 10;
+}
+
+message ReportVerdictRequest {
+  Verdict verdict = 1;
+}
+message ReportVerdictResponse {}

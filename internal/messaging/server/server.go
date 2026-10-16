@@ -408,8 +408,8 @@ func (s *Server) QueryAudit(ctx context.Context, req *connect.Request[messagingv
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("workspace is required"))
 	}
 	for _, k := range m.Kinds {
-		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence}, k) {
-			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, crossing, refusal or presence", k))
+		if !slices.Contains([]string{store.AuditMessage, store.AuditCrossing, store.AuditRefusal, store.AuditPresence, store.AuditVerdict}, k) {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("unknown audit kind %q: use message, crossing, refusal, presence or verdict", k))
 		}
 	}
 	q := store.AuditQuery{Workspace: m.Workspace, Kinds: m.Kinds, Address: m.Address, Limit: int(m.Limit)}

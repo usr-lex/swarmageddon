@@ -110,7 +110,7 @@ supervisor runs `/usr/local/libexec/podman-ulimits` before starting Podman.
 
 One JetStream stream per workspace and kind, so retention is that stream's
 `MaxAge`: `INBOX_<ws>` (`inbox.<ws>.<name>`), `AUDIT_<ws>`
-(`audit.<ws>.{message,crossing,refusal,presence}`) and `APPROVALS_<ws>`
+(`audit.<ws>.{message,crossing,refusal,presence,verdict}`) and `APPROVALS_<ws>`
 (`approval.<ws>.<room>`); KV buckets `presence`, `status` and `people`. Each
 recipient has a durable consumer named after it. `Nats-Msg-Id` is
 `<id>/<recipient>`. Names match `^[a-z0-9][a-z0-9_-]{0,62}$`; `forge` and

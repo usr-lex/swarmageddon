@@ -138,6 +138,61 @@ func (Decision) EnumDescriptor() ([]byte, []int) {
 	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{1}
 }
 
+type Severity int32
+
+const (
+	Severity_SEVERITY_UNSPECIFIED Severity = 0
+	Severity_SEVERITY_LOW         Severity = 1
+	Severity_SEVERITY_MEDIUM      Severity = 2
+	Severity_SEVERITY_HIGH        Severity = 3
+	Severity_SEVERITY_CRITICAL    Severity = 4
+)
+
+// Enum value maps for Severity.
+var (
+	Severity_name = map[int32]string{
+		0: "SEVERITY_UNSPECIFIED",
+		1: "SEVERITY_LOW",
+		2: "SEVERITY_MEDIUM",
+		3: "SEVERITY_HIGH",
+		4: "SEVERITY_CRITICAL",
+	}
+	Severity_value = map[string]int32{
+		"SEVERITY_UNSPECIFIED": 0,
+		"SEVERITY_LOW":         1,
+		"SEVERITY_MEDIUM":      2,
+		"SEVERITY_HIGH":        3,
+		"SEVERITY_CRITICAL":    4,
+	}
+)
+
+func (x Severity) Enum() *Severity {
+	p := new(Severity)
+	*p = x
+	return p
+}
+
+func (x Severity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Severity) Descriptor() protoreflect.EnumDescriptor {
+	return file_swarm_messaging_v1_messaging_proto_enumTypes[2].Descriptor()
+}
+
+func (Severity) Type() protoreflect.EnumType {
+	return &file_swarm_messaging_v1_messaging_proto_enumTypes[2]
+}
+
+func (x Severity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Severity.Descriptor instead.
+func (Severity) EnumDescriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{2}
+}
+
 type Message struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// ULID chosen by the sender; the dedup key.
@@ -1860,7 +1915,7 @@ func (x *PresenceEvent) GetStatus() *RoomStatusReport {
 type QueryAuditRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Workspace string                 `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	// message, crossing, refusal, presence; empty: all.
+	// message, crossing, refusal, presence, verdict; empty: all.
 	Kinds []string               `protobuf:"bytes,2,rep,name=kinds,proto3" json:"kinds,omitempty"`
 	Since *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=since,proto3" json:"since,omitempty"`
 	Until *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=until,proto3" json:"until,omitempty"`
@@ -2045,6 +2100,209 @@ func (x *AuditRecord) GetLink() string {
 	return ""
 }
 
+type Verdict struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ULID.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Room address.
+	Room string `protobuf:"bytes,2,opt,name=room,proto3" json:"room,omitempty"`
+	// rules, judge, trajectory or gateway.
+	Layer    string   `protobuf:"bytes,3,opt,name=layer,proto3" json:"layer,omitempty"`
+	Severity Severity `protobuf:"varint,4,opt,name=severity,proto3,enum=swarm.messaging.v1.Severity" json:"severity,omitempty"`
+	// Rule name, or "model" for a model judgement.
+	Rule   string `protobuf:"bytes,5,opt,name=rule,proto3" json:"rule,omitempty"`
+	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The tool call or transcript excerpt it is about.
+	Evidence string `protobuf:"bytes,7,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	// What was done: allowed, denied, escalated, gated, interrupted, quarantined.
+	Action string `protobuf:"bytes,8,opt,name=action,proto3" json:"action,omitempty"`
+	// room (self-report) or gateway.
+	Source        string                 `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
+	At            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=at,proto3" json:"at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Verdict) Reset() {
+	*x = Verdict{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Verdict) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Verdict) ProtoMessage() {}
+
+func (x *Verdict) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Verdict.ProtoReflect.Descriptor instead.
+func (*Verdict) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *Verdict) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Verdict) GetRoom() string {
+	if x != nil {
+		return x.Room
+	}
+	return ""
+}
+
+func (x *Verdict) GetLayer() string {
+	if x != nil {
+		return x.Layer
+	}
+	return ""
+}
+
+func (x *Verdict) GetSeverity() Severity {
+	if x != nil {
+		return x.Severity
+	}
+	return Severity_SEVERITY_UNSPECIFIED
+}
+
+func (x *Verdict) GetRule() string {
+	if x != nil {
+		return x.Rule
+	}
+	return ""
+}
+
+func (x *Verdict) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Verdict) GetEvidence() string {
+	if x != nil {
+		return x.Evidence
+	}
+	return ""
+}
+
+func (x *Verdict) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *Verdict) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *Verdict) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+type ReportVerdictRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Verdict       *Verdict               `protobuf:"bytes,1,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportVerdictRequest) Reset() {
+	*x = ReportVerdictRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportVerdictRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportVerdictRequest) ProtoMessage() {}
+
+func (x *ReportVerdictRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportVerdictRequest.ProtoReflect.Descriptor instead.
+func (*ReportVerdictRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ReportVerdictRequest) GetVerdict() *Verdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return nil
+}
+
+type ReportVerdictResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportVerdictResponse) Reset() {
+	*x = ReportVerdictResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportVerdictResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportVerdictResponse) ProtoMessage() {}
+
+func (x *ReportVerdictResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportVerdictResponse.ProtoReflect.Descriptor instead.
+func (*ReportVerdictResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{33}
+}
+
 var File_swarm_messaging_v1_messaging_proto protoreflect.FileDescriptor
 
 const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
@@ -2185,7 +2443,22 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x12\n" +
 	"\x04body\x18\x06 \x01(\tR\x04body\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x12\x12\n" +
-	"\x04link\x18\b \x01(\tR\x04link*\x82\x01\n" +
+	"\x04link\x18\b \x01(\tR\x04link\"\xa1\x02\n" +
+	"\aVerdict\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04room\x18\x02 \x01(\tR\x04room\x12\x14\n" +
+	"\x05layer\x18\x03 \x01(\tR\x05layer\x128\n" +
+	"\bseverity\x18\x04 \x01(\x0e2\x1c.swarm.messaging.v1.SeverityR\bseverity\x12\x12\n" +
+	"\x04rule\x18\x05 \x01(\tR\x04rule\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x1a\n" +
+	"\bevidence\x18\a \x01(\tR\bevidence\x12\x16\n" +
+	"\x06action\x18\b \x01(\tR\x06action\x12\x16\n" +
+	"\x06source\x18\t \x01(\tR\x06source\x12*\n" +
+	"\x02at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"M\n" +
+	"\x14ReportVerdictRequest\x125\n" +
+	"\averdict\x18\x01 \x01(\v2\x1b.swarm.messaging.v1.VerdictR\averdict\"\x17\n" +
+	"\x15ReportVerdictResponse*\x82\x01\n" +
 	"\bPresence\x12\x18\n" +
 	"\x14PRESENCE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10PRESENCE_WORKING\x10\x01\x12\x1d\n" +
@@ -2196,7 +2469,13 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1e\n" +
 	"\x1aDECISION_ALLOW_FOR_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x032\xfc\b\n" +
+	"\rDECISION_DENY\x10\x03*u\n" +
+	"\bSeverity\x12\x18\n" +
+	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fSEVERITY_LOW\x10\x01\x12\x13\n" +
+	"\x0fSEVERITY_MEDIUM\x10\x02\x12\x11\n" +
+	"\rSEVERITY_HIGH\x10\x03\x12\x15\n" +
+	"\x11SEVERITY_CRITICAL\x10\x042\xe2\t\n" +
 	"\x10MessagingService\x12I\n" +
 	"\x04Send\x12\x1f.swarm.messaging.v1.SendRequest\x1a .swarm.messaging.v1.SendResponse\x12Q\n" +
 	"\tSubscribe\x12$.swarm.messaging.v1.SubscribeRequest\x1a\x1c.swarm.messaging.v1.Delivery0\x01\x12F\n" +
@@ -2207,7 +2486,8 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\x10WithdrawApproval\x12+.swarm.messaging.v1.WithdrawApprovalRequest\x1a,.swarm.messaging.v1.WithdrawApprovalResponse\x12`\n" +
 	"\x0eWatchApprovals\x12).swarm.messaging.v1.WatchApprovalsRequest\x1a!.swarm.messaging.v1.ApprovalEvent0\x01\x12g\n" +
 	"\x0eAnswerApproval\x12).swarm.messaging.v1.AnswerApprovalRequest\x1a*.swarm.messaging.v1.AnswerApprovalResponse\x12a\n" +
-	"\fReportStatus\x12'.swarm.messaging.v1.ReportStatusRequest\x1a(.swarm.messaging.v1.ReportStatusResponse\x12^\n" +
+	"\fReportStatus\x12'.swarm.messaging.v1.ReportStatusRequest\x1a(.swarm.messaging.v1.ReportStatusResponse\x12d\n" +
+	"\rReportVerdict\x12(.swarm.messaging.v1.ReportVerdictRequest\x1a).swarm.messaging.v1.ReportVerdictResponse\x12^\n" +
 	"\rWatchPresence\x12(.swarm.messaging.v1.WatchPresenceRequest\x1a!.swarm.messaging.v1.PresenceEvent0\x01\x12V\n" +
 	"\n" +
 	"QueryAudit\x12%.swarm.messaging.v1.QueryAuditRequest\x1a\x1f.swarm.messaging.v1.AuditRecord0\x01BDZBgithub.com/usr-lex/swarmageddon/gen/swarm/messaging/v1;messagingv1b\x06proto3"
@@ -2224,97 +2504,106 @@ func file_swarm_messaging_v1_messaging_proto_rawDescGZIP() []byte {
 	return file_swarm_messaging_v1_messaging_proto_rawDescData
 }
 
-var file_swarm_messaging_v1_messaging_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_swarm_messaging_v1_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_swarm_messaging_v1_messaging_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_swarm_messaging_v1_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_swarm_messaging_v1_messaging_proto_goTypes = []any{
 	(Presence)(0),                    // 0: swarm.messaging.v1.Presence
 	(Decision)(0),                    // 1: swarm.messaging.v1.Decision
-	(*Message)(nil),                  // 2: swarm.messaging.v1.Message
-	(*SendRequest)(nil),              // 3: swarm.messaging.v1.SendRequest
-	(*SendResponse)(nil),             // 4: swarm.messaging.v1.SendResponse
-	(*SubscribeRequest)(nil),         // 5: swarm.messaging.v1.SubscribeRequest
-	(*Delivery)(nil),                 // 6: swarm.messaging.v1.Delivery
-	(*Notice)(nil),                   // 7: swarm.messaging.v1.Notice
-	(*AckRequest)(nil),               // 8: swarm.messaging.v1.AckRequest
-	(*AckResponse)(nil),              // 9: swarm.messaging.v1.AckResponse
-	(*ReportPresenceRequest)(nil),    // 10: swarm.messaging.v1.ReportPresenceRequest
-	(*ReportPresenceResponse)(nil),   // 11: swarm.messaging.v1.ReportPresenceResponse
-	(*ListPeersRequest)(nil),         // 12: swarm.messaging.v1.ListPeersRequest
-	(*Peer)(nil),                     // 13: swarm.messaging.v1.Peer
-	(*ListPeersResponse)(nil),        // 14: swarm.messaging.v1.ListPeersResponse
-	(*ApprovalRequest)(nil),          // 15: swarm.messaging.v1.ApprovalRequest
-	(*ApprovalAnswer)(nil),           // 16: swarm.messaging.v1.ApprovalAnswer
-	(*RequestApprovalRequest)(nil),   // 17: swarm.messaging.v1.RequestApprovalRequest
-	(*RequestApprovalResponse)(nil),  // 18: swarm.messaging.v1.RequestApprovalResponse
-	(*WithdrawApprovalRequest)(nil),  // 19: swarm.messaging.v1.WithdrawApprovalRequest
-	(*WithdrawApprovalResponse)(nil), // 20: swarm.messaging.v1.WithdrawApprovalResponse
-	(*WatchApprovalsRequest)(nil),    // 21: swarm.messaging.v1.WatchApprovalsRequest
-	(*ApprovalEvent)(nil),            // 22: swarm.messaging.v1.ApprovalEvent
-	(*AnswerApprovalRequest)(nil),    // 23: swarm.messaging.v1.AnswerApprovalRequest
-	(*AnswerApprovalResponse)(nil),   // 24: swarm.messaging.v1.AnswerApprovalResponse
-	(*VolumeUsage)(nil),              // 25: swarm.messaging.v1.VolumeUsage
-	(*RoomStatusReport)(nil),         // 26: swarm.messaging.v1.RoomStatusReport
-	(*ReportStatusRequest)(nil),      // 27: swarm.messaging.v1.ReportStatusRequest
-	(*ReportStatusResponse)(nil),     // 28: swarm.messaging.v1.ReportStatusResponse
-	(*WatchPresenceRequest)(nil),     // 29: swarm.messaging.v1.WatchPresenceRequest
-	(*PresenceEvent)(nil),            // 30: swarm.messaging.v1.PresenceEvent
-	(*QueryAuditRequest)(nil),        // 31: swarm.messaging.v1.QueryAuditRequest
-	(*AuditRecord)(nil),              // 32: swarm.messaging.v1.AuditRecord
-	(*timestamppb.Timestamp)(nil),    // 33: google.protobuf.Timestamp
+	(Severity)(0),                    // 2: swarm.messaging.v1.Severity
+	(*Message)(nil),                  // 3: swarm.messaging.v1.Message
+	(*SendRequest)(nil),              // 4: swarm.messaging.v1.SendRequest
+	(*SendResponse)(nil),             // 5: swarm.messaging.v1.SendResponse
+	(*SubscribeRequest)(nil),         // 6: swarm.messaging.v1.SubscribeRequest
+	(*Delivery)(nil),                 // 7: swarm.messaging.v1.Delivery
+	(*Notice)(nil),                   // 8: swarm.messaging.v1.Notice
+	(*AckRequest)(nil),               // 9: swarm.messaging.v1.AckRequest
+	(*AckResponse)(nil),              // 10: swarm.messaging.v1.AckResponse
+	(*ReportPresenceRequest)(nil),    // 11: swarm.messaging.v1.ReportPresenceRequest
+	(*ReportPresenceResponse)(nil),   // 12: swarm.messaging.v1.ReportPresenceResponse
+	(*ListPeersRequest)(nil),         // 13: swarm.messaging.v1.ListPeersRequest
+	(*Peer)(nil),                     // 14: swarm.messaging.v1.Peer
+	(*ListPeersResponse)(nil),        // 15: swarm.messaging.v1.ListPeersResponse
+	(*ApprovalRequest)(nil),          // 16: swarm.messaging.v1.ApprovalRequest
+	(*ApprovalAnswer)(nil),           // 17: swarm.messaging.v1.ApprovalAnswer
+	(*RequestApprovalRequest)(nil),   // 18: swarm.messaging.v1.RequestApprovalRequest
+	(*RequestApprovalResponse)(nil),  // 19: swarm.messaging.v1.RequestApprovalResponse
+	(*WithdrawApprovalRequest)(nil),  // 20: swarm.messaging.v1.WithdrawApprovalRequest
+	(*WithdrawApprovalResponse)(nil), // 21: swarm.messaging.v1.WithdrawApprovalResponse
+	(*WatchApprovalsRequest)(nil),    // 22: swarm.messaging.v1.WatchApprovalsRequest
+	(*ApprovalEvent)(nil),            // 23: swarm.messaging.v1.ApprovalEvent
+	(*AnswerApprovalRequest)(nil),    // 24: swarm.messaging.v1.AnswerApprovalRequest
+	(*AnswerApprovalResponse)(nil),   // 25: swarm.messaging.v1.AnswerApprovalResponse
+	(*VolumeUsage)(nil),              // 26: swarm.messaging.v1.VolumeUsage
+	(*RoomStatusReport)(nil),         // 27: swarm.messaging.v1.RoomStatusReport
+	(*ReportStatusRequest)(nil),      // 28: swarm.messaging.v1.ReportStatusRequest
+	(*ReportStatusResponse)(nil),     // 29: swarm.messaging.v1.ReportStatusResponse
+	(*WatchPresenceRequest)(nil),     // 30: swarm.messaging.v1.WatchPresenceRequest
+	(*PresenceEvent)(nil),            // 31: swarm.messaging.v1.PresenceEvent
+	(*QueryAuditRequest)(nil),        // 32: swarm.messaging.v1.QueryAuditRequest
+	(*AuditRecord)(nil),              // 33: swarm.messaging.v1.AuditRecord
+	(*Verdict)(nil),                  // 34: swarm.messaging.v1.Verdict
+	(*ReportVerdictRequest)(nil),     // 35: swarm.messaging.v1.ReportVerdictRequest
+	(*ReportVerdictResponse)(nil),    // 36: swarm.messaging.v1.ReportVerdictResponse
+	(*timestamppb.Timestamp)(nil),    // 37: google.protobuf.Timestamp
 }
 var file_swarm_messaging_v1_messaging_proto_depIdxs = []int32{
-	33, // 0: swarm.messaging.v1.Message.sent_at:type_name -> google.protobuf.Timestamp
-	2,  // 1: swarm.messaging.v1.Delivery.message:type_name -> swarm.messaging.v1.Message
-	16, // 2: swarm.messaging.v1.Delivery.approval_answer:type_name -> swarm.messaging.v1.ApprovalAnswer
-	7,  // 3: swarm.messaging.v1.Delivery.notice:type_name -> swarm.messaging.v1.Notice
+	37, // 0: swarm.messaging.v1.Message.sent_at:type_name -> google.protobuf.Timestamp
+	3,  // 1: swarm.messaging.v1.Delivery.message:type_name -> swarm.messaging.v1.Message
+	17, // 2: swarm.messaging.v1.Delivery.approval_answer:type_name -> swarm.messaging.v1.ApprovalAnswer
+	8,  // 3: swarm.messaging.v1.Delivery.notice:type_name -> swarm.messaging.v1.Notice
 	0,  // 4: swarm.messaging.v1.ReportPresenceRequest.presence:type_name -> swarm.messaging.v1.Presence
 	0,  // 5: swarm.messaging.v1.Peer.presence:type_name -> swarm.messaging.v1.Presence
-	13, // 6: swarm.messaging.v1.ListPeersResponse.peers:type_name -> swarm.messaging.v1.Peer
-	33, // 7: swarm.messaging.v1.ApprovalRequest.requested_at:type_name -> google.protobuf.Timestamp
+	14, // 6: swarm.messaging.v1.ListPeersResponse.peers:type_name -> swarm.messaging.v1.Peer
+	37, // 7: swarm.messaging.v1.ApprovalRequest.requested_at:type_name -> google.protobuf.Timestamp
 	1,  // 8: swarm.messaging.v1.ApprovalAnswer.decision:type_name -> swarm.messaging.v1.Decision
-	33, // 9: swarm.messaging.v1.ApprovalAnswer.answered_at:type_name -> google.protobuf.Timestamp
-	15, // 10: swarm.messaging.v1.RequestApprovalRequest.request:type_name -> swarm.messaging.v1.ApprovalRequest
-	15, // 11: swarm.messaging.v1.ApprovalEvent.requested:type_name -> swarm.messaging.v1.ApprovalRequest
-	16, // 12: swarm.messaging.v1.ApprovalEvent.answered:type_name -> swarm.messaging.v1.ApprovalAnswer
-	19, // 13: swarm.messaging.v1.ApprovalEvent.withdrawn:type_name -> swarm.messaging.v1.WithdrawApprovalRequest
-	16, // 14: swarm.messaging.v1.AnswerApprovalRequest.answer:type_name -> swarm.messaging.v1.ApprovalAnswer
-	25, // 15: swarm.messaging.v1.RoomStatusReport.volumes:type_name -> swarm.messaging.v1.VolumeUsage
-	26, // 16: swarm.messaging.v1.ReportStatusRequest.status:type_name -> swarm.messaging.v1.RoomStatusReport
+	37, // 9: swarm.messaging.v1.ApprovalAnswer.answered_at:type_name -> google.protobuf.Timestamp
+	16, // 10: swarm.messaging.v1.RequestApprovalRequest.request:type_name -> swarm.messaging.v1.ApprovalRequest
+	16, // 11: swarm.messaging.v1.ApprovalEvent.requested:type_name -> swarm.messaging.v1.ApprovalRequest
+	17, // 12: swarm.messaging.v1.ApprovalEvent.answered:type_name -> swarm.messaging.v1.ApprovalAnswer
+	20, // 13: swarm.messaging.v1.ApprovalEvent.withdrawn:type_name -> swarm.messaging.v1.WithdrawApprovalRequest
+	17, // 14: swarm.messaging.v1.AnswerApprovalRequest.answer:type_name -> swarm.messaging.v1.ApprovalAnswer
+	26, // 15: swarm.messaging.v1.RoomStatusReport.volumes:type_name -> swarm.messaging.v1.VolumeUsage
+	27, // 16: swarm.messaging.v1.ReportStatusRequest.status:type_name -> swarm.messaging.v1.RoomStatusReport
 	0,  // 17: swarm.messaging.v1.PresenceEvent.presence:type_name -> swarm.messaging.v1.Presence
-	33, // 18: swarm.messaging.v1.PresenceEvent.at:type_name -> google.protobuf.Timestamp
-	26, // 19: swarm.messaging.v1.PresenceEvent.status:type_name -> swarm.messaging.v1.RoomStatusReport
-	33, // 20: swarm.messaging.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
-	33, // 21: swarm.messaging.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
-	33, // 22: swarm.messaging.v1.AuditRecord.at:type_name -> google.protobuf.Timestamp
-	3,  // 23: swarm.messaging.v1.MessagingService.Send:input_type -> swarm.messaging.v1.SendRequest
-	5,  // 24: swarm.messaging.v1.MessagingService.Subscribe:input_type -> swarm.messaging.v1.SubscribeRequest
-	8,  // 25: swarm.messaging.v1.MessagingService.Ack:input_type -> swarm.messaging.v1.AckRequest
-	10, // 26: swarm.messaging.v1.MessagingService.ReportPresence:input_type -> swarm.messaging.v1.ReportPresenceRequest
-	12, // 27: swarm.messaging.v1.MessagingService.ListPeers:input_type -> swarm.messaging.v1.ListPeersRequest
-	17, // 28: swarm.messaging.v1.MessagingService.RequestApproval:input_type -> swarm.messaging.v1.RequestApprovalRequest
-	19, // 29: swarm.messaging.v1.MessagingService.WithdrawApproval:input_type -> swarm.messaging.v1.WithdrawApprovalRequest
-	21, // 30: swarm.messaging.v1.MessagingService.WatchApprovals:input_type -> swarm.messaging.v1.WatchApprovalsRequest
-	23, // 31: swarm.messaging.v1.MessagingService.AnswerApproval:input_type -> swarm.messaging.v1.AnswerApprovalRequest
-	27, // 32: swarm.messaging.v1.MessagingService.ReportStatus:input_type -> swarm.messaging.v1.ReportStatusRequest
-	29, // 33: swarm.messaging.v1.MessagingService.WatchPresence:input_type -> swarm.messaging.v1.WatchPresenceRequest
-	31, // 34: swarm.messaging.v1.MessagingService.QueryAudit:input_type -> swarm.messaging.v1.QueryAuditRequest
-	4,  // 35: swarm.messaging.v1.MessagingService.Send:output_type -> swarm.messaging.v1.SendResponse
-	6,  // 36: swarm.messaging.v1.MessagingService.Subscribe:output_type -> swarm.messaging.v1.Delivery
-	9,  // 37: swarm.messaging.v1.MessagingService.Ack:output_type -> swarm.messaging.v1.AckResponse
-	11, // 38: swarm.messaging.v1.MessagingService.ReportPresence:output_type -> swarm.messaging.v1.ReportPresenceResponse
-	14, // 39: swarm.messaging.v1.MessagingService.ListPeers:output_type -> swarm.messaging.v1.ListPeersResponse
-	18, // 40: swarm.messaging.v1.MessagingService.RequestApproval:output_type -> swarm.messaging.v1.RequestApprovalResponse
-	20, // 41: swarm.messaging.v1.MessagingService.WithdrawApproval:output_type -> swarm.messaging.v1.WithdrawApprovalResponse
-	22, // 42: swarm.messaging.v1.MessagingService.WatchApprovals:output_type -> swarm.messaging.v1.ApprovalEvent
-	24, // 43: swarm.messaging.v1.MessagingService.AnswerApproval:output_type -> swarm.messaging.v1.AnswerApprovalResponse
-	28, // 44: swarm.messaging.v1.MessagingService.ReportStatus:output_type -> swarm.messaging.v1.ReportStatusResponse
-	30, // 45: swarm.messaging.v1.MessagingService.WatchPresence:output_type -> swarm.messaging.v1.PresenceEvent
-	32, // 46: swarm.messaging.v1.MessagingService.QueryAudit:output_type -> swarm.messaging.v1.AuditRecord
-	35, // [35:47] is the sub-list for method output_type
-	23, // [23:35] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	37, // 18: swarm.messaging.v1.PresenceEvent.at:type_name -> google.protobuf.Timestamp
+	27, // 19: swarm.messaging.v1.PresenceEvent.status:type_name -> swarm.messaging.v1.RoomStatusReport
+	37, // 20: swarm.messaging.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
+	37, // 21: swarm.messaging.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
+	37, // 22: swarm.messaging.v1.AuditRecord.at:type_name -> google.protobuf.Timestamp
+	2,  // 23: swarm.messaging.v1.Verdict.severity:type_name -> swarm.messaging.v1.Severity
+	37, // 24: swarm.messaging.v1.Verdict.at:type_name -> google.protobuf.Timestamp
+	34, // 25: swarm.messaging.v1.ReportVerdictRequest.verdict:type_name -> swarm.messaging.v1.Verdict
+	4,  // 26: swarm.messaging.v1.MessagingService.Send:input_type -> swarm.messaging.v1.SendRequest
+	6,  // 27: swarm.messaging.v1.MessagingService.Subscribe:input_type -> swarm.messaging.v1.SubscribeRequest
+	9,  // 28: swarm.messaging.v1.MessagingService.Ack:input_type -> swarm.messaging.v1.AckRequest
+	11, // 29: swarm.messaging.v1.MessagingService.ReportPresence:input_type -> swarm.messaging.v1.ReportPresenceRequest
+	13, // 30: swarm.messaging.v1.MessagingService.ListPeers:input_type -> swarm.messaging.v1.ListPeersRequest
+	18, // 31: swarm.messaging.v1.MessagingService.RequestApproval:input_type -> swarm.messaging.v1.RequestApprovalRequest
+	20, // 32: swarm.messaging.v1.MessagingService.WithdrawApproval:input_type -> swarm.messaging.v1.WithdrawApprovalRequest
+	22, // 33: swarm.messaging.v1.MessagingService.WatchApprovals:input_type -> swarm.messaging.v1.WatchApprovalsRequest
+	24, // 34: swarm.messaging.v1.MessagingService.AnswerApproval:input_type -> swarm.messaging.v1.AnswerApprovalRequest
+	28, // 35: swarm.messaging.v1.MessagingService.ReportStatus:input_type -> swarm.messaging.v1.ReportStatusRequest
+	35, // 36: swarm.messaging.v1.MessagingService.ReportVerdict:input_type -> swarm.messaging.v1.ReportVerdictRequest
+	30, // 37: swarm.messaging.v1.MessagingService.WatchPresence:input_type -> swarm.messaging.v1.WatchPresenceRequest
+	32, // 38: swarm.messaging.v1.MessagingService.QueryAudit:input_type -> swarm.messaging.v1.QueryAuditRequest
+	5,  // 39: swarm.messaging.v1.MessagingService.Send:output_type -> swarm.messaging.v1.SendResponse
+	7,  // 40: swarm.messaging.v1.MessagingService.Subscribe:output_type -> swarm.messaging.v1.Delivery
+	10, // 41: swarm.messaging.v1.MessagingService.Ack:output_type -> swarm.messaging.v1.AckResponse
+	12, // 42: swarm.messaging.v1.MessagingService.ReportPresence:output_type -> swarm.messaging.v1.ReportPresenceResponse
+	15, // 43: swarm.messaging.v1.MessagingService.ListPeers:output_type -> swarm.messaging.v1.ListPeersResponse
+	19, // 44: swarm.messaging.v1.MessagingService.RequestApproval:output_type -> swarm.messaging.v1.RequestApprovalResponse
+	21, // 45: swarm.messaging.v1.MessagingService.WithdrawApproval:output_type -> swarm.messaging.v1.WithdrawApprovalResponse
+	23, // 46: swarm.messaging.v1.MessagingService.WatchApprovals:output_type -> swarm.messaging.v1.ApprovalEvent
+	25, // 47: swarm.messaging.v1.MessagingService.AnswerApproval:output_type -> swarm.messaging.v1.AnswerApprovalResponse
+	29, // 48: swarm.messaging.v1.MessagingService.ReportStatus:output_type -> swarm.messaging.v1.ReportStatusResponse
+	36, // 49: swarm.messaging.v1.MessagingService.ReportVerdict:output_type -> swarm.messaging.v1.ReportVerdictResponse
+	31, // 50: swarm.messaging.v1.MessagingService.WatchPresence:output_type -> swarm.messaging.v1.PresenceEvent
+	33, // 51: swarm.messaging.v1.MessagingService.QueryAudit:output_type -> swarm.messaging.v1.AuditRecord
+	39, // [39:52] is the sub-list for method output_type
+	26, // [26:39] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_swarm_messaging_v1_messaging_proto_init() }
@@ -2337,8 +2626,8 @@ func file_swarm_messaging_v1_messaging_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_swarm_messaging_v1_messaging_proto_rawDesc), len(file_swarm_messaging_v1_messaging_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   31,
+			NumEnums:      3,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

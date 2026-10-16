@@ -70,6 +70,9 @@ const (
 	// MessagingServiceReportStatusProcedure is the fully-qualified name of the MessagingService's
 	// ReportStatus RPC.
 	MessagingServiceReportStatusProcedure = "/swarm.messaging.v1.MessagingService/ReportStatus"
+	// MessagingServiceReportVerdictProcedure is the fully-qualified name of the MessagingService's
+	// ReportVerdict RPC.
+	MessagingServiceReportVerdictProcedure = "/swarm.messaging.v1.MessagingService/ReportVerdict"
 	// MessagingServiceWatchPresenceProcedure is the fully-qualified name of the MessagingService's
 	// WatchPresence RPC.
 	MessagingServiceWatchPresenceProcedure = "/swarm.messaging.v1.MessagingService/WatchPresence"
@@ -99,6 +102,10 @@ type MessagingServiceClient interface {
 	AnswerApproval(context.Context, *connect.Request[v1.AnswerApprovalRequest]) (*connect.Response[v1.AnswerApprovalResponse], error)
 	// Room telemetry for the control center: current task, usage, disk.
 	ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error)
+	// ReportVerdict records a warden verdict (ADR 0011) in the audit log
+	// (kind "verdict"). Rooms report their own (source "room"); the gateway
+	// guard (principal "warden") reports for any room (source "gateway").
+	ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error)
 	// Control center only.
 	WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest]) (*connect.ServerStreamForClient[v1.PresenceEvent], error)
 	QueryAudit(context.Context, *connect.Request[v1.QueryAuditRequest]) (*connect.ServerStreamForClient[v1.AuditRecord], error)
@@ -175,6 +182,12 @@ func NewMessagingServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(messagingServiceMethods.ByName("ReportStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		reportVerdict: connect.NewClient[v1.ReportVerdictRequest, v1.ReportVerdictResponse](
+			httpClient,
+			baseURL+MessagingServiceReportVerdictProcedure,
+			connect.WithSchema(messagingServiceMethods.ByName("ReportVerdict")),
+			connect.WithClientOptions(opts...),
+		),
 		watchPresence: connect.NewClient[v1.WatchPresenceRequest, v1.PresenceEvent](
 			httpClient,
 			baseURL+MessagingServiceWatchPresenceProcedure,
@@ -202,6 +215,7 @@ type messagingServiceClient struct {
 	watchApprovals   *connect.Client[v1.WatchApprovalsRequest, v1.ApprovalEvent]
 	answerApproval   *connect.Client[v1.AnswerApprovalRequest, v1.AnswerApprovalResponse]
 	reportStatus     *connect.Client[v1.ReportStatusRequest, v1.ReportStatusResponse]
+	reportVerdict    *connect.Client[v1.ReportVerdictRequest, v1.ReportVerdictResponse]
 	watchPresence    *connect.Client[v1.WatchPresenceRequest, v1.PresenceEvent]
 	queryAudit       *connect.Client[v1.QueryAuditRequest, v1.AuditRecord]
 }
@@ -256,6 +270,11 @@ func (c *messagingServiceClient) ReportStatus(ctx context.Context, req *connect.
 	return c.reportStatus.CallUnary(ctx, req)
 }
 
+// ReportVerdict calls swarm.messaging.v1.MessagingService.ReportVerdict.
+func (c *messagingServiceClient) ReportVerdict(ctx context.Context, req *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error) {
+	return c.reportVerdict.CallUnary(ctx, req)
+}
+
 // WatchPresence calls swarm.messaging.v1.MessagingService.WatchPresence.
 func (c *messagingServiceClient) WatchPresence(ctx context.Context, req *connect.Request[v1.WatchPresenceRequest]) (*connect.ServerStreamForClient[v1.PresenceEvent], error) {
 	return c.watchPresence.CallServerStream(ctx, req)
@@ -287,6 +306,10 @@ type MessagingServiceHandler interface {
 	AnswerApproval(context.Context, *connect.Request[v1.AnswerApprovalRequest]) (*connect.Response[v1.AnswerApprovalResponse], error)
 	// Room telemetry for the control center: current task, usage, disk.
 	ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error)
+	// ReportVerdict records a warden verdict (ADR 0011) in the audit log
+	// (kind "verdict"). Rooms report their own (source "room"); the gateway
+	// guard (principal "warden") reports for any room (source "gateway").
+	ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error)
 	// Control center only.
 	WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest], *connect.ServerStream[v1.PresenceEvent]) error
 	QueryAudit(context.Context, *connect.Request[v1.QueryAuditRequest], *connect.ServerStream[v1.AuditRecord]) error
@@ -359,6 +382,12 @@ func NewMessagingServiceHandler(svc MessagingServiceHandler, opts ...connect.Han
 		connect.WithSchema(messagingServiceMethods.ByName("ReportStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagingServiceReportVerdictHandler := connect.NewUnaryHandler(
+		MessagingServiceReportVerdictProcedure,
+		svc.ReportVerdict,
+		connect.WithSchema(messagingServiceMethods.ByName("ReportVerdict")),
+		connect.WithHandlerOptions(opts...),
+	)
 	messagingServiceWatchPresenceHandler := connect.NewServerStreamHandler(
 		MessagingServiceWatchPresenceProcedure,
 		svc.WatchPresence,
@@ -393,6 +422,8 @@ func NewMessagingServiceHandler(svc MessagingServiceHandler, opts ...connect.Han
 			messagingServiceAnswerApprovalHandler.ServeHTTP(w, r)
 		case MessagingServiceReportStatusProcedure:
 			messagingServiceReportStatusHandler.ServeHTTP(w, r)
+		case MessagingServiceReportVerdictProcedure:
+			messagingServiceReportVerdictHandler.ServeHTTP(w, r)
 		case MessagingServiceWatchPresenceProcedure:
 			messagingServiceWatchPresenceHandler.ServeHTTP(w, r)
 		case MessagingServiceQueryAuditProcedure:
@@ -444,6 +475,10 @@ func (UnimplementedMessagingServiceHandler) AnswerApproval(context.Context, *con
 
 func (UnimplementedMessagingServiceHandler) ReportStatus(context.Context, *connect.Request[v1.ReportStatusRequest]) (*connect.Response[v1.ReportStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ReportStatus is not implemented"))
+}
+
+func (UnimplementedMessagingServiceHandler) ReportVerdict(context.Context, *connect.Request[v1.ReportVerdictRequest]) (*connect.Response[v1.ReportVerdictResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.messaging.v1.MessagingService.ReportVerdict is not implemented"))
 }
 
 func (UnimplementedMessagingServiceHandler) WatchPresence(context.Context, *connect.Request[v1.WatchPresenceRequest], *connect.ServerStream[v1.PresenceEvent]) error {

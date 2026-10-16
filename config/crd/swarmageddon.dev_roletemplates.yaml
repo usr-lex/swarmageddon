@@ -45,6 +45,31 @@ spec:
               RoleTemplateSpec is a persona: role text plus CLI policy. Personas are
               guardrails, not security (docs/design.md §6.4).
             properties:
+              advisor:
+                description: 'Advisor the agent can consult with `swarm advise` (ADR
+                  0010). No model: no advisor.'
+                properties:
+                  effort:
+                    type: string
+                  maxCallsPerHour:
+                    default: 10
+                    format: int32
+                    type: integer
+                  model:
+                    description: Model, as the gateway names it.
+                    type: string
+                  monthlyUSD:
+                    description: 'Monthly budget of the advisor''s own gateway key
+                      in USD; 0: the workspace''s per-room budget.'
+                    format: int32
+                    type: integer
+                  native:
+                    description: Native also turns on Claude Code's built-in advisor
+                      tool (Claude rooms only; unauditable).
+                    type: boolean
+                required:
+                - model
+                type: object
               autoApprove:
                 description: AutoApprove rules the control center applies to approval
                   requests.
@@ -150,6 +175,41 @@ spec:
                 type: string
               title:
                 type: string
+              wardenRules:
+                description: WardenRules adds rules to the warden's rule table for
+                  rooms of this role (ADR 0011).
+                items:
+                  description: |-
+                    WardenRule matches a tool call by tool name and a regular expression over
+                    its command or path.
+                  properties:
+                    action:
+                      description: WardenAction is what a warden rule does with a
+                        matching tool call.
+                      enum:
+                      - allow
+                      - deny
+                      - escalate
+                      type: string
+                    match:
+                      description: Match is a regular expression against the command
+                        or file path.
+                      type: string
+                    name:
+                      type: string
+                    reason:
+                      type: string
+                    tool:
+                      description: 'Tool name (Claude: Bash, Edit, ...; ore: exec,
+                        patch); "*" for any.'
+                      type: string
+                  required:
+                  - action
+                  - match
+                  - name
+                  - tool
+                  type: object
+                type: array
             required:
             - roleText
             - title

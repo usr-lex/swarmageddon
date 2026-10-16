@@ -42,6 +42,9 @@ type WorkspaceSpec struct {
 	// (docs/design.md §9.7). Empty: all of them.
 	// +optional
 	ForgeNotifications []ForgeEvent `json:"forgeNotifications,omitempty"`
+	// Warden watches agents for drift and risky actions (ADR 0011).
+	// +optional
+	Warden WardenSpec `json:"warden,omitempty"`
 	// DeletedRoomRetention keeps a removed room's volumes this long. Default 168h.
 	// +optional
 	DeletedRoomRetention *metav1.Duration `json:"deletedRoomRetention,omitempty"`
@@ -175,7 +178,7 @@ type BudgetSettings struct {
 type ChannelKind string
 
 // NotificationEvent is something people get notified about.
-// +kubebuilder:validation:Enum=approvalWaiting;idleWithOpenWork;ciRed;budget;diskLow;roomCrashed
+// +kubebuilder:validation:Enum=approvalWaiting;idleWithOpenWork;ciRed;budget;diskLow;roomCrashed;wardenFlag
 type NotificationEvent string
 
 const (
@@ -185,6 +188,7 @@ const (
 	EventBudget           NotificationEvent = "budget"
 	EventDiskLow          NotificationEvent = "diskLow"
 	EventRoomCrashed      NotificationEvent = "roomCrashed"
+	EventWardenFlag       NotificationEvent = "wardenFlag"
 )
 
 type NotificationSettings struct {
@@ -221,6 +225,36 @@ type RepositorySpec struct {
 	// StatusChecks required on the default branch.
 	// +optional
 	StatusChecks []string `json:"statusChecks,omitempty"`
+}
+
+// WardenMode is how closely the warden watches.
+// +kubebuilder:validation:Enum=off;monitor;gate
+type WardenMode string
+
+const (
+	WardenOff     WardenMode = "off"
+	WardenMonitor WardenMode = "monitor"
+	WardenGate    WardenMode = "gate"
+)
+
+// WardenSpec configures the warden (ADR 0011).
+type WardenSpec struct {
+	// +kubebuilder:default=monitor
+	// +optional
+	Mode WardenMode `json:"mode,omitempty"`
+	// Model the warden judges with: a small, fast model on the gateway. Empty: rules only.
+	// +optional
+	Model string `json:"model,omitempty"`
+	// InterruptOnHigh interrupts the agent's turn on a high-severity verdict.
+	// +kubebuilder:default=true
+	// +optional
+	InterruptOnHigh *bool `json:"interruptOnHigh,omitempty"`
+	// QuarantineOnHigh quarantines on high verdicts from the gateway guard, not only critical ones.
+	// +optional
+	QuarantineOnHigh bool `json:"quarantineOnHigh,omitempty"`
+	// Monthly budget of each room's warden key in USD. Default 20.
+	// +optional
+	MonthlyUSD int32 `json:"monthlyUSD,omitempty"`
 }
 
 // ForgeEvent is a kind of forge activity delivered to agents.
