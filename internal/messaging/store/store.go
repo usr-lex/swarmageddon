@@ -272,6 +272,12 @@ func (s *Store) isLeader(ctx context.Context, stream string) bool {
 	return info.Cluster == nil || info.Cluster.Leader == "" || info.Cluster.Leader == s.node.name
 }
 
+// IsInboxLeader reports whether this replica leads a workspace's inbox
+// stream; timers that must run once (digests) run there.
+func (s *Store) IsInboxLeader(ctx context.Context, ws string) bool {
+	return s.isLeader(ctx, InboxStream(ws))
+}
+
 // InboxLeader names the replica leading a workspace's inbox stream.
 func (s *Store) InboxLeader(ctx context.Context, ws string) string {
 	st, err := s.js.Stream(ctx, InboxStream(ws))

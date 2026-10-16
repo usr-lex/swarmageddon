@@ -1,11 +1,13 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"time"
@@ -80,72 +82,81 @@ func (e *Entry) ChanSeq() uint64 {
 	return n
 }
 
+// MaxScan bounds one scan, so a huge backlog can't stall a call.
+const MaxScan = 50000
+
 // Scan calls fn with the messages on subjects in a stream, in order,
-// starting at sequence start, until fn returns false, limit messages were
-// read (at most limit), or the end. It returns the last sequence read (start-1 if none) and
-// whether it stopped at limit.
-func (s *Store) Scan(ctx context.Context, stream string, subjects []string, start uint64, limit int, fn func(*Entry) bool) (last uint64, capped bool, err error) {
-	last = start - 1
+// starting at sequence start, until fn returns false, MaxScan messages were
+// read, or the end.
+func (s *Store) Scan(ctx context.Context, stream string, subjects []string, start uint64, fn func(*Entry) bool) error {
+	return s.scan(ctx, stream, subjects, jetstream.ConsumerConfig{
+		DeliverPolicy: jetstream.DeliverByStartSequencePolicy, OptStartSeq: max(start, 1)}, MaxScan, fn)
+}
+
+// ScanSince is Scan from the first message stored at or after since.
+func (s *Store) ScanSince(ctx context.Context, stream string, subjects []string, since time.Time, fn func(*Entry) bool) error {
+	return s.scan(ctx, stream, subjects, jetstream.ConsumerConfig{
+		DeliverPolicy: jetstream.DeliverByStartTimePolicy, OptStartTime: &since}, MaxScan, fn)
+}
+
+func (s *Store) scan(ctx context.Context, stream string, subjects []string, cfg jetstream.ConsumerConfig, limit uint64, fn func(*Entry) bool) error {
 	if len(subjects) == 0 {
-		return last, false, nil
+		return nil
 	}
 	st, err := s.js.Stream(ctx, stream)
 	if errors.Is(err, jetstream.ErrStreamNotFound) {
-		return last, false, nil
+		return nil
 	}
 	if err != nil {
-		return last, false, err
+		return err
 	}
-	cfg := jetstream.ConsumerConfig{
-		AckPolicy:         jetstream.AckNonePolicy,
-		DeliverPolicy:     jetstream.DeliverByStartSequencePolicy,
-		OptStartSeq:       max(start, 1),
-		FilterSubjects:    subjects,
-		InactiveThreshold: time.Minute,
-		MemoryStorage:     true,
-		Replicas:          1,
-	}
+	cfg.AckPolicy = jetstream.AckNonePolicy
+	cfg.FilterSubjects = subjects
+	cfg.InactiveThreshold = time.Minute
+	cfg.MemoryStorage = true
+	cfg.Replicas = 1
 	cons, err := st.CreateConsumer(ctx, cfg)
 	if err != nil {
-		return last, false, err
+		return fmt.Errorf("scan %s: %w", stream, err)
 	}
 	defer func() {
 		dctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = st.DeleteConsumer(dctx, cons.CachedInfo().Name)
 	}()
-	remaining := cons.CachedInfo().NumPending
-	read := 0
+	remaining := min(cons.CachedInfo().NumPending, limit)
+	retries := 0
 	for remaining > 0 {
-		if read >= limit {
-			return last, true, nil
-		}
-		batch, err := cons.Fetch(int(min(remaining, 256, uint64(limit-read))), jetstream.FetchMaxWait(5*time.Second))
+		batch, err := cons.Fetch(int(min(remaining, 256)), jetstream.FetchMaxWait(5*time.Second))
 		if err != nil {
-			return last, false, err
+			return fmt.Errorf("scan %s: fetch: %w", stream, err)
 		}
 		got := 0
 		for m := range batch.Messages() {
 			got++
 			remaining--
-			read++
 			meta, err := m.Metadata()
 			if err != nil {
 				continue
 			}
-			last = meta.Sequence.Stream
-			if !fn(&Entry{Seq: last, Subject: m.Subject(), Header: m.Headers(), Data: m.Data(), Time: meta.Timestamp}) {
-				return last, false, nil
+			if !fn(&Entry{Seq: meta.Sequence.Stream, Subject: m.Subject(), Header: m.Headers(), Data: m.Data(), Time: meta.Timestamp}) {
+				return nil
 			}
 		}
+		if err := batch.Error(); got == 0 && errors.Is(err, nats.ErrNoResponders) && retries < 40 {
+			// A new consumer may not be ready for pull requests yet.
+			retries++
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
 		if err := batch.Error(); err != nil && !errors.Is(err, jetstream.ErrNoMessages) {
-			return last, false, err
+			return fmt.Errorf("scan %s: batch: %w", stream, err)
 		}
 		if got == 0 {
 			break
 		}
 	}
-	return last, false, nil
+	return nil
 }
 
 // LastSeq is the stream's last sequence, or 0.
@@ -244,17 +255,54 @@ func (r *ReadState) Advance(seqs []uint64, skip func(uint64) bool) {
 
 func cursorKey(ws, member, scope string) string { return ws + "." + member + "." + scope }
 
+// get reads a key from the stream leader. KV handles use direct gets,
+// which any replica may answer, possibly with a value older than a write
+// this replica just made; read cursors must read their own writes.
+func (s *Store) get(ctx context.Context, bucket, key string) (data []byte, rev uint64, err error) {
+	req, _ := json.Marshal(map[string]string{"last_by_subj": "$KV." + bucket + "." + key})
+	msg, err := s.nc.RequestWithContext(ctx, "$JS.API.STREAM.MSG.GET.KV_"+bucket, req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get %s/%s: %w", bucket, key, err)
+	}
+	var resp struct {
+		Message *struct {
+			Seq  uint64 `json:"seq"`
+			Hdrs []byte `json:"hdrs"`
+			Data []byte `json:"data"`
+		} `json:"message"`
+		Error *struct {
+			Code        int    `json:"code"`
+			Description string `json:"description"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(msg.Data, &resp); err != nil {
+		return nil, 0, err
+	}
+	switch {
+	case resp.Error != nil && resp.Error.Code == 404:
+		return nil, 0, jetstream.ErrKeyNotFound
+	case resp.Error != nil:
+		return nil, 0, fmt.Errorf("get %s/%s: %s", bucket, key, resp.Error.Description)
+	case resp.Message == nil:
+		return nil, 0, jetstream.ErrKeyNotFound
+	case bytes.Contains(resp.Message.Hdrs, []byte("KV-Operation")):
+		// A delete or purge marker.
+		return nil, resp.Message.Seq, jetstream.ErrKeyNotFound
+	}
+	return resp.Message.Data, resp.Message.Seq, nil
+}
+
 // ReadState returns a member's read state in a scope.
 func (s *Store) ReadState(ctx context.Context, ws, member, scope string) (ReadState, error) {
 	var r ReadState
-	e, err := s.cursors.Get(ctx, cursorKey(ws, member, scope))
+	data, _, err := s.get(ctx, BucketCursors, cursorKey(ws, member, scope))
 	if errors.Is(err, jetstream.ErrKeyNotFound) {
 		return r, nil
 	}
 	if err != nil {
 		return r, err
 	}
-	return r, json.Unmarshal(e.Value(), &r)
+	return r, json.Unmarshal(data, &r)
 }
 
 // UpdateReadState applies f to a member's read state, retrying on conflicts.
@@ -262,15 +310,13 @@ func (s *Store) UpdateReadState(ctx context.Context, ws, member, scope string, f
 	key := cursorKey(ws, member, scope)
 	for range 20 {
 		var r ReadState
-		var rev uint64
-		e, err := s.cursors.Get(ctx, key)
+		data, rev, err := s.get(ctx, BucketCursors, key)
 		switch {
 		case errors.Is(err, jetstream.ErrKeyNotFound):
 		case err != nil:
 			return err
 		default:
-			rev = e.Revision()
-			if err := json.Unmarshal(e.Value(), &r); err != nil {
+			if err := json.Unmarshal(data, &r); err != nil {
 				return err
 			}
 		}
@@ -279,7 +325,7 @@ func (s *Store) UpdateReadState(ctx context.Context, ws, member, scope string, f
 		if r.Upto == before && slices.Equal(r.Extra, extra) {
 			return nil
 		}
-		data, _ := json.Marshal(r)
+		data, _ = json.Marshal(r)
 		if rev == 0 {
 			_, err = s.cursors.Create(ctx, key, data)
 		} else {
@@ -303,14 +349,14 @@ func isWrongSequence(err error) bool {
 
 // Delivery returns a member's delivery mode for a channel, or "" if unset.
 func (s *Store) Delivery(ctx context.Context, ws, member, channel string) (string, error) {
-	e, err := s.delivery.Get(ctx, cursorKey(ws, member, channel))
+	data, _, err := s.get(ctx, BucketDelivery, cursorKey(ws, member, channel))
 	if errors.Is(err, jetstream.ErrKeyNotFound) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return string(e.Value()), nil
+	return string(data), nil
 }
 
 // SetDelivery sets a member's delivery mode for a channel.
@@ -330,14 +376,14 @@ type DigestState struct {
 // Digest returns a member's digest state for a channel.
 func (s *Store) Digest(ctx context.Context, ws, member, channel string) (DigestState, error) {
 	var d DigestState
-	e, err := s.digests.Get(ctx, cursorKey(ws, member, channel))
+	data, _, err := s.get(ctx, BucketDigests, cursorKey(ws, member, channel))
 	if errors.Is(err, jetstream.ErrKeyNotFound) {
 		return d, nil
 	}
 	if err != nil {
 		return d, err
 	}
-	return d, json.Unmarshal(e.Value(), &d)
+	return d, json.Unmarshal(data, &d)
 }
 
 // SetDigest records a member's digest state for a channel.
@@ -358,14 +404,14 @@ func (s *Store) SameBody(ctx context.Context, ws, sender, target, body, id strin
 	} else if !errors.Is(err, jetstream.ErrKeyExists) {
 		return "", err
 	}
-	e, err := s.dupes.Get(ctx, key)
+	data, _, err := s.get(ctx, BucketDupes, key)
 	if err != nil {
 		if errors.Is(err, jetstream.ErrKeyNotFound) {
 			return "", nil // expired in between
 		}
 		return "", err
 	}
-	if prev := string(e.Value()); prev != id {
+	if prev := string(data); prev != id {
 		return prev, nil
 	}
 	return "", nil

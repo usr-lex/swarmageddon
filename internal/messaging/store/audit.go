@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -42,79 +41,43 @@ type AuditQuery struct {
 
 // QueryAudit streams matching records, oldest first, to emit.
 func (s *Store) QueryAudit(ctx context.Context, q AuditQuery, emit func(*messagingv1.AuditRecord) error) error {
-	stream, err := s.js.Stream(ctx, AuditStream(q.Workspace))
-	if errors.Is(err, jetstream.ErrStreamNotFound) {
-		return nil
+	subjects := []string{"audit." + q.Workspace + ".>"}
+	if len(q.Kinds) > 0 {
+		subjects = nil
+		for _, k := range q.Kinds {
+			subjects = append(subjects, "audit."+q.Workspace+"."+k)
+		}
 	}
-	if err != nil {
-		return err
-	}
-	cfg := jetstream.ConsumerConfig{
-		AckPolicy:         jetstream.AckNonePolicy,
-		DeliverPolicy:     jetstream.DeliverAllPolicy,
-		InactiveThreshold: time.Minute,
-		MemoryStorage:     true,
-		Replicas:          1,
-	}
-	if !q.Since.IsZero() {
-		cfg.DeliverPolicy = jetstream.DeliverByStartTimePolicy
-		since := q.Since
-		cfg.OptStartTime = &since
-	}
-	for _, k := range q.Kinds {
-		cfg.FilterSubjects = append(cfg.FilterSubjects, "audit."+q.Workspace+"."+k)
-	}
-	cons, err := stream.CreateConsumer(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		dctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		_ = stream.DeleteConsumer(dctx, cons.CachedInfo().Name)
-	}()
-	info, err := cons.Info(ctx)
-	if err != nil {
-		return err
-	}
-	remaining := info.NumPending
 	until := q.Until
 	if until.IsZero() {
 		until = time.Now()
 	}
 	sent := 0
-	for remaining > 0 {
-		batch, err := cons.Fetch(int(min(remaining, 256)), jetstream.FetchMaxWait(5*time.Second))
-		if err != nil {
-			return err
+	var emitErr error
+	fn := func(e *Entry) bool {
+		var rec messagingv1.AuditRecord
+		if proto.Unmarshal(e.Data, &rec) != nil {
+			return true
 		}
-		got := 0
-		for m := range batch.Messages() {
-			got++
-			remaining--
-			var rec messagingv1.AuditRecord
-			if proto.Unmarshal(m.Data(), &rec) != nil {
-				continue
-			}
-			if rec.GetAt().AsTime().After(until) {
-				return nil
-			}
-			if q.Address != "" && rec.From != q.Address && rec.To != q.Address {
-				continue
-			}
-			if err := emit(&rec); err != nil {
-				return err
-			}
-			if sent++; q.Limit > 0 && sent >= q.Limit {
-				return nil
-			}
+		if rec.GetAt().AsTime().After(until) {
+			return false
 		}
-		if err := batch.Error(); err != nil && !errors.Is(err, jetstream.ErrNoMessages) {
-			return err
+		if q.Address != "" && rec.From != q.Address && rec.To != q.Address {
+			return true
 		}
-		if got == 0 {
-			return nil
+		if emitErr = emit(&rec); emitErr != nil {
+			return false
 		}
+		sent++
+		return q.Limit <= 0 || sent < q.Limit
 	}
-	return nil
+	cfg := jetstream.ConsumerConfig{DeliverPolicy: jetstream.DeliverAllPolicy}
+	if !q.Since.IsZero() {
+		cfg = jetstream.ConsumerConfig{DeliverPolicy: jetstream.DeliverByStartTimePolicy, OptStartTime: &q.Since}
+	}
+	err := s.scan(ctx, AuditStream(q.Workspace), subjects, cfg, ^uint64(0), fn)
+	if emitErr != nil {
+		return emitErr
+	}
+	return err
 }

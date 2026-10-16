@@ -30,7 +30,10 @@ type Pending struct {
 	Delivery *messagingv1.Delivery
 	// Entry is the stored message (sequence, headers, time).
 	Entry *Entry
-	msg   jetstream.Msg
+	// Delivered counts deliveries of this item (more than 1: a redelivery);
+	// Waiting is how many items wait behind it.
+	Delivered, Waiting uint64
+	msg                jetstream.Msg
 }
 
 // Ack acknowledges the item on the server's side, for items the service
@@ -94,11 +97,12 @@ func (s *Store) Subscribe(ctx context.Context, ws, name string, fn func(*Pending
 		}
 		d.DeliveryId = m.Reply()
 		last = m
-		e := &Entry{Subject: m.Subject(), Header: m.Headers(), Data: m.Data()}
+		p := &Pending{Delivery: &d, Entry: &Entry{Subject: m.Subject(), Header: m.Headers(), Data: m.Data()}, msg: m}
 		if meta, err := m.Metadata(); err == nil {
-			e.Seq, e.Time = meta.Sequence.Stream, meta.Timestamp
+			p.Entry.Seq, p.Entry.Time = meta.Sequence.Stream, meta.Timestamp
+			p.Delivered, p.Waiting = meta.NumDelivered, meta.NumPending
 		}
-		if err := fn(&Pending{Delivery: &d, Entry: e, msg: m}); err != nil {
+		if err := fn(p); err != nil {
 			return err
 		}
 	}
