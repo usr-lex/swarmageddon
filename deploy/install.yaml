@@ -652,6 +652,142 @@ spec:
               roleText:
                 description: RoleText is written to the agent.
                 type: string
+              roomDefaults:
+                description: RoomDefaults apply to rooms of this role, over the workspace's
+                  (docs/design.md §6.6).
+                properties:
+                  env:
+                    additionalProperties:
+                      type: string
+                    description: Env adds non-secret environment variables.
+                    type: object
+                  mcpServers:
+                    additionalProperties:
+                      description: MCPServer is one MCP server, as in .mcp.json.
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        command:
+                          type: string
+                        disabled:
+                          description: Disabled removes a server inherited from an
+                            earlier level.
+                          type: boolean
+                        enabledTools:
+                          description: 'EnabledTools limits the server''s tools; empty:
+                            all.'
+                          items:
+                            type: string
+                          type: array
+                        env:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        headers:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        type:
+                          description: stdio (default when command is set) or http.
+                          enum:
+                          - stdio
+                          - http
+                          type: string
+                        url:
+                          type: string
+                      type: object
+                    description: MCPServers for both CLIs, by name, in the .mcp.json
+                      format.
+                    type: object
+                  network:
+                    description: Network is the room's network access (docs/design.md
+                      §11.2).
+                    properties:
+                      domains:
+                        description: |-
+                          Domains reachable in limited mode: exact hosts or *.suffix, with an
+                          optional :port (default 443 and 80). Merged across levels.
+                        items:
+                          type: string
+                        type: array
+                      mode:
+                        default: full
+                        description: NetworkMode is how much network a room gets.
+                        enum:
+                        - none
+                        - limited
+                        - full
+                        type: string
+                      packageManagers:
+                        description: PackageManagers adds the package registries'
+                          domains in limited mode.
+                        type: boolean
+                    type: object
+                  secretEnv:
+                    description: |-
+                      SecretEnv adds environment variables whose values come from Secrets in
+                      the workspace namespace.
+                    items:
+                      description: SecretEnvVar is an environment variable whose value
+                        comes from a Secret.
+                      properties:
+                        name:
+                          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                          type: string
+                        secretRef:
+                          description: SecretKeyRef names a key of a Secret in the
+                            workspace namespace.
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - name
+                      - secretRef
+                      type: object
+                    type: array
+                type: object
               summary:
                 description: One line, shown in teammates' team lists.
                 type: string
@@ -801,17 +937,114 @@ spec:
               env:
                 additionalProperties:
                   type: string
-                description: Env adds non-secret environment variables.
+                description: Env adds non-secret environment variables, over the role's
+                  and workspace's.
                 type: object
               group:
                 type: string
               image:
                 description: Image overrides the room image (for development).
                 type: string
+              mcpServers:
+                additionalProperties:
+                  description: MCPServer is one MCP server, as in .mcp.json.
+                  properties:
+                    args:
+                      items:
+                        type: string
+                      type: array
+                    command:
+                      type: string
+                    disabled:
+                      description: Disabled removes a server inherited from an earlier
+                        level.
+                      type: boolean
+                    enabledTools:
+                      description: 'EnabledTools limits the server''s tools; empty:
+                        all.'
+                      items:
+                        type: string
+                      type: array
+                    env:
+                      additionalProperties:
+                        description: MCPValue is a literal value, or one taken from
+                          a Secret.
+                        properties:
+                          value:
+                            type: string
+                          valueFrom:
+                            description: SecretKeyRef names a key of a Secret in the
+                              workspace namespace.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
+                      type: object
+                    headers:
+                      additionalProperties:
+                        description: MCPValue is a literal value, or one taken from
+                          a Secret.
+                        properties:
+                          value:
+                            type: string
+                          valueFrom:
+                            description: SecretKeyRef names a key of a Secret in the
+                              workspace namespace.
+                            properties:
+                              key:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
+                      type: object
+                    type:
+                      description: stdio (default when command is set) or http.
+                      enum:
+                      - stdio
+                      - http
+                      type: string
+                    url:
+                      type: string
+                  type: object
+                description: MCPServers for this room, over the role's and workspace's.
+                type: object
               model:
                 description: 'Model, as the gateway names it. Empty: the workspace
                   default.'
                 type: string
+              network:
+                description: Network access for this room, over the role's and workspace's.
+                properties:
+                  domains:
+                    description: |-
+                      Domains reachable in limited mode: exact hosts or *.suffix, with an
+                      optional :port (default 443 and 80). Merged across levels.
+                    items:
+                      type: string
+                    type: array
+                  mode:
+                    default: full
+                    description: NetworkMode is how much network a room gets.
+                    enum:
+                    - none
+                    - limited
+                    - full
+                    type: string
+                  packageManagers:
+                    description: PackageManagers adds the package registries' domains
+                      in limited mode.
+                    type: boolean
+                type: object
               paused:
                 description: Paused scales the room to zero; its volumes stay.
                 type: boolean
@@ -845,7 +1078,35 @@ spec:
               role:
                 description: Role names a RoleTemplate in the same namespace.
                 type: string
+              secretEnv:
+                description: SecretEnv adds variables from Secrets in the workspace
+                  namespace.
+                items:
+                  description: SecretEnvVar is an environment variable whose value
+                    comes from a Secret.
+                  properties:
+                    name:
+                      pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                      type: string
+                    secretRef:
+                      description: SecretKeyRef names a key of a Secret in the workspace
+                        namespace.
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - key
+                      - name
+                      type: object
+                  required:
+                  - name
+                  - secretRef
+                  type: object
+                type: array
               sharedDirs:
+                description: 'Deprecated: use Workspace.spec.sharedVolumes.'
                 items:
                   properties:
                     name:
@@ -1311,8 +1572,8 @@ spec:
                 type: array
               internet:
                 default: true
-                description: 'Room egress: false cuts rooms off from the internet;
-                  platform services stay reachable.'
+                description: 'Deprecated: use roomDefaults.network. false is the same
+                  as network mode none.'
                 type: boolean
               isolationTier:
                 default: inherit
@@ -1576,6 +1837,183 @@ spec:
                       type: array
                   required:
                   - name
+                  type: object
+                type: array
+              roomDefaults:
+                description: RoomDefaults apply to every room of the workspace (docs/design.md
+                  §6.6).
+                properties:
+                  env:
+                    additionalProperties:
+                      type: string
+                    description: Env adds non-secret environment variables.
+                    type: object
+                  mcpServers:
+                    additionalProperties:
+                      description: MCPServer is one MCP server, as in .mcp.json.
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        command:
+                          type: string
+                        disabled:
+                          description: Disabled removes a server inherited from an
+                            earlier level.
+                          type: boolean
+                        enabledTools:
+                          description: 'EnabledTools limits the server''s tools; empty:
+                            all.'
+                          items:
+                            type: string
+                          type: array
+                        env:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        headers:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        type:
+                          description: stdio (default when command is set) or http.
+                          enum:
+                          - stdio
+                          - http
+                          type: string
+                        url:
+                          type: string
+                      type: object
+                    description: MCPServers for both CLIs, by name, in the .mcp.json
+                      format.
+                    type: object
+                  network:
+                    description: Network is the room's network access (docs/design.md
+                      §11.2).
+                    properties:
+                      domains:
+                        description: |-
+                          Domains reachable in limited mode: exact hosts or *.suffix, with an
+                          optional :port (default 443 and 80). Merged across levels.
+                        items:
+                          type: string
+                        type: array
+                      mode:
+                        default: full
+                        description: NetworkMode is how much network a room gets.
+                        enum:
+                        - none
+                        - limited
+                        - full
+                        type: string
+                      packageManagers:
+                        description: PackageManagers adds the package registries'
+                          domains in limited mode.
+                        type: boolean
+                    type: object
+                  secretEnv:
+                    description: |-
+                      SecretEnv adds environment variables whose values come from Secrets in
+                      the workspace namespace.
+                    items:
+                      description: SecretEnvVar is an environment variable whose value
+                        comes from a Secret.
+                      properties:
+                        name:
+                          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                          type: string
+                        secretRef:
+                          description: SecretKeyRef names a key of a Secret in the
+                            workspace namespace.
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - name
+                      - secretRef
+                      type: object
+                    type: array
+                type: object
+              sharedVolumes:
+                description: SharedVolumes are ReadWriteMany volumes shared between
+                  rooms.
+                items:
+                  description: |-
+                    SharedVolume is a ReadWriteMany volume mounted into the rooms its mounts
+                    select, at /srv/shared/<name> (docs/design.md §6.6).
+                  properties:
+                    mounts:
+                      items:
+                        description: VolumeMount selects rooms for a shared volume.
+                        properties:
+                          readOnly:
+                            type: boolean
+                          select:
+                            description: 'Selector: everyone, role:<template>, group:<group>
+                              or room:<name>.'
+                            pattern: ^(everyone|(role|group|room):[a-z0-9][a-z0-9_-]{0,62})$
+                            type: string
+                        required:
+                        - select
+                        type: object
+                      minItems: 1
+                      type: array
+                    name:
+                      pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+                      type: string
+                    size:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    storageClassName:
+                      type: string
+                  required:
+                  - mounts
+                  - name
+                  - size
                   type: object
                 type: array
               updatePolicy:
