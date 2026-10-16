@@ -8,15 +8,47 @@ import (
 
 // ForgeNotificationEvents are the org webhook events behind forge
 // notifications to agents (docs/design.md §9.7). Verified against Forgejo
-// 17.0.0: "issues" and "pull_request" also enable their _assign, _label and
-// _milestone events (and pull_request_sync); "pull_request_review" and
-// "workflow_run" are not event names there and are dropped silently, so
-// reviews and failed runs use the names below.
+// 17.0.0; "workflow_run" is not an event there and is dropped silently.
 var ForgeNotificationEvents = []string{
-	"issues", "issue_comment",
-	"pull_request", "pull_request_comment", "pull_request_review_request",
-	"pull_request_review_approved", "pull_request_review_rejected", "pull_request_review_comment",
-	"action_run_failure",
+	"issues", "issue_comment", "pull_request", "pull_request_review",
+	"pull_request_comment", "workflow_run_failure", "action_run_failure",
+}
+
+// eventExpansion is how Forgejo 17.0.0 stores the umbrella events it
+// accepts (observed by creating hooks; the stored list is the expansion).
+var eventExpansion = map[string][]string{
+	"issues": {"issues", "issue_assign", "issue_label", "issue_milestone"},
+	"pull_request": {"pull_request", "pull_request_assign", "pull_request_label", "pull_request_milestone",
+		"pull_request_sync", "pull_request_review_request"},
+	"pull_request_review": {"pull_request_review_approved", "pull_request_review_rejected", "pull_request_review_comment"},
+}
+
+// ExpandEvents returns the set of event names Forgejo stores for events.
+func ExpandEvents(events []string) map[string]bool {
+	set := map[string]bool{}
+	for _, e := range events {
+		if x, ok := eventExpansion[e]; ok {
+			for _, y := range x {
+				set[y] = true
+			}
+			continue
+		}
+		set[e] = true
+	}
+	return set
+}
+
+func sameEvents(stored, want []string) bool {
+	a, b := ExpandEvents(stored), ExpandEvents(want)
+	if len(a) != len(b) {
+		return false
+	}
+	for e := range b {
+		if !a[e] {
+			return false
+		}
+	}
+	return true
 }
 
 // ListOrgHooks lists an org's webhooks.
@@ -26,17 +58,21 @@ func (c *Client) ListOrgHooks(ctx context.Context, org string) ([]Hook, error) {
 }
 
 // EnsureOrgHook makes the org have one active forgejo-type JSON webhook to
-// hookURL with these events and secret. Forgejo doesn't return the secret,
-// so an existing hook is always patched.
-func (c *Client) EnsureOrgHook(ctx context.Context, org, hookURL, secret string, events []string) (*Hook, error) {
+// hookURL with these events and secret. An existing hook is patched only
+// when its events, state or content type differ: Forgejo never returns the
+// secret, so to change the secret pass rotateSecret.
+func (c *Client) EnsureOrgHook(ctx context.Context, org, hookURL, secret string, events []string, rotateSecret bool) (*Hook, error) {
 	hs, err := c.ListOrgHooks(ctx, org)
 	if err != nil {
 		return nil, err
 	}
 	cfg := map[string]string{"url": hookURL, "content_type": "json", "secret": secret}
-	for _, h := range hs {
+	for i, h := range hs {
 		if h.Config["url"] != hookURL {
 			continue
+		}
+		if !rotateSecret && h.Active && h.Config["content_type"] == "json" && sameEvents(h.Events, events) {
+			return &hs[i], nil
 		}
 		var out Hook
 		return &out, c.do(ctx, http.MethodPatch, fmt.Sprintf("/orgs/%s/hooks/%d", esc(org), h.ID),

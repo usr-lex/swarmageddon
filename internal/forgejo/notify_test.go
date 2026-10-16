@@ -16,7 +16,7 @@ func TestEnsureOrgHookCreatesThenPatches(t *testing.T) {
 		"POST /orgs/acme/hooks":         jsonResp(201, Hook{ID: 3}),
 	})
 	ctx := context.Background()
-	if _, err := c.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "s3cret", ForgeNotificationEvents); err != nil {
+	if _, err := c.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "s3cret", ForgeNotificationEvents, false); err != nil {
 		t.Fatal(err)
 	}
 	b := f.mustFind("POST", "/orgs/acme/hooks").Body
@@ -27,18 +27,33 @@ func TestEnsureOrgHookCreatesThenPatches(t *testing.T) {
 		t.Errorf("config = %v", b["config"])
 	}
 
+	// As Forgejo 17 stores ForgeNotificationEvents (expanded).
+	stored := []string{"issues", "issue_assign", "issue_label", "issue_milestone", "issue_comment", "pull_request",
+		"pull_request_assign", "pull_request_label", "pull_request_milestone", "pull_request_comment",
+		"pull_request_review_approved", "pull_request_review_rejected", "pull_request_review_comment",
+		"pull_request_sync", "pull_request_review_request", "action_run_failure", "workflow_run_failure"}
+	existing := Hook{ID: 3, Active: true, Events: stored, Config: map[string]string{"url": "https://cc/hooks/forgejo/acme", "content_type": "json"}}
 	f2, c2 := newFake(t, map[string]func(http.ResponseWriter){
-		"GET /orgs/acme/hooks?limit=50": jsonResp(200, []Hook{{ID: 3, Config: map[string]string{"url": "https://cc/hooks/forgejo/acme"}}}),
+		"GET /orgs/acme/hooks?limit=50": jsonResp(200, []Hook{existing}),
 		"PATCH /orgs/acme/hooks/3":      jsonResp(200, Hook{ID: 3}),
 	})
-	if _, err := c2.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "new", ForgeNotificationEvents); err != nil {
+	if _, err := c2.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "same", ForgeNotificationEvents, false); err != nil {
 		t.Fatal(err)
 	}
-	if f2.find("POST", "/orgs/acme/hooks") != nil {
-		t.Error("created a second hook")
+	if f2.find("PATCH", "/orgs/acme/hooks/3") != nil || f2.find("POST", "/orgs/acme/hooks") != nil {
+		t.Error("touched an up-to-date hook")
+	}
+	if _, err := c2.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "new", ForgeNotificationEvents, true); err != nil {
+		t.Fatal(err)
 	}
 	if p := f2.mustFind("PATCH", "/orgs/acme/hooks/3").Body; p["config"].(map[string]any)["secret"] != "new" {
 		t.Errorf("patch = %v", p)
+	}
+	if _, err := c2.EnsureOrgHook(ctx, "acme", "https://cc/hooks/forgejo/acme", "x", []string{"issues"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f2.calls); f2.calls[n-1].Method != "PATCH" {
+		t.Error("changed events not patched")
 	}
 }
 

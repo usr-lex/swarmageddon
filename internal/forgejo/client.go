@@ -720,11 +720,12 @@ func (c *Client) EnsurePushMirror(ctx context.Context, owner, repo, address, use
 
 // Hook is a system webhook.
 type Hook struct {
-	ID     int64             `json:"id"`
-	Type   string            `json:"type"`
-	Active bool              `json:"active"`
-	Events []string          `json:"events"`
-	Config map[string]string `json:"config"`
+	ID        int64             `json:"id"`
+	Type      string            `json:"type"`
+	Active    bool              `json:"active"`
+	Events    []string          `json:"events"`
+	Config    map[string]string `json:"config"`
+	UpdatedAt string            `json:"updated_at"`
 }
 
 // EnsureSystemHook adds a system webhook (type forgejo, JSON) to url if missing.

@@ -106,9 +106,18 @@ func TestLive(t *testing.T) {
 		t.Errorf("permission = %+v", p)
 	}
 
-	h, err := c.EnsureOrgHook(ctx, org, "http://example.invalid/hooks/forgejo/"+org, "s", ForgeNotificationEvents)
+	hookURL := "http://example.invalid/hooks/forgejo/" + org
+	h, err := c.EnsureOrgHook(ctx, org, hookURL, "s", ForgeNotificationEvents, false)
 	must(err)
-	_, err = c.EnsureOrgHook(ctx, org, "http://example.invalid/hooks/forgejo/"+org, "s2", ForgeNotificationEvents)
+	if !sameEvents(h.Events, ForgeNotificationEvents) {
+		t.Errorf("stored events %v don't match the expansion of %v", h.Events, ForgeNotificationEvents)
+	}
+	h2, err := c.EnsureOrgHook(ctx, org, hookURL, "s", ForgeNotificationEvents, false)
+	must(err)
+	if h2.UpdatedAt != h.UpdatedAt {
+		t.Error("an up-to-date hook was patched")
+	}
+	_, err = c.EnsureOrgHook(ctx, org, hookURL, "s2", ForgeNotificationEvents, true)
 	must(err)
 	hs, err := c.ListOrgHooks(ctx, org)
 	must(err)
