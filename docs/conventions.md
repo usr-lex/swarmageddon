@@ -84,7 +84,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 
 | Binary | Flags |
 |---|---|
-| `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version` |
+| `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version`; env `POD_NAMESPACE`. `operator welcome` (the chart's welcome Job): waits for Platform `default` `status.url` and Secret `setup-token`, prints the URL, the token, `status.caFingerprint` and the port-forward fallback, exits 0 |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
 | `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca`, `--data /data`, `--nats-routes`, `--server-name`, `--cluster-size`, `--namespace` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
@@ -96,3 +96,9 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 `ghcr.io/usr-lex/swarmageddon/<name>:<version>`: `operator`, `control-center`,
 `messaging`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
 the operator in `internal/operator/images/images.go`.
+
+Each image's ENTRYPOINT is its binary (`images/service/Dockerfile` is the
+shared default; a `cmd/<name>/Dockerfile` overrides it), so manifests pass only
+`args`. The chart runs the operator, control center and welcome Job as uid
+65532 with a read-only root filesystem and a writable `/tmp`. The room
+supervisor runs `/usr/local/libexec/podman-ulimits` before starting Podman.

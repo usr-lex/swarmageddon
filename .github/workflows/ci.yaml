@@ -1,0 +1,157 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly canaries against the pinned CLIs.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -race ./...
+
+  golangci-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
+  buf:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: bufbuild/buf-action@v1
+        with:
+          lint: true
+          format: false
+          push: false
+          breaking: ${{ github.event_name == 'pull_request' }}
+          breaking_against: ${{ github.event.repository.clone_url }}#branch=main
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - id: has
+        working-directory: .
+        run: echo "web=$([ -f web/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v5
+        if: steps.has.outputs.web == 'true'
+        with:
+          node-version: 24
+      - name: Install
+        if: steps.has.outputs.web == 'true'
+        run: |
+          corepack enable
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else npm ci; fi
+      - name: Lint
+        if: steps.has.outputs.web == 'true'
+        run: if [ -f pnpm-lock.yaml ]; then pnpm run lint; else npm run lint; fi
+      - name: Test
+        if: steps.has.outputs.web == 'true'
+        run: if [ -f pnpm-lock.yaml ]; then pnpm test; else npm test; fi
+
+  chart:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.22.1
+      - run: make chart-lint HELM="$(command -v helm)"
+      # install.yaml is committed; it must match what the chart renders.
+      - run: make install-yaml-check HELM="$(command -v helm)"
+      - run: pip install shellcheck-py && shellcheck install.sh hack/dev/*.sh images/runner/runner-entrypoint images/room/rootfs/usr/local/libexec/*
+
+  images:
+    needs: [go]
+    uses: ./.github/workflows/images.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      version: ${{ github.event_name == 'push' && 'main' || format('pr-{0}', github.run_number) }}
+      push: ${{ github.event_name == 'push' }}
+    secrets: inherit
+
+  e2e:
+    if: github.event_name != 'schedule'
+    needs: [go, chart]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - id: has
+        run: echo "e2e=$([ -d test/e2e ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Dev cluster (k3d, local registry, every image)
+        if: steps.has.outputs.e2e == 'true'
+        run: make dev
+      - if: steps.has.outputs.e2e == 'true'
+        run: make e2e
+      - name: Cluster state on failure
+        if: failure()
+        run: |
+          bin/tools/kubectl --context k3d-swarm-dev get all -A || true
+          bin/tools/kubectl --context k3d-swarm-dev -n swarmageddon-system logs deploy/swarmageddon-operator --tail=300 || true
+
+  canary:
+    # On a schedule, on demand, and when CLI pins in the room image change.
+    if: >-
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+       contains(github.event.pull_request.labels.*.name, 'canary') || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - id: has
+        run: echo "canary=$([ -d test/canary ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v5
+        if: steps.has.outputs.canary == 'true'
+        with:
+          node-version: 24
+      - name: Pinned CLIs (the versions in images/room/Dockerfile)
+        run: |
+          cc=$(sed -n 's/^ARG CLAUDE_CODE_VERSION=//p' images/room/Dockerfile)
+          ore=$(sed -n 's/^ARG ORE_VERSION=//p' images/room/Dockerfile)
+          npm install -g "@anthropic-ai/claude-code@$cc" "@ore-cli/ore@$ore"
+        if: steps.has.outputs.canary == 'true'
+      - if: steps.has.outputs.canary == 'true'
+        run: make canary

@@ -129,10 +129,12 @@ dev: tools
 	K3D=$(K3D) KUBECTL=$(KUBECTL) HELM=$(HELM) hack/dev/up.sh
 
 DEV_REGISTRY ?= localhost:5005
+# Leave out room and runner (large) with DEV_IMAGES="operator control-center messaging mockmodel".
+DEV_IMAGES ?= $(IMAGES)
 # Called by hack/dev/up.sh: build every image and push it to the dev registry.
 dev-images:
-	$(MAKE) images REGISTRY=$(DEV_REGISTRY) VERSION=dev PLATFORMS=linux/$(HOST_ARCH) IMAGE_OUTPUT=--load
-	for i in $(IMAGES); do docker push $(DEV_REGISTRY)/$$i:dev; done
+	$(MAKE) $(addprefix image-,$(DEV_IMAGES)) REGISTRY=$(DEV_REGISTRY) VERSION=dev PLATFORMS=linux/$(HOST_ARCH) IMAGE_OUTPUT=--load
+	for i in $(DEV_IMAGES); do docker push $(DEV_REGISTRY)/$$i:dev; done
 
 dev-down: $(K3D)
 	K3D=$(K3D) hack/dev/down.sh
