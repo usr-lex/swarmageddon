@@ -42,12 +42,48 @@ func New(dir directory.Directory, st *store.Store, log *slog.Logger) *Server {
 		ExpiryInterval: 30 * time.Second, ExpiryMargin: time.Minute}
 }
 
+// removeDeleted deletes the streams of workspaces that no longer exist. A
+// workspace must be missing from a synced directory on two scans in a row,
+// so a slow or restarting watch never costs a workspace its messages.
+func (s *Server) removeDeleted(ctx context.Context, missing map[string]bool) {
+	if !s.dir.Ready() {
+		return
+	}
+	have, err := s.st.WorkspaceStreams(ctx)
+	if err != nil {
+		s.log.Warn("list streams", "err", err)
+		return
+	}
+	now := map[string]bool{}
+	for _, ws := range have {
+		if _, ok := s.dir.Workspace(ws); ok {
+			continue
+		}
+		if missing[ws] {
+			if err := s.st.RemoveWorkspace(ctx, ws); err != nil {
+				s.log.Warn("remove deleted workspace", "workspace", ws, "err", err)
+				now[ws] = true
+				continue
+			}
+			s.log.Info("removed the streams of a deleted workspace", "workspace", ws)
+			continue
+		}
+		now[ws] = true
+	}
+	clear(missing)
+	for ws := range now {
+		missing[ws] = true
+	}
+}
+
 // Run keeps every workspace's streams in line with its resource and runs the
 // expiry scan, until ctx ends.
 func (s *Server) Run(ctx context.Context) {
 	t := time.NewTicker(s.ExpiryInterval)
 	defer t.Stop()
+	missing := map[string]bool{}
 	for {
+		s.removeDeleted(ctx, missing)
 		for _, name := range s.dir.Workspaces() {
 			ws, ok := s.dir.Workspace(name)
 			if !ok {

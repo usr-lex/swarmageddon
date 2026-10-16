@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -156,6 +158,42 @@ func (s *Store) EnsureWorkspace(ctx context.Context, ws string, cfg WorkspaceCon
 	}
 	s.mu.Lock()
 	s.applied[ws] = cfg
+	s.mu.Unlock()
+	return nil
+}
+
+// WorkspaceStreams lists the workspaces that have streams on the cluster.
+func (s *Store) WorkspaceStreams(ctx context.Context) ([]string, error) {
+	seen := map[string]bool{}
+	names := s.js.StreamNames(ctx)
+	for n := range names.Name() {
+		for _, prefix := range []string{"INBOX_", "AUDIT_", "APPROVALS_"} {
+			if strings.HasPrefix(n, prefix) {
+				seen[strings.TrimPrefix(n, prefix)] = true
+			}
+		}
+	}
+	if err := names.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(seen))
+	for ws := range seen {
+		out = append(out, ws)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// RemoveWorkspace deletes a workspace's streams: its inboxes, audit log and
+// approvals. Used once the Workspace resource is gone.
+func (s *Store) RemoveWorkspace(ctx context.Context, ws string) error {
+	for _, name := range []string{InboxStream(ws), AuditStream(ws), ApprovalStream(ws)} {
+		if err := s.js.DeleteStream(ctx, name); err != nil && !errors.Is(err, jetstream.ErrStreamNotFound) {
+			return fmt.Errorf("delete stream %s: %w", name, err)
+		}
+	}
+	s.mu.Lock()
+	delete(s.applied, ws)
 	s.mu.Unlock()
 	return nil
 }

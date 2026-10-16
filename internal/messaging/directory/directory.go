@@ -181,6 +181,13 @@ func (s *Static) Set(w *Workspace) {
 	s.ws[w.Name] = w
 }
 
+// Delete removes a workspace.
+func (s *Static) Delete(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.ws, name)
+}
+
 // Workspace implements Directory.
 func (s *Static) Workspace(name string) (*Workspace, bool) {
 	s.mu.RLock()
