@@ -1,0 +1,92 @@
+# Dev-only services in the platform namespace: Keycloak (OIDC and SAML, realm
+# from hack/keycloak/realm.json) and the mock model. hack/dev/up.sh applies
+# this with the image registry substituted for REGISTRY.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: swarmageddon-platform
+  labels: {app.kubernetes.io/name: keycloak, app.kubernetes.io/part-of: swarmageddon-dev}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: keycloak}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: keycloak, app.kubernetes.io/part-of: swarmageddon-dev}
+    spec:
+      containers:
+        - name: keycloak
+          image: docker.io/keycloak/keycloak:26.8.1
+          args: ["start-dev", "--import-realm", "--http-port=8080", "--hostname-strict=false", "--health-enabled=true"]
+          env:
+            - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin}
+            - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, value: admin}
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 9000}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: management}
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: realm, mountPath: /opt/keycloak/data/import, readOnly: true}
+      volumes:
+        - name: realm
+          configMap: {name: keycloak-realm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: swarmageddon-platform
+spec:
+  selector: {app.kubernetes.io/name: keycloak}
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockmodel
+  namespace: swarmageddon-platform
+  labels: {app.kubernetes.io/name: mockmodel, app.kubernetes.io/part-of: swarmageddon-dev}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: mockmodel}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mockmodel, app.kubernetes.io/part-of: swarmageddon-dev}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mockmodel
+          image: REGISTRY/mockmodel:dev
+          imagePullPolicy: Always
+          args: ["--listen=:9999"]
+          ports:
+            - {name: http, containerPort: 9999}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mockmodel
+  namespace: swarmageddon-platform
+spec:
+  selector: {app.kubernetes.io/name: mockmodel}
+  ports:
+    - {name: http, port: 9999, targetPort: http}

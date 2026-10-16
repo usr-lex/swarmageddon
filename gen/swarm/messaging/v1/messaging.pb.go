@@ -138,6 +138,61 @@ func (Decision) EnumDescriptor() ([]byte, []int) {
 	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{1}
 }
 
+type Severity int32
+
+const (
+	Severity_SEVERITY_UNSPECIFIED Severity = 0
+	Severity_SEVERITY_LOW         Severity = 1
+	Severity_SEVERITY_MEDIUM      Severity = 2
+	Severity_SEVERITY_HIGH        Severity = 3
+	Severity_SEVERITY_CRITICAL    Severity = 4
+)
+
+// Enum value maps for Severity.
+var (
+	Severity_name = map[int32]string{
+		0: "SEVERITY_UNSPECIFIED",
+		1: "SEVERITY_LOW",
+		2: "SEVERITY_MEDIUM",
+		3: "SEVERITY_HIGH",
+		4: "SEVERITY_CRITICAL",
+	}
+	Severity_value = map[string]int32{
+		"SEVERITY_UNSPECIFIED": 0,
+		"SEVERITY_LOW":         1,
+		"SEVERITY_MEDIUM":      2,
+		"SEVERITY_HIGH":        3,
+		"SEVERITY_CRITICAL":    4,
+	}
+)
+
+func (x Severity) Enum() *Severity {
+	p := new(Severity)
+	*p = x
+	return p
+}
+
+func (x Severity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Severity) Descriptor() protoreflect.EnumDescriptor {
+	return file_swarm_messaging_v1_messaging_proto_enumTypes[2].Descriptor()
+}
+
+func (Severity) Type() protoreflect.EnumType {
+	return &file_swarm_messaging_v1_messaging_proto_enumTypes[2]
+}
+
+func (x Severity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Severity.Descriptor instead.
+func (Severity) EnumDescriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{2}
+}
+
 type Message struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// ULID chosen by the sender; the dedup key.
@@ -400,7 +455,12 @@ type Delivery struct {
 	//	*Delivery_Message
 	//	*Delivery_ApprovalAnswer
 	//	*Delivery_Notice
-	Item          isDelivery_Item `protobuf_oneof:"item"`
+	//	*Delivery_Post
+	//	*Delivery_Digest
+	Item isDelivery_Item `protobuf_oneof:"item"`
+	// Never held back by the push budget (approval answers, warden notices,
+	// people's direct messages).
+	Urgent        bool `protobuf:"varint,7,opt,name=urgent,proto3" json:"urgent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +536,31 @@ func (x *Delivery) GetNotice() *Notice {
 	return nil
 }
 
+func (x *Delivery) GetPost() *ChannelPost {
+	if x != nil {
+		if x, ok := x.Item.(*Delivery_Post); ok {
+			return x.Post
+		}
+	}
+	return nil
+}
+
+func (x *Delivery) GetDigest() *Digest {
+	if x != nil {
+		if x, ok := x.Item.(*Delivery_Digest); ok {
+			return x.Digest
+		}
+	}
+	return nil
+}
+
+func (x *Delivery) GetUrgent() bool {
+	if x != nil {
+		return x.Urgent
+	}
+	return false
+}
+
 type isDelivery_Item interface {
 	isDelivery_Item()
 }
@@ -492,11 +577,196 @@ type Delivery_Notice struct {
 	Notice *Notice `protobuf:"bytes,4,opt,name=notice,proto3,oneof"`
 }
 
+type Delivery_Post struct {
+	// A channel post pushed to this reader (push mode or a mention).
+	Post *ChannelPost `protobuf:"bytes,5,opt,name=post,proto3,oneof"`
+}
+
+type Delivery_Digest struct {
+	// A digest of new posts in one channel.
+	Digest *Digest `protobuf:"bytes,6,opt,name=digest,proto3,oneof"`
+}
+
 func (*Delivery_Message) isDelivery_Item() {}
 
 func (*Delivery_ApprovalAnswer) isDelivery_Item() {}
 
 func (*Delivery_Notice) isDelivery_Item() {}
+
+func (*Delivery_Post) isDelivery_Item() {}
+
+func (*Delivery_Digest) isDelivery_Item() {}
+
+type ChannelPost struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Channel  string                 `protobuf:"bytes,2,opt,name=channel,proto3" json:"channel,omitempty"`
+	From     string                 `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
+	FromKind string                 `protobuf:"bytes,4,opt,name=from_kind,json=fromKind,proto3" json:"from_kind,omitempty"`
+	Body     string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	SentAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	// Addresses mentioned with @name.
+	Mentions []string `protobuf:"bytes,7,rep,name=mentions,proto3" json:"mentions,omitempty"`
+	// True when body was cut; get_message returns the rest.
+	Truncated     bool `protobuf:"varint,8,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChannelPost) Reset() {
+	*x = ChannelPost{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChannelPost) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChannelPost) ProtoMessage() {}
+
+func (x *ChannelPost) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChannelPost.ProtoReflect.Descriptor instead.
+func (*ChannelPost) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ChannelPost) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ChannelPost) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *ChannelPost) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *ChannelPost) GetFromKind() string {
+	if x != nil {
+		return x.FromKind
+	}
+	return ""
+}
+
+func (x *ChannelPost) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ChannelPost) GetSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SentAt
+	}
+	return nil
+}
+
+func (x *ChannelPost) GetMentions() []string {
+	if x != nil {
+		return x.Mentions
+	}
+	return nil
+}
+
+func (x *ChannelPost) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+type Digest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Channel  string                 `protobuf:"bytes,1,opt,name=channel,proto3" json:"channel,omitempty"`
+	NewPosts int32                  `protobuf:"varint,2,opt,name=new_posts,json=newPosts,proto3" json:"new_posts,omitempty"`
+	Posters  []string               `protobuf:"bytes,3,rep,name=posters,proto3" json:"posters,omitempty"`
+	// First line of each new post, oldest first, a few at most.
+	Previews      []string `protobuf:"bytes,4,rep,name=previews,proto3" json:"previews,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Digest) Reset() {
+	*x = Digest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Digest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Digest) ProtoMessage() {}
+
+func (x *Digest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Digest.ProtoReflect.Descriptor instead.
+func (*Digest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Digest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *Digest) GetNewPosts() int32 {
+	if x != nil {
+		return x.NewPosts
+	}
+	return 0
+}
+
+func (x *Digest) GetPosters() []string {
+	if x != nil {
+		return x.Posters
+	}
+	return nil
+}
+
+func (x *Digest) GetPreviews() []string {
+	if x != nil {
+		return x.Previews
+	}
+	return nil
+}
 
 // Notice is a message from the platform itself, e.g. "not delivered".
 type Notice struct {
@@ -510,7 +780,7 @@ type Notice struct {
 
 func (x *Notice) Reset() {
 	*x = Notice{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[5]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +792,7 @@ func (x *Notice) String() string {
 func (*Notice) ProtoMessage() {}
 
 func (x *Notice) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[5]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +805,7 @@ func (x *Notice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Notice.ProtoReflect.Descriptor instead.
 func (*Notice) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{5}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Notice) GetId() string {
@@ -568,7 +838,7 @@ type AckRequest struct {
 
 func (x *AckRequest) Reset() {
 	*x = AckRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[6]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +850,7 @@ func (x *AckRequest) String() string {
 func (*AckRequest) ProtoMessage() {}
 
 func (x *AckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[6]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +863,7 @@ func (x *AckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckRequest.ProtoReflect.Descriptor instead.
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{6}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AckRequest) GetDeliveryId() string {
@@ -611,7 +881,7 @@ type AckResponse struct {
 
 func (x *AckResponse) Reset() {
 	*x = AckResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[7]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -623,7 +893,7 @@ func (x *AckResponse) String() string {
 func (*AckResponse) ProtoMessage() {}
 
 func (x *AckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[7]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +906,7 @@ func (x *AckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckResponse.ProtoReflect.Descriptor instead.
 func (*AckResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{7}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{9}
 }
 
 type ReportPresenceRequest struct {
@@ -648,7 +918,7 @@ type ReportPresenceRequest struct {
 
 func (x *ReportPresenceRequest) Reset() {
 	*x = ReportPresenceRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[8]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +930,7 @@ func (x *ReportPresenceRequest) String() string {
 func (*ReportPresenceRequest) ProtoMessage() {}
 
 func (x *ReportPresenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[8]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +943,7 @@ func (x *ReportPresenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportPresenceRequest.ProtoReflect.Descriptor instead.
 func (*ReportPresenceRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{8}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ReportPresenceRequest) GetPresence() Presence {
@@ -691,7 +961,7 @@ type ReportPresenceResponse struct {
 
 func (x *ReportPresenceResponse) Reset() {
 	*x = ReportPresenceResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[9]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +973,7 @@ func (x *ReportPresenceResponse) String() string {
 func (*ReportPresenceResponse) ProtoMessage() {}
 
 func (x *ReportPresenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[9]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +986,7 @@ func (x *ReportPresenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportPresenceResponse.ProtoReflect.Descriptor instead.
 func (*ReportPresenceResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{9}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{11}
 }
 
 type ListPeersRequest struct {
@@ -727,7 +997,7 @@ type ListPeersRequest struct {
 
 func (x *ListPeersRequest) Reset() {
 	*x = ListPeersRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[10]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -739,7 +1009,7 @@ func (x *ListPeersRequest) String() string {
 func (*ListPeersRequest) ProtoMessage() {}
 
 func (x *ListPeersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[10]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -752,7 +1022,7 @@ func (x *ListPeersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPeersRequest.ProtoReflect.Descriptor instead.
 func (*ListPeersRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{10}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{12}
 }
 
 type Peer struct {
@@ -774,7 +1044,7 @@ type Peer struct {
 
 func (x *Peer) Reset() {
 	*x = Peer{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[11]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -786,7 +1056,7 @@ func (x *Peer) String() string {
 func (*Peer) ProtoMessage() {}
 
 func (x *Peer) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[11]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -799,7 +1069,7 @@ func (x *Peer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Peer.ProtoReflect.Descriptor instead.
 func (*Peer) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{11}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Peer) GetAddress() string {
@@ -875,7 +1145,7 @@ type ListPeersResponse struct {
 
 func (x *ListPeersResponse) Reset() {
 	*x = ListPeersResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[12]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -887,7 +1157,7 @@ func (x *ListPeersResponse) String() string {
 func (*ListPeersResponse) ProtoMessage() {}
 
 func (x *ListPeersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[12]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -900,7 +1170,7 @@ func (x *ListPeersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPeersResponse.ProtoReflect.Descriptor instead.
 func (*ListPeersResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{12}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListPeersResponse) GetSelf() string {
@@ -935,7 +1205,7 @@ type ApprovalRequest struct {
 
 func (x *ApprovalRequest) Reset() {
 	*x = ApprovalRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[13]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -947,7 +1217,7 @@ func (x *ApprovalRequest) String() string {
 func (*ApprovalRequest) ProtoMessage() {}
 
 func (x *ApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[13]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -960,7 +1230,7 @@ func (x *ApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalRequest.ProtoReflect.Descriptor instead.
 func (*ApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{13}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ApprovalRequest) GetId() string {
@@ -1040,7 +1310,7 @@ type ApprovalAnswer struct {
 
 func (x *ApprovalAnswer) Reset() {
 	*x = ApprovalAnswer{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[14]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +1322,7 @@ func (x *ApprovalAnswer) String() string {
 func (*ApprovalAnswer) ProtoMessage() {}
 
 func (x *ApprovalAnswer) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[14]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +1335,7 @@ func (x *ApprovalAnswer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalAnswer.ProtoReflect.Descriptor instead.
 func (*ApprovalAnswer) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{14}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ApprovalAnswer) GetApprovalId() string {
@@ -1112,7 +1382,7 @@ type RequestApprovalRequest struct {
 
 func (x *RequestApprovalRequest) Reset() {
 	*x = RequestApprovalRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[15]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1124,7 +1394,7 @@ func (x *RequestApprovalRequest) String() string {
 func (*RequestApprovalRequest) ProtoMessage() {}
 
 func (x *RequestApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[15]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1137,7 +1407,7 @@ func (x *RequestApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestApprovalRequest.ProtoReflect.Descriptor instead.
 func (*RequestApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{15}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RequestApprovalRequest) GetRequest() *ApprovalRequest {
@@ -1155,7 +1425,7 @@ type RequestApprovalResponse struct {
 
 func (x *RequestApprovalResponse) Reset() {
 	*x = RequestApprovalResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[16]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1437,7 @@ func (x *RequestApprovalResponse) String() string {
 func (*RequestApprovalResponse) ProtoMessage() {}
 
 func (x *RequestApprovalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[16]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1450,7 @@ func (x *RequestApprovalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestApprovalResponse.ProtoReflect.Descriptor instead.
 func (*RequestApprovalResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{16}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{18}
 }
 
 type WithdrawApprovalRequest struct {
@@ -1194,7 +1464,7 @@ type WithdrawApprovalRequest struct {
 
 func (x *WithdrawApprovalRequest) Reset() {
 	*x = WithdrawApprovalRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[17]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1206,7 +1476,7 @@ func (x *WithdrawApprovalRequest) String() string {
 func (*WithdrawApprovalRequest) ProtoMessage() {}
 
 func (x *WithdrawApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[17]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1219,7 +1489,7 @@ func (x *WithdrawApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawApprovalRequest.ProtoReflect.Descriptor instead.
 func (*WithdrawApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{17}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *WithdrawApprovalRequest) GetApprovalId() string {
@@ -1244,7 +1514,7 @@ type WithdrawApprovalResponse struct {
 
 func (x *WithdrawApprovalResponse) Reset() {
 	*x = WithdrawApprovalResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[18]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1256,7 +1526,7 @@ func (x *WithdrawApprovalResponse) String() string {
 func (*WithdrawApprovalResponse) ProtoMessage() {}
 
 func (x *WithdrawApprovalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[18]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1269,7 +1539,7 @@ func (x *WithdrawApprovalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawApprovalResponse.ProtoReflect.Descriptor instead.
 func (*WithdrawApprovalResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{18}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{20}
 }
 
 type WatchApprovalsRequest struct {
@@ -1282,7 +1552,7 @@ type WatchApprovalsRequest struct {
 
 func (x *WatchApprovalsRequest) Reset() {
 	*x = WatchApprovalsRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[19]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1294,7 +1564,7 @@ func (x *WatchApprovalsRequest) String() string {
 func (*WatchApprovalsRequest) ProtoMessage() {}
 
 func (x *WatchApprovalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[19]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1307,7 +1577,7 @@ func (x *WatchApprovalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchApprovalsRequest.ProtoReflect.Descriptor instead.
 func (*WatchApprovalsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{19}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *WatchApprovalsRequest) GetWorkspaces() []string {
@@ -1331,7 +1601,7 @@ type ApprovalEvent struct {
 
 func (x *ApprovalEvent) Reset() {
 	*x = ApprovalEvent{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[20]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1343,7 +1613,7 @@ func (x *ApprovalEvent) String() string {
 func (*ApprovalEvent) ProtoMessage() {}
 
 func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[20]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1356,7 +1626,7 @@ func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalEvent.ProtoReflect.Descriptor instead.
 func (*ApprovalEvent) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{20}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ApprovalEvent) GetEvent() isApprovalEvent_Event {
@@ -1426,7 +1696,7 @@ type AnswerApprovalRequest struct {
 
 func (x *AnswerApprovalRequest) Reset() {
 	*x = AnswerApprovalRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[21]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1438,7 +1708,7 @@ func (x *AnswerApprovalRequest) String() string {
 func (*AnswerApprovalRequest) ProtoMessage() {}
 
 func (x *AnswerApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[21]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1721,7 @@ func (x *AnswerApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerApprovalRequest.ProtoReflect.Descriptor instead.
 func (*AnswerApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{21}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AnswerApprovalRequest) GetAnswer() *ApprovalAnswer {
@@ -1476,7 +1746,7 @@ type AnswerApprovalResponse struct {
 
 func (x *AnswerApprovalResponse) Reset() {
 	*x = AnswerApprovalResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[22]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1488,7 +1758,7 @@ func (x *AnswerApprovalResponse) String() string {
 func (*AnswerApprovalResponse) ProtoMessage() {}
 
 func (x *AnswerApprovalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[22]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1501,7 +1771,7 @@ func (x *AnswerApprovalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerApprovalResponse.ProtoReflect.Descriptor instead.
 func (*AnswerApprovalResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{22}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{24}
 }
 
 type VolumeUsage struct {
@@ -1515,7 +1785,7 @@ type VolumeUsage struct {
 
 func (x *VolumeUsage) Reset() {
 	*x = VolumeUsage{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[23]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1527,7 +1797,7 @@ func (x *VolumeUsage) String() string {
 func (*VolumeUsage) ProtoMessage() {}
 
 func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[23]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1540,7 +1810,7 @@ func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeUsage.ProtoReflect.Descriptor instead.
 func (*VolumeUsage) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{23}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *VolumeUsage) GetName() string {
@@ -1581,7 +1851,7 @@ type RoomStatusReport struct {
 
 func (x *RoomStatusReport) Reset() {
 	*x = RoomStatusReport{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[24]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1593,7 +1863,7 @@ func (x *RoomStatusReport) String() string {
 func (*RoomStatusReport) ProtoMessage() {}
 
 func (x *RoomStatusReport) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[24]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1606,7 +1876,7 @@ func (x *RoomStatusReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomStatusReport.ProtoReflect.Descriptor instead.
 func (*RoomStatusReport) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{24}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RoomStatusReport) GetCurrentTask() string {
@@ -1674,7 +1944,7 @@ type ReportStatusRequest struct {
 
 func (x *ReportStatusRequest) Reset() {
 	*x = ReportStatusRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[25]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1686,7 +1956,7 @@ func (x *ReportStatusRequest) String() string {
 func (*ReportStatusRequest) ProtoMessage() {}
 
 func (x *ReportStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[25]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1699,7 +1969,7 @@ func (x *ReportStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportStatusRequest.ProtoReflect.Descriptor instead.
 func (*ReportStatusRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{25}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ReportStatusRequest) GetStatus() *RoomStatusReport {
@@ -1717,7 +1987,7 @@ type ReportStatusResponse struct {
 
 func (x *ReportStatusResponse) Reset() {
 	*x = ReportStatusResponse{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[26]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1729,7 +1999,7 @@ func (x *ReportStatusResponse) String() string {
 func (*ReportStatusResponse) ProtoMessage() {}
 
 func (x *ReportStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[26]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1742,7 +2012,7 @@ func (x *ReportStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportStatusResponse.ProtoReflect.Descriptor instead.
 func (*ReportStatusResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{26}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{28}
 }
 
 type WatchPresenceRequest struct {
@@ -1754,7 +2024,7 @@ type WatchPresenceRequest struct {
 
 func (x *WatchPresenceRequest) Reset() {
 	*x = WatchPresenceRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[27]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1766,7 +2036,7 @@ func (x *WatchPresenceRequest) String() string {
 func (*WatchPresenceRequest) ProtoMessage() {}
 
 func (x *WatchPresenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[27]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1779,7 +2049,7 @@ func (x *WatchPresenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchPresenceRequest.ProtoReflect.Descriptor instead.
 func (*WatchPresenceRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{27}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *WatchPresenceRequest) GetWorkspaces() []string {
@@ -1801,7 +2071,7 @@ type PresenceEvent struct {
 
 func (x *PresenceEvent) Reset() {
 	*x = PresenceEvent{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[28]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1813,7 +2083,7 @@ func (x *PresenceEvent) String() string {
 func (*PresenceEvent) ProtoMessage() {}
 
 func (x *PresenceEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[28]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1826,7 +2096,7 @@ func (x *PresenceEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PresenceEvent.ProtoReflect.Descriptor instead.
 func (*PresenceEvent) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{28}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *PresenceEvent) GetAddress() string {
@@ -1860,7 +2130,7 @@ func (x *PresenceEvent) GetStatus() *RoomStatusReport {
 type QueryAuditRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Workspace string                 `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	// message, crossing, refusal, presence; empty: all.
+	// message, crossing, refusal, presence, verdict; empty: all.
 	Kinds []string               `protobuf:"bytes,2,rep,name=kinds,proto3" json:"kinds,omitempty"`
 	Since *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=since,proto3" json:"since,omitempty"`
 	Until *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=until,proto3" json:"until,omitempty"`
@@ -1873,7 +2143,7 @@ type QueryAuditRequest struct {
 
 func (x *QueryAuditRequest) Reset() {
 	*x = QueryAuditRequest{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[29]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1885,7 +2155,7 @@ func (x *QueryAuditRequest) String() string {
 func (*QueryAuditRequest) ProtoMessage() {}
 
 func (x *QueryAuditRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[29]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1898,7 +2168,7 @@ func (x *QueryAuditRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryAuditRequest.ProtoReflect.Descriptor instead.
 func (*QueryAuditRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{29}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *QueryAuditRequest) GetWorkspace() string {
@@ -1961,7 +2231,7 @@ type AuditRecord struct {
 
 func (x *AuditRecord) Reset() {
 	*x = AuditRecord{}
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[30]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1973,7 +2243,7 @@ func (x *AuditRecord) String() string {
 func (*AuditRecord) ProtoMessage() {}
 
 func (x *AuditRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[30]
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1986,7 +2256,7 @@ func (x *AuditRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditRecord.ProtoReflect.Descriptor instead.
 func (*AuditRecord) Descriptor() ([]byte, []int) {
-	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{30}
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *AuditRecord) GetKind() string {
@@ -2045,6 +2315,1163 @@ func (x *AuditRecord) GetLink() string {
 	return ""
 }
 
+type Verdict struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ULID.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Room address.
+	Room string `protobuf:"bytes,2,opt,name=room,proto3" json:"room,omitempty"`
+	// rules, judge, trajectory or gateway.
+	Layer    string   `protobuf:"bytes,3,opt,name=layer,proto3" json:"layer,omitempty"`
+	Severity Severity `protobuf:"varint,4,opt,name=severity,proto3,enum=swarm.messaging.v1.Severity" json:"severity,omitempty"`
+	// Rule name, or "model" for a model judgement.
+	Rule   string `protobuf:"bytes,5,opt,name=rule,proto3" json:"rule,omitempty"`
+	Reason string `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The tool call or transcript excerpt it is about.
+	Evidence string `protobuf:"bytes,7,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	// What was done: allowed, denied, escalated, gated, interrupted, quarantined.
+	Action string `protobuf:"bytes,8,opt,name=action,proto3" json:"action,omitempty"`
+	// room (self-report) or gateway.
+	Source        string                 `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`
+	At            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=at,proto3" json:"at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Verdict) Reset() {
+	*x = Verdict{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Verdict) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Verdict) ProtoMessage() {}
+
+func (x *Verdict) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Verdict.ProtoReflect.Descriptor instead.
+func (*Verdict) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *Verdict) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Verdict) GetRoom() string {
+	if x != nil {
+		return x.Room
+	}
+	return ""
+}
+
+func (x *Verdict) GetLayer() string {
+	if x != nil {
+		return x.Layer
+	}
+	return ""
+}
+
+func (x *Verdict) GetSeverity() Severity {
+	if x != nil {
+		return x.Severity
+	}
+	return Severity_SEVERITY_UNSPECIFIED
+}
+
+func (x *Verdict) GetRule() string {
+	if x != nil {
+		return x.Rule
+	}
+	return ""
+}
+
+func (x *Verdict) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Verdict) GetEvidence() string {
+	if x != nil {
+		return x.Evidence
+	}
+	return ""
+}
+
+func (x *Verdict) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *Verdict) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *Verdict) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+type ReportVerdictRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Verdict       *Verdict               `protobuf:"bytes,1,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportVerdictRequest) Reset() {
+	*x = ReportVerdictRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportVerdictRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportVerdictRequest) ProtoMessage() {}
+
+func (x *ReportVerdictRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportVerdictRequest.ProtoReflect.Descriptor instead.
+func (*ReportVerdictRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ReportVerdictRequest) GetVerdict() *Verdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return nil
+}
+
+type ReportVerdictResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportVerdictResponse) Reset() {
+	*x = ReportVerdictResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportVerdictResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportVerdictResponse) ProtoMessage() {}
+
+func (x *ReportVerdictResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportVerdictResponse.ProtoReflect.Descriptor instead.
+func (*ReportVerdictResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{35}
+}
+
+type PostRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ULID chosen by the poster; the dedup key.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Without the leading #.
+	Channel       string `protobuf:"bytes,2,opt,name=channel,proto3" json:"channel,omitempty"`
+	Body          string `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PostRequest) Reset() {
+	*x = PostRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PostRequest) ProtoMessage() {}
+
+func (x *PostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PostRequest.ProtoReflect.Descriptor instead.
+func (*PostRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *PostRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PostRequest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *PostRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+type PostResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Duplicate bool                   `protobuf:"varint,2,opt,name=duplicate,proto3" json:"duplicate,omitempty"`
+	// Mentioned agents the post was pushed to.
+	Mentioned     []string `protobuf:"bytes,3,rep,name=mentioned,proto3" json:"mentioned,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PostResponse) Reset() {
+	*x = PostResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PostResponse) ProtoMessage() {}
+
+func (x *PostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PostResponse.ProtoReflect.Descriptor instead.
+func (*PostResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *PostResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PostResponse) GetDuplicate() bool {
+	if x != nil {
+		return x.Duplicate
+	}
+	return false
+}
+
+func (x *PostResponse) GetMentioned() []string {
+	if x != nil {
+		return x.Mentioned
+	}
+	return nil
+}
+
+// One item in a reading page: a direct message or a channel post.
+type InboxItem struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Empty for direct messages.
+	Channel       string                 `protobuf:"bytes,2,opt,name=channel,proto3" json:"channel,omitempty"`
+	From          string                 `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
+	FromKind      string                 `protobuf:"bytes,4,opt,name=from_kind,json=fromKind,proto3" json:"from_kind,omitempty"`
+	Body          string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	SentAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	Truncated     bool                   `protobuf:"varint,7,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	Read          bool                   `protobuf:"varint,8,opt,name=read,proto3" json:"read,omitempty"`
+	MentionsMe    bool                   `protobuf:"varint,9,opt,name=mentions_me,json=mentionsMe,proto3" json:"mentions_me,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxItem) Reset() {
+	*x = InboxItem{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxItem) ProtoMessage() {}
+
+func (x *InboxItem) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxItem.ProtoReflect.Descriptor instead.
+func (*InboxItem) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *InboxItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InboxItem) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *InboxItem) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *InboxItem) GetFromKind() string {
+	if x != nil {
+		return x.FromKind
+	}
+	return ""
+}
+
+func (x *InboxItem) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *InboxItem) GetSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SentAt
+	}
+	return nil
+}
+
+func (x *InboxItem) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *InboxItem) GetRead() bool {
+	if x != nil {
+		return x.Read
+	}
+	return false
+}
+
+func (x *InboxItem) GetMentionsMe() bool {
+	if x != nil {
+		return x.MentionsMe
+	}
+	return false
+}
+
+type ReadMessagesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// all, direct, mentions, or a channel name.
+	Scope string `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	// Default true.
+	UnreadOnly *bool `protobuf:"varint,2,opt,name=unread_only,json=unreadOnly,proto3,oneof" json:"unread_only,omitempty"`
+	// Default 20, at most 50.
+	Limit  int32  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Cursor string `protobuf:"bytes,4,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	// Whole bodies instead of the first 500 characters.
+	Full bool `protobuf:"varint,5,opt,name=full,proto3" json:"full,omitempty"`
+	// Default true: returned items are marked read.
+	MarkRead      *bool `protobuf:"varint,6,opt,name=mark_read,json=markRead,proto3,oneof" json:"mark_read,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadMessagesRequest) Reset() {
+	*x = ReadMessagesRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadMessagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadMessagesRequest) ProtoMessage() {}
+
+func (x *ReadMessagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadMessagesRequest.ProtoReflect.Descriptor instead.
+func (*ReadMessagesRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ReadMessagesRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *ReadMessagesRequest) GetUnreadOnly() bool {
+	if x != nil && x.UnreadOnly != nil {
+		return *x.UnreadOnly
+	}
+	return false
+}
+
+func (x *ReadMessagesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ReadMessagesRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *ReadMessagesRequest) GetFull() bool {
+	if x != nil {
+		return x.Full
+	}
+	return false
+}
+
+func (x *ReadMessagesRequest) GetMarkRead() bool {
+	if x != nil && x.MarkRead != nil {
+		return *x.MarkRead
+	}
+	return false
+}
+
+type ReadMessagesResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Items           []*InboxItem           `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	NextCursor      string                 `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	UnreadRemaining int32                  `protobuf:"varint,3,opt,name=unread_remaining,json=unreadRemaining,proto3" json:"unread_remaining,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ReadMessagesResponse) Reset() {
+	*x = ReadMessagesResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadMessagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadMessagesResponse) ProtoMessage() {}
+
+func (x *ReadMessagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadMessagesResponse.ProtoReflect.Descriptor instead.
+func (*ReadMessagesResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ReadMessagesResponse) GetItems() []*InboxItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ReadMessagesResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+func (x *ReadMessagesResponse) GetUnreadRemaining() int32 {
+	if x != nil {
+		return x.UnreadRemaining
+	}
+	return 0
+}
+
+type GetMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMessageRequest) Reset() {
+	*x = GetMessageRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMessageRequest) ProtoMessage() {}
+
+func (x *GetMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMessageRequest.ProtoReflect.Descriptor instead.
+func (*GetMessageRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *GetMessageRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Item          *InboxItem             `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMessageResponse) Reset() {
+	*x = GetMessageResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMessageResponse) ProtoMessage() {}
+
+func (x *GetMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMessageResponse.ProtoReflect.Descriptor instead.
+func (*GetMessageResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *GetMessageResponse) GetItem() *InboxItem {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type MarkReadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Scope string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	// Item id to mark read up to and including; empty: everything in scope.
+	UpTo          string `protobuf:"bytes,2,opt,name=up_to,json=upTo,proto3" json:"up_to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkReadRequest) Reset() {
+	*x = MarkReadRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkReadRequest) ProtoMessage() {}
+
+func (x *MarkReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkReadRequest.ProtoReflect.Descriptor instead.
+func (*MarkReadRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *MarkReadRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *MarkReadRequest) GetUpTo() string {
+	if x != nil {
+		return x.UpTo
+	}
+	return ""
+}
+
+type MarkReadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkReadResponse) Reset() {
+	*x = MarkReadResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkReadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkReadResponse) ProtoMessage() {}
+
+func (x *MarkReadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkReadResponse.ProtoReflect.Descriptor instead.
+func (*MarkReadResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{44}
+}
+
+type UnreadCount struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// direct, mentions, or a channel name.
+	Scope         string `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Unread        int32  `protobuf:"varint,2,opt,name=unread,proto3" json:"unread,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreadCount) Reset() {
+	*x = UnreadCount{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreadCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreadCount) ProtoMessage() {}
+
+func (x *UnreadCount) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreadCount.ProtoReflect.Descriptor instead.
+func (*UnreadCount) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *UnreadCount) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *UnreadCount) GetUnread() int32 {
+	if x != nil {
+		return x.Unread
+	}
+	return 0
+}
+
+type UnreadSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreadSummaryRequest) Reset() {
+	*x = UnreadSummaryRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreadSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreadSummaryRequest) ProtoMessage() {}
+
+func (x *UnreadSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreadSummaryRequest.ProtoReflect.Descriptor instead.
+func (*UnreadSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{46}
+}
+
+type UnreadSummaryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Counts        []*UnreadCount         `protobuf:"bytes,1,rep,name=counts,proto3" json:"counts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreadSummaryResponse) Reset() {
+	*x = UnreadSummaryResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreadSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreadSummaryResponse) ProtoMessage() {}
+
+func (x *UnreadSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreadSummaryResponse.ProtoReflect.Descriptor instead.
+func (*UnreadSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *UnreadSummaryResponse) GetCounts() []*UnreadCount {
+	if x != nil {
+		return x.Counts
+	}
+	return nil
+}
+
+type Channel struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	// read, write or readWrite.
+	Access string `protobuf:"bytes,3,opt,name=access,proto3" json:"access,omitempty"`
+	// push, digest or pull.
+	Delivery        string   `protobuf:"bytes,4,opt,name=delivery,proto3" json:"delivery,omitempty"`
+	AllowedDelivery []string `protobuf:"bytes,5,rep,name=allowed_delivery,json=allowedDelivery,proto3" json:"allowed_delivery,omitempty"`
+	Unread          int32    `protobuf:"varint,6,opt,name=unread,proto3" json:"unread,omitempty"`
+	Members         int32    `protobuf:"varint,7,opt,name=members,proto3" json:"members,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Channel) Reset() {
+	*x = Channel{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Channel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Channel) ProtoMessage() {}
+
+func (x *Channel) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Channel.ProtoReflect.Descriptor instead.
+func (*Channel) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *Channel) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Channel) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Channel) GetAccess() string {
+	if x != nil {
+		return x.Access
+	}
+	return ""
+}
+
+func (x *Channel) GetDelivery() string {
+	if x != nil {
+		return x.Delivery
+	}
+	return ""
+}
+
+func (x *Channel) GetAllowedDelivery() []string {
+	if x != nil {
+		return x.AllowedDelivery
+	}
+	return nil
+}
+
+func (x *Channel) GetUnread() int32 {
+	if x != nil {
+		return x.Unread
+	}
+	return 0
+}
+
+func (x *Channel) GetMembers() int32 {
+	if x != nil {
+		return x.Members
+	}
+	return 0
+}
+
+type ListChannelsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChannelsRequest) Reset() {
+	*x = ListChannelsRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChannelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChannelsRequest) ProtoMessage() {}
+
+func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChannelsRequest.ProtoReflect.Descriptor instead.
+func (*ListChannelsRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{49}
+}
+
+type ListChannelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Channels      []*Channel             `protobuf:"bytes,1,rep,name=channels,proto3" json:"channels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChannelsResponse) Reset() {
+	*x = ListChannelsResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChannelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChannelsResponse) ProtoMessage() {}
+
+func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChannelsResponse.ProtoReflect.Descriptor instead.
+func (*ListChannelsResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ListChannelsResponse) GetChannels() []*Channel {
+	if x != nil {
+		return x.Channels
+	}
+	return nil
+}
+
+type SetDeliveryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Channel       string                 `protobuf:"bytes,1,opt,name=channel,proto3" json:"channel,omitempty"`
+	Mode          string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDeliveryRequest) Reset() {
+	*x = SetDeliveryRequest{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDeliveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDeliveryRequest) ProtoMessage() {}
+
+func (x *SetDeliveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDeliveryRequest.ProtoReflect.Descriptor instead.
+func (*SetDeliveryRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *SetDeliveryRequest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *SetDeliveryRequest) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+type SetDeliveryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDeliveryResponse) Reset() {
+	*x = SetDeliveryResponse{}
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDeliveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDeliveryResponse) ProtoMessage() {}
+
+func (x *SetDeliveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_messaging_v1_messaging_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDeliveryResponse.ProtoReflect.Descriptor instead.
+func (*SetDeliveryResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_messaging_v1_messaging_proto_rawDescGZIP(), []int{52}
+}
+
 var File_swarm_messaging_v1_messaging_proto protoreflect.FileDescriptor
 
 const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
@@ -2066,14 +3493,31 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\fSendResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
 	"\tduplicate\x18\x02 \x01(\bR\tduplicate\"\x12\n" +
-	"\x10SubscribeRequest\"\xf1\x01\n" +
+	"\x10SubscribeRequest\"\xf6\x02\n" +
 	"\bDelivery\x12\x1f\n" +
 	"\vdelivery_id\x18\x01 \x01(\tR\n" +
 	"deliveryId\x127\n" +
 	"\amessage\x18\x02 \x01(\v2\x1b.swarm.messaging.v1.MessageH\x00R\amessage\x12M\n" +
 	"\x0fapproval_answer\x18\x03 \x01(\v2\".swarm.messaging.v1.ApprovalAnswerH\x00R\x0eapprovalAnswer\x124\n" +
-	"\x06notice\x18\x04 \x01(\v2\x1a.swarm.messaging.v1.NoticeH\x00R\x06noticeB\x06\n" +
-	"\x04item\"V\n" +
+	"\x06notice\x18\x04 \x01(\v2\x1a.swarm.messaging.v1.NoticeH\x00R\x06notice\x125\n" +
+	"\x04post\x18\x05 \x01(\v2\x1f.swarm.messaging.v1.ChannelPostH\x00R\x04post\x124\n" +
+	"\x06digest\x18\x06 \x01(\v2\x1a.swarm.messaging.v1.DigestH\x00R\x06digest\x12\x16\n" +
+	"\x06urgent\x18\a \x01(\bR\x06urgentB\x06\n" +
+	"\x04item\"\xeb\x01\n" +
+	"\vChannelPost\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\achannel\x18\x02 \x01(\tR\achannel\x12\x12\n" +
+	"\x04from\x18\x03 \x01(\tR\x04from\x12\x1b\n" +
+	"\tfrom_kind\x18\x04 \x01(\tR\bfromKind\x12\x12\n" +
+	"\x04body\x18\x05 \x01(\tR\x04body\x123\n" +
+	"\asent_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06sentAt\x12\x1a\n" +
+	"\bmentions\x18\a \x03(\tR\bmentions\x12\x1c\n" +
+	"\ttruncated\x18\b \x01(\bR\ttruncated\"u\n" +
+	"\x06Digest\x12\x18\n" +
+	"\achannel\x18\x01 \x01(\tR\achannel\x12\x1b\n" +
+	"\tnew_posts\x18\x02 \x01(\x05R\bnewPosts\x12\x18\n" +
+	"\aposters\x18\x03 \x03(\tR\aposters\x12\x1a\n" +
+	"\bpreviews\x18\x04 \x03(\tR\bpreviews\"V\n" +
 	"\x06Notice\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12(\n" +
@@ -2185,7 +3629,86 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x12\n" +
 	"\x04body\x18\x06 \x01(\tR\x04body\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x12\x12\n" +
-	"\x04link\x18\b \x01(\tR\x04link*\x82\x01\n" +
+	"\x04link\x18\b \x01(\tR\x04link\"\xa1\x02\n" +
+	"\aVerdict\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04room\x18\x02 \x01(\tR\x04room\x12\x14\n" +
+	"\x05layer\x18\x03 \x01(\tR\x05layer\x128\n" +
+	"\bseverity\x18\x04 \x01(\x0e2\x1c.swarm.messaging.v1.SeverityR\bseverity\x12\x12\n" +
+	"\x04rule\x18\x05 \x01(\tR\x04rule\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12\x1a\n" +
+	"\bevidence\x18\a \x01(\tR\bevidence\x12\x16\n" +
+	"\x06action\x18\b \x01(\tR\x06action\x12\x16\n" +
+	"\x06source\x18\t \x01(\tR\x06source\x12*\n" +
+	"\x02at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"M\n" +
+	"\x14ReportVerdictRequest\x125\n" +
+	"\averdict\x18\x01 \x01(\v2\x1b.swarm.messaging.v1.VerdictR\averdict\"\x17\n" +
+	"\x15ReportVerdictResponse\"K\n" +
+	"\vPostRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\achannel\x18\x02 \x01(\tR\achannel\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\"Z\n" +
+	"\fPostResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
+	"\tduplicate\x18\x02 \x01(\bR\tduplicate\x12\x1c\n" +
+	"\tmentioned\x18\x03 \x03(\tR\tmentioned\"\x82\x02\n" +
+	"\tInboxItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\achannel\x18\x02 \x01(\tR\achannel\x12\x12\n" +
+	"\x04from\x18\x03 \x01(\tR\x04from\x12\x1b\n" +
+	"\tfrom_kind\x18\x04 \x01(\tR\bfromKind\x12\x12\n" +
+	"\x04body\x18\x05 \x01(\tR\x04body\x123\n" +
+	"\asent_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06sentAt\x12\x1c\n" +
+	"\ttruncated\x18\a \x01(\bR\ttruncated\x12\x12\n" +
+	"\x04read\x18\b \x01(\bR\x04read\x12\x1f\n" +
+	"\vmentions_me\x18\t \x01(\bR\n" +
+	"mentionsMe\"\xd3\x01\n" +
+	"\x13ReadMessagesRequest\x12\x14\n" +
+	"\x05scope\x18\x01 \x01(\tR\x05scope\x12$\n" +
+	"\vunread_only\x18\x02 \x01(\bH\x00R\n" +
+	"unreadOnly\x88\x01\x01\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06cursor\x18\x04 \x01(\tR\x06cursor\x12\x12\n" +
+	"\x04full\x18\x05 \x01(\bR\x04full\x12 \n" +
+	"\tmark_read\x18\x06 \x01(\bH\x01R\bmarkRead\x88\x01\x01B\x0e\n" +
+	"\f_unread_onlyB\f\n" +
+	"\n" +
+	"_mark_read\"\x97\x01\n" +
+	"\x14ReadMessagesResponse\x123\n" +
+	"\x05items\x18\x01 \x03(\v2\x1d.swarm.messaging.v1.InboxItemR\x05items\x12\x1f\n" +
+	"\vnext_cursor\x18\x02 \x01(\tR\n" +
+	"nextCursor\x12)\n" +
+	"\x10unread_remaining\x18\x03 \x01(\x05R\x0funreadRemaining\"#\n" +
+	"\x11GetMessageRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"G\n" +
+	"\x12GetMessageResponse\x121\n" +
+	"\x04item\x18\x01 \x01(\v2\x1d.swarm.messaging.v1.InboxItemR\x04item\"<\n" +
+	"\x0fMarkReadRequest\x12\x14\n" +
+	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x13\n" +
+	"\x05up_to\x18\x02 \x01(\tR\x04upTo\"\x12\n" +
+	"\x10MarkReadResponse\";\n" +
+	"\vUnreadCount\x12\x14\n" +
+	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x16\n" +
+	"\x06unread\x18\x02 \x01(\x05R\x06unread\"\x16\n" +
+	"\x14UnreadSummaryRequest\"P\n" +
+	"\x15UnreadSummaryResponse\x127\n" +
+	"\x06counts\x18\x01 \x03(\v2\x1f.swarm.messaging.v1.UnreadCountR\x06counts\"\xd0\x01\n" +
+	"\aChannel\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06access\x18\x03 \x01(\tR\x06access\x12\x1a\n" +
+	"\bdelivery\x18\x04 \x01(\tR\bdelivery\x12)\n" +
+	"\x10allowed_delivery\x18\x05 \x03(\tR\x0fallowedDelivery\x12\x16\n" +
+	"\x06unread\x18\x06 \x01(\x05R\x06unread\x12\x18\n" +
+	"\amembers\x18\a \x01(\x05R\amembers\"\x15\n" +
+	"\x13ListChannelsRequest\"O\n" +
+	"\x14ListChannelsResponse\x127\n" +
+	"\bchannels\x18\x01 \x03(\v2\x1b.swarm.messaging.v1.ChannelR\bchannels\"B\n" +
+	"\x12SetDeliveryRequest\x12\x18\n" +
+	"\achannel\x18\x01 \x01(\tR\achannel\x12\x12\n" +
+	"\x04mode\x18\x02 \x01(\tR\x04mode\"\x15\n" +
+	"\x13SetDeliveryResponse*\x82\x01\n" +
 	"\bPresence\x12\x18\n" +
 	"\x14PRESENCE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10PRESENCE_WORKING\x10\x01\x12\x1d\n" +
@@ -2196,7 +3719,13 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1e\n" +
 	"\x1aDECISION_ALLOW_FOR_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x032\xfc\b\n" +
+	"\rDECISION_DENY\x10\x03*u\n" +
+	"\bSeverity\x12\x18\n" +
+	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fSEVERITY_LOW\x10\x01\x12\x13\n" +
+	"\x0fSEVERITY_MEDIUM\x10\x02\x12\x11\n" +
+	"\rSEVERITY_HIGH\x10\x03\x12\x15\n" +
+	"\x11SEVERITY_CRITICAL\x10\x042\xed\x0e\n" +
 	"\x10MessagingService\x12I\n" +
 	"\x04Send\x12\x1f.swarm.messaging.v1.SendRequest\x1a .swarm.messaging.v1.SendResponse\x12Q\n" +
 	"\tSubscribe\x12$.swarm.messaging.v1.SubscribeRequest\x1a\x1c.swarm.messaging.v1.Delivery0\x01\x12F\n" +
@@ -2206,8 +3735,17 @@ const file_swarm_messaging_v1_messaging_proto_rawDesc = "" +
 	"\x0fRequestApproval\x12*.swarm.messaging.v1.RequestApprovalRequest\x1a+.swarm.messaging.v1.RequestApprovalResponse\x12m\n" +
 	"\x10WithdrawApproval\x12+.swarm.messaging.v1.WithdrawApprovalRequest\x1a,.swarm.messaging.v1.WithdrawApprovalResponse\x12`\n" +
 	"\x0eWatchApprovals\x12).swarm.messaging.v1.WatchApprovalsRequest\x1a!.swarm.messaging.v1.ApprovalEvent0\x01\x12g\n" +
-	"\x0eAnswerApproval\x12).swarm.messaging.v1.AnswerApprovalRequest\x1a*.swarm.messaging.v1.AnswerApprovalResponse\x12a\n" +
-	"\fReportStatus\x12'.swarm.messaging.v1.ReportStatusRequest\x1a(.swarm.messaging.v1.ReportStatusResponse\x12^\n" +
+	"\x0eAnswerApproval\x12).swarm.messaging.v1.AnswerApprovalRequest\x1a*.swarm.messaging.v1.AnswerApprovalResponse\x12I\n" +
+	"\x04Post\x12\x1f.swarm.messaging.v1.PostRequest\x1a .swarm.messaging.v1.PostResponse\x12a\n" +
+	"\fReadMessages\x12'.swarm.messaging.v1.ReadMessagesRequest\x1a(.swarm.messaging.v1.ReadMessagesResponse\x12[\n" +
+	"\n" +
+	"GetMessage\x12%.swarm.messaging.v1.GetMessageRequest\x1a&.swarm.messaging.v1.GetMessageResponse\x12U\n" +
+	"\bMarkRead\x12#.swarm.messaging.v1.MarkReadRequest\x1a$.swarm.messaging.v1.MarkReadResponse\x12d\n" +
+	"\rUnreadSummary\x12(.swarm.messaging.v1.UnreadSummaryRequest\x1a).swarm.messaging.v1.UnreadSummaryResponse\x12a\n" +
+	"\fListChannels\x12'.swarm.messaging.v1.ListChannelsRequest\x1a(.swarm.messaging.v1.ListChannelsResponse\x12^\n" +
+	"\vSetDelivery\x12&.swarm.messaging.v1.SetDeliveryRequest\x1a'.swarm.messaging.v1.SetDeliveryResponse\x12a\n" +
+	"\fReportStatus\x12'.swarm.messaging.v1.ReportStatusRequest\x1a(.swarm.messaging.v1.ReportStatusResponse\x12d\n" +
+	"\rReportVerdict\x12(.swarm.messaging.v1.ReportVerdictRequest\x1a).swarm.messaging.v1.ReportVerdictResponse\x12^\n" +
 	"\rWatchPresence\x12(.swarm.messaging.v1.WatchPresenceRequest\x1a!.swarm.messaging.v1.PresenceEvent0\x01\x12V\n" +
 	"\n" +
 	"QueryAudit\x12%.swarm.messaging.v1.QueryAuditRequest\x1a\x1f.swarm.messaging.v1.AuditRecord0\x01BDZBgithub.com/usr-lex/swarmageddon/gen/swarm/messaging/v1;messagingv1b\x06proto3"
@@ -2224,97 +3762,147 @@ func file_swarm_messaging_v1_messaging_proto_rawDescGZIP() []byte {
 	return file_swarm_messaging_v1_messaging_proto_rawDescData
 }
 
-var file_swarm_messaging_v1_messaging_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_swarm_messaging_v1_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_swarm_messaging_v1_messaging_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_swarm_messaging_v1_messaging_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_swarm_messaging_v1_messaging_proto_goTypes = []any{
 	(Presence)(0),                    // 0: swarm.messaging.v1.Presence
 	(Decision)(0),                    // 1: swarm.messaging.v1.Decision
-	(*Message)(nil),                  // 2: swarm.messaging.v1.Message
-	(*SendRequest)(nil),              // 3: swarm.messaging.v1.SendRequest
-	(*SendResponse)(nil),             // 4: swarm.messaging.v1.SendResponse
-	(*SubscribeRequest)(nil),         // 5: swarm.messaging.v1.SubscribeRequest
-	(*Delivery)(nil),                 // 6: swarm.messaging.v1.Delivery
-	(*Notice)(nil),                   // 7: swarm.messaging.v1.Notice
-	(*AckRequest)(nil),               // 8: swarm.messaging.v1.AckRequest
-	(*AckResponse)(nil),              // 9: swarm.messaging.v1.AckResponse
-	(*ReportPresenceRequest)(nil),    // 10: swarm.messaging.v1.ReportPresenceRequest
-	(*ReportPresenceResponse)(nil),   // 11: swarm.messaging.v1.ReportPresenceResponse
-	(*ListPeersRequest)(nil),         // 12: swarm.messaging.v1.ListPeersRequest
-	(*Peer)(nil),                     // 13: swarm.messaging.v1.Peer
-	(*ListPeersResponse)(nil),        // 14: swarm.messaging.v1.ListPeersResponse
-	(*ApprovalRequest)(nil),          // 15: swarm.messaging.v1.ApprovalRequest
-	(*ApprovalAnswer)(nil),           // 16: swarm.messaging.v1.ApprovalAnswer
-	(*RequestApprovalRequest)(nil),   // 17: swarm.messaging.v1.RequestApprovalRequest
-	(*RequestApprovalResponse)(nil),  // 18: swarm.messaging.v1.RequestApprovalResponse
-	(*WithdrawApprovalRequest)(nil),  // 19: swarm.messaging.v1.WithdrawApprovalRequest
-	(*WithdrawApprovalResponse)(nil), // 20: swarm.messaging.v1.WithdrawApprovalResponse
-	(*WatchApprovalsRequest)(nil),    // 21: swarm.messaging.v1.WatchApprovalsRequest
-	(*ApprovalEvent)(nil),            // 22: swarm.messaging.v1.ApprovalEvent
-	(*AnswerApprovalRequest)(nil),    // 23: swarm.messaging.v1.AnswerApprovalRequest
-	(*AnswerApprovalResponse)(nil),   // 24: swarm.messaging.v1.AnswerApprovalResponse
-	(*VolumeUsage)(nil),              // 25: swarm.messaging.v1.VolumeUsage
-	(*RoomStatusReport)(nil),         // 26: swarm.messaging.v1.RoomStatusReport
-	(*ReportStatusRequest)(nil),      // 27: swarm.messaging.v1.ReportStatusRequest
-	(*ReportStatusResponse)(nil),     // 28: swarm.messaging.v1.ReportStatusResponse
-	(*WatchPresenceRequest)(nil),     // 29: swarm.messaging.v1.WatchPresenceRequest
-	(*PresenceEvent)(nil),            // 30: swarm.messaging.v1.PresenceEvent
-	(*QueryAuditRequest)(nil),        // 31: swarm.messaging.v1.QueryAuditRequest
-	(*AuditRecord)(nil),              // 32: swarm.messaging.v1.AuditRecord
-	(*timestamppb.Timestamp)(nil),    // 33: google.protobuf.Timestamp
+	(Severity)(0),                    // 2: swarm.messaging.v1.Severity
+	(*Message)(nil),                  // 3: swarm.messaging.v1.Message
+	(*SendRequest)(nil),              // 4: swarm.messaging.v1.SendRequest
+	(*SendResponse)(nil),             // 5: swarm.messaging.v1.SendResponse
+	(*SubscribeRequest)(nil),         // 6: swarm.messaging.v1.SubscribeRequest
+	(*Delivery)(nil),                 // 7: swarm.messaging.v1.Delivery
+	(*ChannelPost)(nil),              // 8: swarm.messaging.v1.ChannelPost
+	(*Digest)(nil),                   // 9: swarm.messaging.v1.Digest
+	(*Notice)(nil),                   // 10: swarm.messaging.v1.Notice
+	(*AckRequest)(nil),               // 11: swarm.messaging.v1.AckRequest
+	(*AckResponse)(nil),              // 12: swarm.messaging.v1.AckResponse
+	(*ReportPresenceRequest)(nil),    // 13: swarm.messaging.v1.ReportPresenceRequest
+	(*ReportPresenceResponse)(nil),   // 14: swarm.messaging.v1.ReportPresenceResponse
+	(*ListPeersRequest)(nil),         // 15: swarm.messaging.v1.ListPeersRequest
+	(*Peer)(nil),                     // 16: swarm.messaging.v1.Peer
+	(*ListPeersResponse)(nil),        // 17: swarm.messaging.v1.ListPeersResponse
+	(*ApprovalRequest)(nil),          // 18: swarm.messaging.v1.ApprovalRequest
+	(*ApprovalAnswer)(nil),           // 19: swarm.messaging.v1.ApprovalAnswer
+	(*RequestApprovalRequest)(nil),   // 20: swarm.messaging.v1.RequestApprovalRequest
+	(*RequestApprovalResponse)(nil),  // 21: swarm.messaging.v1.RequestApprovalResponse
+	(*WithdrawApprovalRequest)(nil),  // 22: swarm.messaging.v1.WithdrawApprovalRequest
+	(*WithdrawApprovalResponse)(nil), // 23: swarm.messaging.v1.WithdrawApprovalResponse
+	(*WatchApprovalsRequest)(nil),    // 24: swarm.messaging.v1.WatchApprovalsRequest
+	(*ApprovalEvent)(nil),            // 25: swarm.messaging.v1.ApprovalEvent
+	(*AnswerApprovalRequest)(nil),    // 26: swarm.messaging.v1.AnswerApprovalRequest
+	(*AnswerApprovalResponse)(nil),   // 27: swarm.messaging.v1.AnswerApprovalResponse
+	(*VolumeUsage)(nil),              // 28: swarm.messaging.v1.VolumeUsage
+	(*RoomStatusReport)(nil),         // 29: swarm.messaging.v1.RoomStatusReport
+	(*ReportStatusRequest)(nil),      // 30: swarm.messaging.v1.ReportStatusRequest
+	(*ReportStatusResponse)(nil),     // 31: swarm.messaging.v1.ReportStatusResponse
+	(*WatchPresenceRequest)(nil),     // 32: swarm.messaging.v1.WatchPresenceRequest
+	(*PresenceEvent)(nil),            // 33: swarm.messaging.v1.PresenceEvent
+	(*QueryAuditRequest)(nil),        // 34: swarm.messaging.v1.QueryAuditRequest
+	(*AuditRecord)(nil),              // 35: swarm.messaging.v1.AuditRecord
+	(*Verdict)(nil),                  // 36: swarm.messaging.v1.Verdict
+	(*ReportVerdictRequest)(nil),     // 37: swarm.messaging.v1.ReportVerdictRequest
+	(*ReportVerdictResponse)(nil),    // 38: swarm.messaging.v1.ReportVerdictResponse
+	(*PostRequest)(nil),              // 39: swarm.messaging.v1.PostRequest
+	(*PostResponse)(nil),             // 40: swarm.messaging.v1.PostResponse
+	(*InboxItem)(nil),                // 41: swarm.messaging.v1.InboxItem
+	(*ReadMessagesRequest)(nil),      // 42: swarm.messaging.v1.ReadMessagesRequest
+	(*ReadMessagesResponse)(nil),     // 43: swarm.messaging.v1.ReadMessagesResponse
+	(*GetMessageRequest)(nil),        // 44: swarm.messaging.v1.GetMessageRequest
+	(*GetMessageResponse)(nil),       // 45: swarm.messaging.v1.GetMessageResponse
+	(*MarkReadRequest)(nil),          // 46: swarm.messaging.v1.MarkReadRequest
+	(*MarkReadResponse)(nil),         // 47: swarm.messaging.v1.MarkReadResponse
+	(*UnreadCount)(nil),              // 48: swarm.messaging.v1.UnreadCount
+	(*UnreadSummaryRequest)(nil),     // 49: swarm.messaging.v1.UnreadSummaryRequest
+	(*UnreadSummaryResponse)(nil),    // 50: swarm.messaging.v1.UnreadSummaryResponse
+	(*Channel)(nil),                  // 51: swarm.messaging.v1.Channel
+	(*ListChannelsRequest)(nil),      // 52: swarm.messaging.v1.ListChannelsRequest
+	(*ListChannelsResponse)(nil),     // 53: swarm.messaging.v1.ListChannelsResponse
+	(*SetDeliveryRequest)(nil),       // 54: swarm.messaging.v1.SetDeliveryRequest
+	(*SetDeliveryResponse)(nil),      // 55: swarm.messaging.v1.SetDeliveryResponse
+	(*timestamppb.Timestamp)(nil),    // 56: google.protobuf.Timestamp
 }
 var file_swarm_messaging_v1_messaging_proto_depIdxs = []int32{
-	33, // 0: swarm.messaging.v1.Message.sent_at:type_name -> google.protobuf.Timestamp
-	2,  // 1: swarm.messaging.v1.Delivery.message:type_name -> swarm.messaging.v1.Message
-	16, // 2: swarm.messaging.v1.Delivery.approval_answer:type_name -> swarm.messaging.v1.ApprovalAnswer
-	7,  // 3: swarm.messaging.v1.Delivery.notice:type_name -> swarm.messaging.v1.Notice
-	0,  // 4: swarm.messaging.v1.ReportPresenceRequest.presence:type_name -> swarm.messaging.v1.Presence
-	0,  // 5: swarm.messaging.v1.Peer.presence:type_name -> swarm.messaging.v1.Presence
-	13, // 6: swarm.messaging.v1.ListPeersResponse.peers:type_name -> swarm.messaging.v1.Peer
-	33, // 7: swarm.messaging.v1.ApprovalRequest.requested_at:type_name -> google.protobuf.Timestamp
-	1,  // 8: swarm.messaging.v1.ApprovalAnswer.decision:type_name -> swarm.messaging.v1.Decision
-	33, // 9: swarm.messaging.v1.ApprovalAnswer.answered_at:type_name -> google.protobuf.Timestamp
-	15, // 10: swarm.messaging.v1.RequestApprovalRequest.request:type_name -> swarm.messaging.v1.ApprovalRequest
-	15, // 11: swarm.messaging.v1.ApprovalEvent.requested:type_name -> swarm.messaging.v1.ApprovalRequest
-	16, // 12: swarm.messaging.v1.ApprovalEvent.answered:type_name -> swarm.messaging.v1.ApprovalAnswer
-	19, // 13: swarm.messaging.v1.ApprovalEvent.withdrawn:type_name -> swarm.messaging.v1.WithdrawApprovalRequest
-	16, // 14: swarm.messaging.v1.AnswerApprovalRequest.answer:type_name -> swarm.messaging.v1.ApprovalAnswer
-	25, // 15: swarm.messaging.v1.RoomStatusReport.volumes:type_name -> swarm.messaging.v1.VolumeUsage
-	26, // 16: swarm.messaging.v1.ReportStatusRequest.status:type_name -> swarm.messaging.v1.RoomStatusReport
-	0,  // 17: swarm.messaging.v1.PresenceEvent.presence:type_name -> swarm.messaging.v1.Presence
-	33, // 18: swarm.messaging.v1.PresenceEvent.at:type_name -> google.protobuf.Timestamp
-	26, // 19: swarm.messaging.v1.PresenceEvent.status:type_name -> swarm.messaging.v1.RoomStatusReport
-	33, // 20: swarm.messaging.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
-	33, // 21: swarm.messaging.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
-	33, // 22: swarm.messaging.v1.AuditRecord.at:type_name -> google.protobuf.Timestamp
-	3,  // 23: swarm.messaging.v1.MessagingService.Send:input_type -> swarm.messaging.v1.SendRequest
-	5,  // 24: swarm.messaging.v1.MessagingService.Subscribe:input_type -> swarm.messaging.v1.SubscribeRequest
-	8,  // 25: swarm.messaging.v1.MessagingService.Ack:input_type -> swarm.messaging.v1.AckRequest
-	10, // 26: swarm.messaging.v1.MessagingService.ReportPresence:input_type -> swarm.messaging.v1.ReportPresenceRequest
-	12, // 27: swarm.messaging.v1.MessagingService.ListPeers:input_type -> swarm.messaging.v1.ListPeersRequest
-	17, // 28: swarm.messaging.v1.MessagingService.RequestApproval:input_type -> swarm.messaging.v1.RequestApprovalRequest
-	19, // 29: swarm.messaging.v1.MessagingService.WithdrawApproval:input_type -> swarm.messaging.v1.WithdrawApprovalRequest
-	21, // 30: swarm.messaging.v1.MessagingService.WatchApprovals:input_type -> swarm.messaging.v1.WatchApprovalsRequest
-	23, // 31: swarm.messaging.v1.MessagingService.AnswerApproval:input_type -> swarm.messaging.v1.AnswerApprovalRequest
-	27, // 32: swarm.messaging.v1.MessagingService.ReportStatus:input_type -> swarm.messaging.v1.ReportStatusRequest
-	29, // 33: swarm.messaging.v1.MessagingService.WatchPresence:input_type -> swarm.messaging.v1.WatchPresenceRequest
-	31, // 34: swarm.messaging.v1.MessagingService.QueryAudit:input_type -> swarm.messaging.v1.QueryAuditRequest
-	4,  // 35: swarm.messaging.v1.MessagingService.Send:output_type -> swarm.messaging.v1.SendResponse
-	6,  // 36: swarm.messaging.v1.MessagingService.Subscribe:output_type -> swarm.messaging.v1.Delivery
-	9,  // 37: swarm.messaging.v1.MessagingService.Ack:output_type -> swarm.messaging.v1.AckResponse
-	11, // 38: swarm.messaging.v1.MessagingService.ReportPresence:output_type -> swarm.messaging.v1.ReportPresenceResponse
-	14, // 39: swarm.messaging.v1.MessagingService.ListPeers:output_type -> swarm.messaging.v1.ListPeersResponse
-	18, // 40: swarm.messaging.v1.MessagingService.RequestApproval:output_type -> swarm.messaging.v1.RequestApprovalResponse
-	20, // 41: swarm.messaging.v1.MessagingService.WithdrawApproval:output_type -> swarm.messaging.v1.WithdrawApprovalResponse
-	22, // 42: swarm.messaging.v1.MessagingService.WatchApprovals:output_type -> swarm.messaging.v1.ApprovalEvent
-	24, // 43: swarm.messaging.v1.MessagingService.AnswerApproval:output_type -> swarm.messaging.v1.AnswerApprovalResponse
-	28, // 44: swarm.messaging.v1.MessagingService.ReportStatus:output_type -> swarm.messaging.v1.ReportStatusResponse
-	30, // 45: swarm.messaging.v1.MessagingService.WatchPresence:output_type -> swarm.messaging.v1.PresenceEvent
-	32, // 46: swarm.messaging.v1.MessagingService.QueryAudit:output_type -> swarm.messaging.v1.AuditRecord
-	35, // [35:47] is the sub-list for method output_type
-	23, // [23:35] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	56, // 0: swarm.messaging.v1.Message.sent_at:type_name -> google.protobuf.Timestamp
+	3,  // 1: swarm.messaging.v1.Delivery.message:type_name -> swarm.messaging.v1.Message
+	19, // 2: swarm.messaging.v1.Delivery.approval_answer:type_name -> swarm.messaging.v1.ApprovalAnswer
+	10, // 3: swarm.messaging.v1.Delivery.notice:type_name -> swarm.messaging.v1.Notice
+	8,  // 4: swarm.messaging.v1.Delivery.post:type_name -> swarm.messaging.v1.ChannelPost
+	9,  // 5: swarm.messaging.v1.Delivery.digest:type_name -> swarm.messaging.v1.Digest
+	56, // 6: swarm.messaging.v1.ChannelPost.sent_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: swarm.messaging.v1.ReportPresenceRequest.presence:type_name -> swarm.messaging.v1.Presence
+	0,  // 8: swarm.messaging.v1.Peer.presence:type_name -> swarm.messaging.v1.Presence
+	16, // 9: swarm.messaging.v1.ListPeersResponse.peers:type_name -> swarm.messaging.v1.Peer
+	56, // 10: swarm.messaging.v1.ApprovalRequest.requested_at:type_name -> google.protobuf.Timestamp
+	1,  // 11: swarm.messaging.v1.ApprovalAnswer.decision:type_name -> swarm.messaging.v1.Decision
+	56, // 12: swarm.messaging.v1.ApprovalAnswer.answered_at:type_name -> google.protobuf.Timestamp
+	18, // 13: swarm.messaging.v1.RequestApprovalRequest.request:type_name -> swarm.messaging.v1.ApprovalRequest
+	18, // 14: swarm.messaging.v1.ApprovalEvent.requested:type_name -> swarm.messaging.v1.ApprovalRequest
+	19, // 15: swarm.messaging.v1.ApprovalEvent.answered:type_name -> swarm.messaging.v1.ApprovalAnswer
+	22, // 16: swarm.messaging.v1.ApprovalEvent.withdrawn:type_name -> swarm.messaging.v1.WithdrawApprovalRequest
+	19, // 17: swarm.messaging.v1.AnswerApprovalRequest.answer:type_name -> swarm.messaging.v1.ApprovalAnswer
+	28, // 18: swarm.messaging.v1.RoomStatusReport.volumes:type_name -> swarm.messaging.v1.VolumeUsage
+	29, // 19: swarm.messaging.v1.ReportStatusRequest.status:type_name -> swarm.messaging.v1.RoomStatusReport
+	0,  // 20: swarm.messaging.v1.PresenceEvent.presence:type_name -> swarm.messaging.v1.Presence
+	56, // 21: swarm.messaging.v1.PresenceEvent.at:type_name -> google.protobuf.Timestamp
+	29, // 22: swarm.messaging.v1.PresenceEvent.status:type_name -> swarm.messaging.v1.RoomStatusReport
+	56, // 23: swarm.messaging.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
+	56, // 24: swarm.messaging.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
+	56, // 25: swarm.messaging.v1.AuditRecord.at:type_name -> google.protobuf.Timestamp
+	2,  // 26: swarm.messaging.v1.Verdict.severity:type_name -> swarm.messaging.v1.Severity
+	56, // 27: swarm.messaging.v1.Verdict.at:type_name -> google.protobuf.Timestamp
+	36, // 28: swarm.messaging.v1.ReportVerdictRequest.verdict:type_name -> swarm.messaging.v1.Verdict
+	56, // 29: swarm.messaging.v1.InboxItem.sent_at:type_name -> google.protobuf.Timestamp
+	41, // 30: swarm.messaging.v1.ReadMessagesResponse.items:type_name -> swarm.messaging.v1.InboxItem
+	41, // 31: swarm.messaging.v1.GetMessageResponse.item:type_name -> swarm.messaging.v1.InboxItem
+	48, // 32: swarm.messaging.v1.UnreadSummaryResponse.counts:type_name -> swarm.messaging.v1.UnreadCount
+	51, // 33: swarm.messaging.v1.ListChannelsResponse.channels:type_name -> swarm.messaging.v1.Channel
+	4,  // 34: swarm.messaging.v1.MessagingService.Send:input_type -> swarm.messaging.v1.SendRequest
+	6,  // 35: swarm.messaging.v1.MessagingService.Subscribe:input_type -> swarm.messaging.v1.SubscribeRequest
+	11, // 36: swarm.messaging.v1.MessagingService.Ack:input_type -> swarm.messaging.v1.AckRequest
+	13, // 37: swarm.messaging.v1.MessagingService.ReportPresence:input_type -> swarm.messaging.v1.ReportPresenceRequest
+	15, // 38: swarm.messaging.v1.MessagingService.ListPeers:input_type -> swarm.messaging.v1.ListPeersRequest
+	20, // 39: swarm.messaging.v1.MessagingService.RequestApproval:input_type -> swarm.messaging.v1.RequestApprovalRequest
+	22, // 40: swarm.messaging.v1.MessagingService.WithdrawApproval:input_type -> swarm.messaging.v1.WithdrawApprovalRequest
+	24, // 41: swarm.messaging.v1.MessagingService.WatchApprovals:input_type -> swarm.messaging.v1.WatchApprovalsRequest
+	26, // 42: swarm.messaging.v1.MessagingService.AnswerApproval:input_type -> swarm.messaging.v1.AnswerApprovalRequest
+	39, // 43: swarm.messaging.v1.MessagingService.Post:input_type -> swarm.messaging.v1.PostRequest
+	42, // 44: swarm.messaging.v1.MessagingService.ReadMessages:input_type -> swarm.messaging.v1.ReadMessagesRequest
+	44, // 45: swarm.messaging.v1.MessagingService.GetMessage:input_type -> swarm.messaging.v1.GetMessageRequest
+	46, // 46: swarm.messaging.v1.MessagingService.MarkRead:input_type -> swarm.messaging.v1.MarkReadRequest
+	49, // 47: swarm.messaging.v1.MessagingService.UnreadSummary:input_type -> swarm.messaging.v1.UnreadSummaryRequest
+	52, // 48: swarm.messaging.v1.MessagingService.ListChannels:input_type -> swarm.messaging.v1.ListChannelsRequest
+	54, // 49: swarm.messaging.v1.MessagingService.SetDelivery:input_type -> swarm.messaging.v1.SetDeliveryRequest
+	30, // 50: swarm.messaging.v1.MessagingService.ReportStatus:input_type -> swarm.messaging.v1.ReportStatusRequest
+	37, // 51: swarm.messaging.v1.MessagingService.ReportVerdict:input_type -> swarm.messaging.v1.ReportVerdictRequest
+	32, // 52: swarm.messaging.v1.MessagingService.WatchPresence:input_type -> swarm.messaging.v1.WatchPresenceRequest
+	34, // 53: swarm.messaging.v1.MessagingService.QueryAudit:input_type -> swarm.messaging.v1.QueryAuditRequest
+	5,  // 54: swarm.messaging.v1.MessagingService.Send:output_type -> swarm.messaging.v1.SendResponse
+	7,  // 55: swarm.messaging.v1.MessagingService.Subscribe:output_type -> swarm.messaging.v1.Delivery
+	12, // 56: swarm.messaging.v1.MessagingService.Ack:output_type -> swarm.messaging.v1.AckResponse
+	14, // 57: swarm.messaging.v1.MessagingService.ReportPresence:output_type -> swarm.messaging.v1.ReportPresenceResponse
+	17, // 58: swarm.messaging.v1.MessagingService.ListPeers:output_type -> swarm.messaging.v1.ListPeersResponse
+	21, // 59: swarm.messaging.v1.MessagingService.RequestApproval:output_type -> swarm.messaging.v1.RequestApprovalResponse
+	23, // 60: swarm.messaging.v1.MessagingService.WithdrawApproval:output_type -> swarm.messaging.v1.WithdrawApprovalResponse
+	25, // 61: swarm.messaging.v1.MessagingService.WatchApprovals:output_type -> swarm.messaging.v1.ApprovalEvent
+	27, // 62: swarm.messaging.v1.MessagingService.AnswerApproval:output_type -> swarm.messaging.v1.AnswerApprovalResponse
+	40, // 63: swarm.messaging.v1.MessagingService.Post:output_type -> swarm.messaging.v1.PostResponse
+	43, // 64: swarm.messaging.v1.MessagingService.ReadMessages:output_type -> swarm.messaging.v1.ReadMessagesResponse
+	45, // 65: swarm.messaging.v1.MessagingService.GetMessage:output_type -> swarm.messaging.v1.GetMessageResponse
+	47, // 66: swarm.messaging.v1.MessagingService.MarkRead:output_type -> swarm.messaging.v1.MarkReadResponse
+	50, // 67: swarm.messaging.v1.MessagingService.UnreadSummary:output_type -> swarm.messaging.v1.UnreadSummaryResponse
+	53, // 68: swarm.messaging.v1.MessagingService.ListChannels:output_type -> swarm.messaging.v1.ListChannelsResponse
+	55, // 69: swarm.messaging.v1.MessagingService.SetDelivery:output_type -> swarm.messaging.v1.SetDeliveryResponse
+	31, // 70: swarm.messaging.v1.MessagingService.ReportStatus:output_type -> swarm.messaging.v1.ReportStatusResponse
+	38, // 71: swarm.messaging.v1.MessagingService.ReportVerdict:output_type -> swarm.messaging.v1.ReportVerdictResponse
+	33, // 72: swarm.messaging.v1.MessagingService.WatchPresence:output_type -> swarm.messaging.v1.PresenceEvent
+	35, // 73: swarm.messaging.v1.MessagingService.QueryAudit:output_type -> swarm.messaging.v1.AuditRecord
+	54, // [54:74] is the sub-list for method output_type
+	34, // [34:54] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_swarm_messaging_v1_messaging_proto_init() }
@@ -2326,19 +3914,22 @@ func file_swarm_messaging_v1_messaging_proto_init() {
 		(*Delivery_Message)(nil),
 		(*Delivery_ApprovalAnswer)(nil),
 		(*Delivery_Notice)(nil),
+		(*Delivery_Post)(nil),
+		(*Delivery_Digest)(nil),
 	}
-	file_swarm_messaging_v1_messaging_proto_msgTypes[20].OneofWrappers = []any{
+	file_swarm_messaging_v1_messaging_proto_msgTypes[22].OneofWrappers = []any{
 		(*ApprovalEvent_Requested)(nil),
 		(*ApprovalEvent_Answered)(nil),
 		(*ApprovalEvent_Withdrawn)(nil),
 	}
+	file_swarm_messaging_v1_messaging_proto_msgTypes[39].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_swarm_messaging_v1_messaging_proto_rawDesc), len(file_swarm_messaging_v1_messaging_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   31,
+			NumEnums:      3,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

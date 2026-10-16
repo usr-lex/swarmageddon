@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: forgejo
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: forgejo, app.kubernetes.io/name: forgejo}
+spec:
+  selector: {swarmageddon.dev/component: forgejo}
+  ports:
+    - {name: http, port: 3000, targetPort: 3000}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: forgejo-ssh
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: forgejo, app.kubernetes.io/name: forgejo}
+spec:
+  selector: {swarmageddon.dev/component: forgejo}
+  ports:
+    - {name: ssh, port: 22, targetPort: 2222}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: forgejo
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: forgejo, app.kubernetes.io/name: forgejo}
+spec:
+  replicas: 1
+  serviceName: forgejo
+  selector:
+    matchLabels: {swarmageddon.dev/component: forgejo}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: forgejo, app.kubernetes.io/name: forgejo}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: {fsGroup: 1000, runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      initContainers:
+        # Migrates the database and creates (or resets) the admin user from Secret forgejo-admin.
+        - name: admin
+          image: {{ .Images.Forgejo }}
+          command: [/usr/local/bin/docker-entrypoint.sh]
+          args:
+            - /bin/sh
+            - -ec
+            - |
+              forgejo migrate
+              if forgejo admin user list --admin | awk 'NR>1 {print $2}' | grep -qx "$ADMIN_USER"; then
+                forgejo admin user change-password --username "$ADMIN_USER" --password "$ADMIN_PASSWORD" --must-change-password=false
+              else
+                forgejo admin user create --admin --username "$ADMIN_USER" --password "$ADMIN_PASSWORD" --email "$ADMIN_USER@forge.invalid" --must-change-password=false
+              fi
+          env: &env
+            - name: ADMIN_USER
+              valueFrom: {secretKeyRef: {name: forgejo-admin, key: username}}
+            - name: ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: forgejo-admin, key: password}}
+            - {name: FORGEJO__database__DB_TYPE, value: postgres}
+            - {name: FORGEJO__database__HOST, value: "postgres.{{ .Namespace }}.svc:5432"}
+            - {name: FORGEJO__database__NAME, value: forgejo}
+            - {name: FORGEJO__database__USER, value: forgejo}
+            - name: FORGEJO__database__PASSWD
+              valueFrom: {secretKeyRef: {name: postgres-forgejo, key: password}}
+            - {name: FORGEJO__security__INSTALL_LOCK, value: "true"}
+            - name: FORGEJO__security__SECRET_KEY
+              valueFrom: {secretKeyRef: {name: forgejo-secrets, key: secretKey}}
+            - {name: FORGEJO__server__ROOT_URL, value: {{ quote .Forgejo.RootURL }}}
+            - {name: FORGEJO__server__DOMAIN, value: {{ quote .Forgejo.Domain }}}
+            - {name: FORGEJO__server__HTTP_PORT, value: "3000"}
+            - {name: FORGEJO__server__START_SSH_SERVER, value: "true"}
+            - {name: FORGEJO__server__SSH_DOMAIN, value: {{ quote .Forgejo.SSHDomain }}}
+            - {name: FORGEJO__server__SSH_PORT, value: "22"}
+            - {name: FORGEJO__server__SSH_LISTEN_PORT, value: "2222"}
+            - {name: FORGEJO__server__LFS_START_SERVER, value: "true"}
+            - {name: FORGEJO__admin__DEFAULT_EMAIL_NOTIFICATIONS, value: disabled}
+            - {name: FORGEJO__mailer__ENABLED, value: "false"}
+            - {name: FORGEJO__actions__ENABLED, value: "true"}
+            - {name: FORGEJO__packages__ENABLED, value: "true"}
+            - {name: FORGEJO__service__DISABLE_REGISTRATION, value: "true"}
+            - {name: FORGEJO__service__DEFAULT_ALLOW_CREATE_ORGANIZATION, value: "false"}
+            - {name: FORGEJO__service__REQUIRE_SIGNIN_VIEW, value: "true"}
+            - {name: FORGEJO__repository__DEFAULT_PRIVATE, value: private}
+            - {name: FORGEJO__webhook__ALLOWED_HOST_LIST, value: private}
+            - {name: FORGEJO__log__LEVEL, value: Info}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/gitea}
+            - {name: tmp, mountPath: /tmp/gitea}
+      containers:
+        - name: forgejo
+          image: {{ .Images.Forgejo }}
+          env: *env
+          ports:
+            - {name: http, containerPort: 3000}
+            - {name: ssh, containerPort: 2222}
+          readinessProbe:
+            httpGet: {path: /api/healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /api/healthz, port: http}
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 2Gi}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/gitea}
+            - {name: tmp, mountPath: /tmp/gitea}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ .Forgejo.Storage }}}

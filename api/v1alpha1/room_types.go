@@ -53,6 +53,17 @@ type RoomSpec struct {
 	// +kubebuilder:default=true
 	// +optional
 	Sudo *bool `json:"sudo,omitempty"`
+	// Advisor overrides the role template's advisor.
+	// +optional
+	Advisor *AdvisorSpec `json:"advisor,omitempty"`
+	// WardenMode overrides the workspace's warden mode for this room.
+	// +optional
+	WardenMode WardenMode `json:"wardenMode,omitempty"`
+	// Quarantined cuts the room off: model requests are refused, its network
+	// shrinks to the gateway, its forge token is paused. Set by the warden or a
+	// person; only a person clears it.
+	// +optional
+	Quarantined bool `json:"quarantined,omitempty"`
 	// Image overrides the room image (for development).
 	// +optional
 	Image string `json:"image,omitempty"`
@@ -122,6 +133,7 @@ const (
 	ConditionGatewayKeyReady        = "GatewayKeyReady"
 	ConditionMessagingIdentityReady = "MessagingIdentityReady"
 	ConditionPodReady               = "PodReady"
+	ConditionQuarantined            = "Quarantined"
 )
 
 // +kubebuilder:object:root=true

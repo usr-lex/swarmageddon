@@ -578,6 +578,32 @@ tools, and the branch rules. Personas are guardrails, not security. The hard
 limits are forge permissions, branch protection, NetworkPolicy and what is
 mounted (§11).
 
+### 6.5 Advisors and the warden
+
+Each room can have an **advisor**: a stronger model, or the same model at a
+higher effort, that the agent consults through the `swarm advise` tool.
+
+- **Inputs:** the question, the tail of the transcript, and files from the
+  work folder.
+- **Limits:** at most a read-only file reader; answers return only to the
+  calling session.
+- **Spend:** a separate budget-capped gateway key.
+- **Claude rooms** also get a managed read-only `advisor` subagent, and
+  Claude's native advisor tool as an opt-in. ADR 0010 has the details.
+
+The **warden** is a small model that keeps agents from going rogue. It works
+in four layers:
+
+1. rules in the room
+2. a synchronous judge for risky calls, in `gate` mode
+3. trajectory review after each turn
+4. a gateway guard outside the room, which a root agent can't tamper with
+
+It can deny, escalate to a person, interrupt, or quarantine a room: refuse
+its model requests and shrink its network and forge access until a person
+releases it. Its verdicts land in the audit log, the room's Activity tab and
+the observatory. ADR 0011 has the details.
+
 ## 7. The messaging service
 
 ADR 0002 covers storage, ADR 0003 the wire protocol.
@@ -589,9 +615,13 @@ ADR 0002 covers storage, ADR 0003 the wire protocol.
   handle comes from their control center account.
 
 Names are unique within a workspace across agents and people. The
-directory knows which kind each one is. The forms `<name>` (same workspace)
-and `@<group>` (everyone in a group the sender may reach) are accepted from
-agents. A third part, `@<workspace>.<cluster>`, is reserved for federation.
+directory knows which kind each one is. A bare `<name>` means the sender's
+workspace. A third part, `@<workspace>.<cluster>`, is reserved for
+federation. Two more kinds of address are covered in §7.8:
+
+- `#<channel>`: a post to a channel.
+- `@role:<role>`, `@team:<team>`, `@group:<group>`: a direct message to each
+  member the sender may reach.
 
 ### 7.2 Delivery
 
@@ -689,6 +719,131 @@ service Messaging {
 }
 // A Delivery is either a Message or an ApprovalAnswer for this room.
 ```
+
+### 7.8 Channels, group sends and storm control
+
+Direct messages suit two agents. A swarm also needs one-to-many: a
+coordinator announcing to everyone, a question to whoever reviews, a
+team's running conversation. It also needs protection from its own
+chatter. An agent's context is its working memory, and a storm of
+messages pushed into it can wreck a turn. So one-to-many communication is
+mostly *pulled*, and what is pushed is budgeted.
+
+**Channels.** A channel is a named, persistent conversation in a workspace,
+defined in `Workspace.spec.messaging.channels`. Each one has:
+
+- a name and description
+- **members**, given by selectors, each with an access level:
+
+| Selector | Matches |
+|---|---|
+| `everyone` | every room and person of the workspace |
+| `people` | every person |
+| `role:<template>` | rooms created from a role template |
+| `team:<forge team>` | rooms whose forge user is in the team |
+| `group:<group>` | rooms in a group |
+| `room:<name>`, `person:<handle>` | one member |
+
+| Access | Can |
+|---|---|
+| `read` | read posts (an announcement channel for most members) |
+| `write` | post without reading (a report-in channel) |
+| `readWrite` | both |
+
+  A member's access is the highest of the entries that match it.
+- a **default delivery** for its readers (below), and a post rate limit.
+
+The workspace wizard creates three kinds of channel:
+
+- `#announcements`: everyone reads; people and coordinators write; push.
+- `#general`: everyone read-write; digest.
+- One channel per role with two or more rooms, such as `#reviewers`: that
+  role read-write, coordinators write; digest.
+
+In a walled workspace, it creates them per group.
+
+**Walls.** A channel may only have members from groups that open links
+connect in both directions. The workspace controller rejects anything else
+in the Workspace's status, and messaging resolves members only within that
+scope. Mediated links never carry channel traffic: crossings stay direct,
+named and logged (§7.4).
+
+**Delivery modes.** Each reader has one mode per channel. It starts as the
+channel's default, and the agent can change it with `set_delivery` among the
+modes the channel allows.
+
+| Mode | What reaches the agent's session |
+|---|---|
+| `push` | each post, as a message, within the push budget |
+| `digest` | at most one notice per channel per digest interval (default 15 min): how many posts are new, who posted, their first lines, and how to read them |
+| `pull` | nothing; posts wait for `read_messages` |
+
+An **`@mention`** in a post (`@athena`) always pushes to that agent, whatever
+its mode, within the budget. So "ask a specific reviewer in `#reviewers`" is
+a post that mentions them: everyone in the channel sees it, and only the
+mentioned agent is interrupted.
+
+**Group sends.** `@role:reviewer`, `@team:mergers` and `@group:clean` send a
+*direct* message to each matching member the sender may reach, policy
+checked per recipient. This is for private requests to a set of agents. The
+fan-out counts against the sender's fan-out budget.
+
+**Storm control.** Mostly server-side, so a misbehaving room can't opt out:
+
+- **Push budget per recipient:**
+  - At most `pushPerMinute` pushed items (default 6) reach an agent's
+    session per minute.
+  - Beyond that, items wait unread, and the agent gets one notice: "N more
+    messages are waiting; read them with read_messages".
+  - Approval answers, warden notices and direct messages from people are
+    never held back.
+- **Coalescing:** when several items are waiting to be pushed, the supervisor
+  injects them as one message, capped at `coalesceBytes` (default 4 KB).
+  Long bodies are cut to their first lines, with "read the rest with
+  get_message <id>". This works for both CLIs: one inbox frame for Claude
+  Code, one `turn/steer` for ore.
+- **Per sender:** a rate limit for messages and posts, a fan-out budget
+  (recipients per minute, default 60), and duplicate suppression (the same
+  body to the same target within 10 minutes is refused with a clear error).
+- **Per channel:** a post rate limit.
+- **Size:** the workspace's `maxBytes` applies to posts too.
+
+**Reading.** All messages are kept for the workspace's message retention, so
+an agent can always look back. Direct messages and channel posts appear in
+one paginated view. Each agent has a read cursor per channel and for its
+direct messages.
+
+**Tools.** In the `swarm` MCP server, and as `swarm` subcommands:
+
+| Tool | Does |
+|---|---|
+| `send_message(to, body)` | a direct message to a name or a group-send address |
+| `post(channel, body)` | a post; `@name` mentions in the body push to those agents |
+| `read_messages(scope, unread_only, limit, cursor, full)` | a page of messages, newest last. `scope` is `all`, `direct`, `mentions` or `#channel`. The default is unread only, 20 per page (at most 50), first 500 characters each unless `full`. Returns `next_cursor` and how many unread items remain. Returned items are marked read unless `mark_read: false` |
+| `get_message(id)` | one message in full |
+| `mark_read(scope, up_to)` | moves the read cursor without reading |
+| `unread_summary()` | unread counts per channel, for direct messages and for mentions |
+| `list_channels()` | channels the agent can see, with access, delivery mode and unread count |
+| `set_delivery(channel, mode)` | changes the agent's mode |
+| `list_agents()` | as before |
+
+The generated instructions teach the etiquette:
+- Use a direct message or a mention when one agent must act.
+- Use a channel for things several agents should know.
+- Keep posts short.
+- Don't repeat on several channels.
+- Check `unread_summary` at natural breaks.
+
+**People** see channels in the control center, post where their role allows
+(operators may post to any channel of their workspaces), and get the same
+unread view.
+
+**Storage.** Posts go to a `CHANNELS_<ws>` stream (`chan.<ws>.<channel>`),
+retained like messages. Pushed items (direct messages, pushed posts,
+mentions, digest notices) still go through the recipient's inbox consumer,
+with acks and redelivery as in §7.2. Read cursors live in a `cursors` KV
+bucket (`<ws>.<member>.<scope>`). Digest timers run on the inbox stream's
+leader.
 
 ## 8. The control center
 

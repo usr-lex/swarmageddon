@@ -11,6 +11,7 @@
 package roomv1
 
 import (
+	v1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -625,11 +626,134 @@ func (x *HookResponse) GetOutput() []byte {
 	return nil
 }
 
+type AdviseRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Question string                 `protobuf:"bytes,1,opt,name=question,proto3" json:"question,omitempty"`
+	// Files in the work folder the advisor should read.
+	Files []string `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	// Include the tail of the session's transcript. Default true.
+	IncludeContext *bool `protobuf:"varint,3,opt,name=include_context,json=includeContext,proto3,oneof" json:"include_context,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AdviseRequest) Reset() {
+	*x = AdviseRequest{}
+	mi := &file_swarm_room_v1_room_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdviseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdviseRequest) ProtoMessage() {}
+
+func (x *AdviseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_room_v1_room_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdviseRequest.ProtoReflect.Descriptor instead.
+func (*AdviseRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_room_v1_room_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AdviseRequest) GetQuestion() string {
+	if x != nil {
+		return x.Question
+	}
+	return ""
+}
+
+func (x *AdviseRequest) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *AdviseRequest) GetIncludeContext() bool {
+	if x != nil && x.IncludeContext != nil {
+		return *x.IncludeContext
+	}
+	return false
+}
+
+type AdviseResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Answer string                 `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
+	Model  string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	// Calls left this hour.
+	Remaining     int32 `protobuf:"varint,3,opt,name=remaining,proto3" json:"remaining,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdviseResponse) Reset() {
+	*x = AdviseResponse{}
+	mi := &file_swarm_room_v1_room_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdviseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdviseResponse) ProtoMessage() {}
+
+func (x *AdviseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_room_v1_room_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdviseResponse.ProtoReflect.Descriptor instead.
+func (*AdviseResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_room_v1_room_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AdviseResponse) GetAnswer() string {
+	if x != nil {
+		return x.Answer
+	}
+	return ""
+}
+
+func (x *AdviseResponse) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AdviseResponse) GetRemaining() int32 {
+	if x != nil {
+		return x.Remaining
+	}
+	return 0
+}
+
 var File_swarm_room_v1_room_proto protoreflect.FileDescriptor
 
 const file_swarm_room_v1_room_proto_rawDesc = "" +
 	"\n" +
-	"\x18swarm/room/v1/room.proto\x12\rswarm.room.v1\"S\n" +
+	"\x18swarm/room/v1/room.proto\x12\rswarm.room.v1\x1a\"swarm/messaging/v1/messaging.proto\"S\n" +
 	"\x12SendMessageRequest\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x12\x19\n" +
@@ -669,13 +793,31 @@ const file_swarm_room_v1_room_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"&\n" +
 	"\fHookResponse\x12\x16\n" +
-	"\x06output\x18\x01 \x01(\fR\x06output2\x94\x03\n" +
+	"\x06output\x18\x01 \x01(\fR\x06output\"\x83\x01\n" +
+	"\rAdviseRequest\x12\x1a\n" +
+	"\bquestion\x18\x01 \x01(\tR\bquestion\x12\x14\n" +
+	"\x05files\x18\x02 \x03(\tR\x05files\x12,\n" +
+	"\x0finclude_context\x18\x03 \x01(\bH\x00R\x0eincludeContext\x88\x01\x01B\x12\n" +
+	"\x10_include_context\"\\\n" +
+	"\x0eAdviseResponse\x12\x16\n" +
+	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12\x1c\n" +
+	"\tremaining\x18\x03 \x01(\x05R\tremaining2\xe6\b\n" +
 	"\x11SupervisorService\x12T\n" +
 	"\vSendMessage\x12!.swarm.room.v1.SendMessageRequest\x1a\".swarm.room.v1.SendMessageResponse\x12Q\n" +
 	"\n" +
 	"ListAgents\x12 .swarm.room.v1.ListAgentsRequest\x1a!.swarm.room.v1.ListAgentsResponse\x12E\n" +
 	"\x06WhoAmI\x12\x1c.swarm.room.v1.WhoAmIRequest\x1a\x1d.swarm.room.v1.WhoAmIResponse\x12N\n" +
-	"\tSetStatus\x12\x1f.swarm.room.v1.SetStatusRequest\x1a .swarm.room.v1.SetStatusResponse\x12?\n" +
+	"\tSetStatus\x12\x1f.swarm.room.v1.SetStatusRequest\x1a .swarm.room.v1.SetStatusResponse\x12I\n" +
+	"\x04Post\x12\x1f.swarm.messaging.v1.PostRequest\x1a .swarm.messaging.v1.PostResponse\x12a\n" +
+	"\fReadMessages\x12'.swarm.messaging.v1.ReadMessagesRequest\x1a(.swarm.messaging.v1.ReadMessagesResponse\x12[\n" +
+	"\n" +
+	"GetMessage\x12%.swarm.messaging.v1.GetMessageRequest\x1a&.swarm.messaging.v1.GetMessageResponse\x12U\n" +
+	"\bMarkRead\x12#.swarm.messaging.v1.MarkReadRequest\x1a$.swarm.messaging.v1.MarkReadResponse\x12d\n" +
+	"\rUnreadSummary\x12(.swarm.messaging.v1.UnreadSummaryRequest\x1a).swarm.messaging.v1.UnreadSummaryResponse\x12a\n" +
+	"\fListChannels\x12'.swarm.messaging.v1.ListChannelsRequest\x1a(.swarm.messaging.v1.ListChannelsResponse\x12^\n" +
+	"\vSetDelivery\x12&.swarm.messaging.v1.SetDeliveryRequest\x1a'.swarm.messaging.v1.SetDeliveryResponse\x12E\n" +
+	"\x06Advise\x12\x1c.swarm.room.v1.AdviseRequest\x1a\x1d.swarm.room.v1.AdviseResponse\x12?\n" +
 	"\x04Hook\x12\x1a.swarm.room.v1.HookRequest\x1a\x1b.swarm.room.v1.HookResponseB:Z8github.com/usr-lex/swarmageddon/gen/swarm/room/v1;roomv1b\x06proto3"
 
 var (
@@ -690,36 +832,68 @@ func file_swarm_room_v1_room_proto_rawDescGZIP() []byte {
 	return file_swarm_room_v1_room_proto_rawDescData
 }
 
-var file_swarm_room_v1_room_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_swarm_room_v1_room_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_swarm_room_v1_room_proto_goTypes = []any{
-	(*SendMessageRequest)(nil),  // 0: swarm.room.v1.SendMessageRequest
-	(*SendMessageResponse)(nil), // 1: swarm.room.v1.SendMessageResponse
-	(*ListAgentsRequest)(nil),   // 2: swarm.room.v1.ListAgentsRequest
-	(*Agent)(nil),               // 3: swarm.room.v1.Agent
-	(*ListAgentsResponse)(nil),  // 4: swarm.room.v1.ListAgentsResponse
-	(*WhoAmIRequest)(nil),       // 5: swarm.room.v1.WhoAmIRequest
-	(*WhoAmIResponse)(nil),      // 6: swarm.room.v1.WhoAmIResponse
-	(*SetStatusRequest)(nil),    // 7: swarm.room.v1.SetStatusRequest
-	(*SetStatusResponse)(nil),   // 8: swarm.room.v1.SetStatusResponse
-	(*HookRequest)(nil),         // 9: swarm.room.v1.HookRequest
-	(*HookResponse)(nil),        // 10: swarm.room.v1.HookResponse
-	nil,                         // 11: swarm.room.v1.HookRequest.EnvEntry
+	(*SendMessageRequest)(nil),       // 0: swarm.room.v1.SendMessageRequest
+	(*SendMessageResponse)(nil),      // 1: swarm.room.v1.SendMessageResponse
+	(*ListAgentsRequest)(nil),        // 2: swarm.room.v1.ListAgentsRequest
+	(*Agent)(nil),                    // 3: swarm.room.v1.Agent
+	(*ListAgentsResponse)(nil),       // 4: swarm.room.v1.ListAgentsResponse
+	(*WhoAmIRequest)(nil),            // 5: swarm.room.v1.WhoAmIRequest
+	(*WhoAmIResponse)(nil),           // 6: swarm.room.v1.WhoAmIResponse
+	(*SetStatusRequest)(nil),         // 7: swarm.room.v1.SetStatusRequest
+	(*SetStatusResponse)(nil),        // 8: swarm.room.v1.SetStatusResponse
+	(*HookRequest)(nil),              // 9: swarm.room.v1.HookRequest
+	(*HookResponse)(nil),             // 10: swarm.room.v1.HookResponse
+	(*AdviseRequest)(nil),            // 11: swarm.room.v1.AdviseRequest
+	(*AdviseResponse)(nil),           // 12: swarm.room.v1.AdviseResponse
+	nil,                              // 13: swarm.room.v1.HookRequest.EnvEntry
+	(*v1.PostRequest)(nil),           // 14: swarm.messaging.v1.PostRequest
+	(*v1.ReadMessagesRequest)(nil),   // 15: swarm.messaging.v1.ReadMessagesRequest
+	(*v1.GetMessageRequest)(nil),     // 16: swarm.messaging.v1.GetMessageRequest
+	(*v1.MarkReadRequest)(nil),       // 17: swarm.messaging.v1.MarkReadRequest
+	(*v1.UnreadSummaryRequest)(nil),  // 18: swarm.messaging.v1.UnreadSummaryRequest
+	(*v1.ListChannelsRequest)(nil),   // 19: swarm.messaging.v1.ListChannelsRequest
+	(*v1.SetDeliveryRequest)(nil),    // 20: swarm.messaging.v1.SetDeliveryRequest
+	(*v1.PostResponse)(nil),          // 21: swarm.messaging.v1.PostResponse
+	(*v1.ReadMessagesResponse)(nil),  // 22: swarm.messaging.v1.ReadMessagesResponse
+	(*v1.GetMessageResponse)(nil),    // 23: swarm.messaging.v1.GetMessageResponse
+	(*v1.MarkReadResponse)(nil),      // 24: swarm.messaging.v1.MarkReadResponse
+	(*v1.UnreadSummaryResponse)(nil), // 25: swarm.messaging.v1.UnreadSummaryResponse
+	(*v1.ListChannelsResponse)(nil),  // 26: swarm.messaging.v1.ListChannelsResponse
+	(*v1.SetDeliveryResponse)(nil),   // 27: swarm.messaging.v1.SetDeliveryResponse
 }
 var file_swarm_room_v1_room_proto_depIdxs = []int32{
 	3,  // 0: swarm.room.v1.ListAgentsResponse.agents:type_name -> swarm.room.v1.Agent
-	11, // 1: swarm.room.v1.HookRequest.env:type_name -> swarm.room.v1.HookRequest.EnvEntry
+	13, // 1: swarm.room.v1.HookRequest.env:type_name -> swarm.room.v1.HookRequest.EnvEntry
 	0,  // 2: swarm.room.v1.SupervisorService.SendMessage:input_type -> swarm.room.v1.SendMessageRequest
 	2,  // 3: swarm.room.v1.SupervisorService.ListAgents:input_type -> swarm.room.v1.ListAgentsRequest
 	5,  // 4: swarm.room.v1.SupervisorService.WhoAmI:input_type -> swarm.room.v1.WhoAmIRequest
 	7,  // 5: swarm.room.v1.SupervisorService.SetStatus:input_type -> swarm.room.v1.SetStatusRequest
-	9,  // 6: swarm.room.v1.SupervisorService.Hook:input_type -> swarm.room.v1.HookRequest
-	1,  // 7: swarm.room.v1.SupervisorService.SendMessage:output_type -> swarm.room.v1.SendMessageResponse
-	4,  // 8: swarm.room.v1.SupervisorService.ListAgents:output_type -> swarm.room.v1.ListAgentsResponse
-	6,  // 9: swarm.room.v1.SupervisorService.WhoAmI:output_type -> swarm.room.v1.WhoAmIResponse
-	8,  // 10: swarm.room.v1.SupervisorService.SetStatus:output_type -> swarm.room.v1.SetStatusResponse
-	10, // 11: swarm.room.v1.SupervisorService.Hook:output_type -> swarm.room.v1.HookResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
+	14, // 6: swarm.room.v1.SupervisorService.Post:input_type -> swarm.messaging.v1.PostRequest
+	15, // 7: swarm.room.v1.SupervisorService.ReadMessages:input_type -> swarm.messaging.v1.ReadMessagesRequest
+	16, // 8: swarm.room.v1.SupervisorService.GetMessage:input_type -> swarm.messaging.v1.GetMessageRequest
+	17, // 9: swarm.room.v1.SupervisorService.MarkRead:input_type -> swarm.messaging.v1.MarkReadRequest
+	18, // 10: swarm.room.v1.SupervisorService.UnreadSummary:input_type -> swarm.messaging.v1.UnreadSummaryRequest
+	19, // 11: swarm.room.v1.SupervisorService.ListChannels:input_type -> swarm.messaging.v1.ListChannelsRequest
+	20, // 12: swarm.room.v1.SupervisorService.SetDelivery:input_type -> swarm.messaging.v1.SetDeliveryRequest
+	11, // 13: swarm.room.v1.SupervisorService.Advise:input_type -> swarm.room.v1.AdviseRequest
+	9,  // 14: swarm.room.v1.SupervisorService.Hook:input_type -> swarm.room.v1.HookRequest
+	1,  // 15: swarm.room.v1.SupervisorService.SendMessage:output_type -> swarm.room.v1.SendMessageResponse
+	4,  // 16: swarm.room.v1.SupervisorService.ListAgents:output_type -> swarm.room.v1.ListAgentsResponse
+	6,  // 17: swarm.room.v1.SupervisorService.WhoAmI:output_type -> swarm.room.v1.WhoAmIResponse
+	8,  // 18: swarm.room.v1.SupervisorService.SetStatus:output_type -> swarm.room.v1.SetStatusResponse
+	21, // 19: swarm.room.v1.SupervisorService.Post:output_type -> swarm.messaging.v1.PostResponse
+	22, // 20: swarm.room.v1.SupervisorService.ReadMessages:output_type -> swarm.messaging.v1.ReadMessagesResponse
+	23, // 21: swarm.room.v1.SupervisorService.GetMessage:output_type -> swarm.messaging.v1.GetMessageResponse
+	24, // 22: swarm.room.v1.SupervisorService.MarkRead:output_type -> swarm.messaging.v1.MarkReadResponse
+	25, // 23: swarm.room.v1.SupervisorService.UnreadSummary:output_type -> swarm.messaging.v1.UnreadSummaryResponse
+	26, // 24: swarm.room.v1.SupervisorService.ListChannels:output_type -> swarm.messaging.v1.ListChannelsResponse
+	27, // 25: swarm.room.v1.SupervisorService.SetDelivery:output_type -> swarm.messaging.v1.SetDeliveryResponse
+	12, // 26: swarm.room.v1.SupervisorService.Advise:output_type -> swarm.room.v1.AdviseResponse
+	10, // 27: swarm.room.v1.SupervisorService.Hook:output_type -> swarm.room.v1.HookResponse
+	15, // [15:28] is the sub-list for method output_type
+	2,  // [2:15] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -730,13 +904,14 @@ func file_swarm_room_v1_room_proto_init() {
 	if File_swarm_room_v1_room_proto != nil {
 		return
 	}
+	file_swarm_room_v1_room_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_swarm_room_v1_room_proto_rawDesc), len(file_swarm_room_v1_room_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

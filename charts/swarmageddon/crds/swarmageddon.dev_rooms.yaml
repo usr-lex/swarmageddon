@@ -1,0 +1,245 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: rooms.swarmageddon.dev
+spec:
+  group: swarmageddon.dev
+  names:
+    kind: Room
+    listKind: RoomList
+    plural: rooms
+    singular: room
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.cli
+      name: CLI
+      type: string
+    - jsonPath: .spec.role
+      name: Role
+      type: string
+    - jsonPath: .spec.group
+      name: Group
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Room is one agent's persistent environment.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              RoomSpec describes one worker's room. It lives in its workspace's namespace;
+              the room's name is the agent's name.
+            properties:
+              cli:
+                default: claude
+                description: CLI is the agent CLI a room runs.
+                enum:
+                - claude
+                - ore
+                type: string
+              displayName:
+                type: string
+              effort:
+                description: Effort, e.g. low, medium, high, xhigh, max.
+                type: string
+              env:
+                additionalProperties:
+                  type: string
+                description: Env adds non-secret environment variables.
+                type: object
+              group:
+                type: string
+              image:
+                description: Image overrides the room image (for development).
+                type: string
+              model:
+                description: 'Model, as the gateway names it. Empty: the workspace
+                  default.'
+                type: string
+              paused:
+                description: Paused scales the room to zero; its volumes stay.
+                type: boolean
+              repos:
+                description: Repos (owner/name in the forge) cloned into ~/work on
+                  first start.
+                items:
+                  type: string
+                type: array
+              resources:
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              role:
+                description: Role names a RoleTemplate in the same namespace.
+                type: string
+              sharedDirs:
+                items:
+                  properties:
+                    name:
+                      description: Name of a ReadWriteMany PersistentVolumeClaim in
+                        the workspace namespace; mounted at /srv/shared/<name>.
+                      type: string
+                    readOnly:
+                      type: boolean
+                  required:
+                  - name
+                  type: object
+                type: array
+              sudo:
+                default: true
+                description: Sudo gives the agent passwordless sudo inside the room.
+                type: boolean
+              volumes:
+                properties:
+                  engine:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  home:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storageClassName:
+                    type: string
+                type: object
+              workDir:
+                description: WorkDir the agent starts in, relative to its home. Default
+                  "work".
+                type: string
+            required:
+            - cli
+            - role
+            type: object
+          status:
+            properties:
+              address:
+                description: Address on the messaging service, name@workspace.
+                type: string
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              credentialsRotatedAt:
+                format: date-time
+                type: string
+              forgeUser:
+                type: string
+              imageVersion:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: RoomPhase summarizes a room's lifecycle.
+                enum:
+                - Provisioning
+                - Running
+                - Paused
+                - Updating
+                - Failed
+                type: string
+              updateAvailable:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

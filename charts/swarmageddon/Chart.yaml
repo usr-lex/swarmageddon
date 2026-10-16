@@ -1,0 +1,13 @@
+apiVersion: v2
+name: swarmageddon
+description: >-
+  Installs the swarmageddon operator and control center. Everything else
+  (platform services, workspaces, rooms) is created by the operator.
+type: application
+# Set from the git tag by the release workflow.
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.33.0-0"
+home: https://github.com/usr-lex/swarmageddon
+sources:
+  - https://github.com/usr-lex/swarmageddon

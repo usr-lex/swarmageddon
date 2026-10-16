@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
+spec:
+  selector: {swarmageddon.dev/component: postgres}
+  ports:
+    - {name: postgres, port: 5432, targetPort: 5432}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
+spec:
+  replicas: 1
+  serviceName: postgres
+  selector:
+    matchLabels: {swarmageddon.dev/component: postgres}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: postgres, app.kubernetes.io/name: postgres}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: {fsGroup: 999, runAsUser: 999, runAsGroup: 999, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: postgres
+          image: {{ .Images.Postgres }}
+          env:
+            - {name: POSTGRES_USER, value: postgres}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-superuser, key: password}}
+          ports:
+            - {name: postgres, containerPort: 5432}
+          readinessProbe:
+            exec: {command: [pg_isready, -U, postgres, -h, 127.0.0.1]}
+            periodSeconds: 5
+          livenessProbe:
+            exec: {command: [pg_isready, -U, postgres, -h, 127.0.0.1]}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 2Gi}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql}
+            - {name: run, mountPath: /var/run/postgresql}
+      volumes:
+        - name: run
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ .Postgres.Storage }}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-bootstrap-{{ .Postgres.BootstrapHash }}
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: postgres-bootstrap, app.kubernetes.io/name: postgres-bootstrap}
+spec:
+  backoffLimit: 20
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: postgres-bootstrap, app.kubernetes.io/name: postgres-bootstrap}
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: {runAsUser: 999, runAsGroup: 999, runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: bootstrap
+          image: {{ .Images.Postgres }}
+          env:
+            - {name: PGHOST, value: postgres.{{ .Namespace }}.svc}
+            - {name: PGUSER, value: postgres}
+            - {name: PGDATABASE, value: postgres}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-superuser, key: password}}
+{{- range .Postgres.Databases }}
+            - name: PW_{{ .Name }}
+              valueFrom: {secretKeyRef: {name: {{ .Secret }}, key: password}}
+{{- end }}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          command: [/bin/bash, -ec]
+          args:
+            - |
+              until pg_isready -q; do sleep 2; done
+              ensure() {
+                psql -v ON_ERROR_STOP=1 -v name="$1" -v pw="$2" <<'SQL'
+              SELECT format('CREATE ROLE %I LOGIN', :'name') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'name')\gexec
+              SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'name', :'pw')\gexec
+              SELECT format('CREATE DATABASE %I OWNER %I', :'name', :'name') WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'name')\gexec
+              SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'name')\gexec
+              SQL
+              }
+{{- range .Postgres.Databases }}
+              ensure {{ .Name }} "$PW_{{ .Name }}"
+{{- end }}

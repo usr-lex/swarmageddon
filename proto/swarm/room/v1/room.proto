@@ -5,6 +5,8 @@ syntax = "proto3";
 // by the agent user and root.
 package swarm.room.v1;
 
+import "swarm/messaging/v1/messaging.proto";
+
 option go_package = "github.com/usr-lex/swarmageddon/gen/swarm/room/v1;roomv1";
 
 service SupervisorService {
@@ -12,6 +14,16 @@ service SupervisorService {
   rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
   rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
   rpc SetStatus(SetStatusRequest) returns (SetStatusResponse);
+  // Channels and reading (docs/design.md §7.8); mirrors the messaging API.
+  rpc Post(swarm.messaging.v1.PostRequest) returns (swarm.messaging.v1.PostResponse);
+  rpc ReadMessages(swarm.messaging.v1.ReadMessagesRequest) returns (swarm.messaging.v1.ReadMessagesResponse);
+  rpc GetMessage(swarm.messaging.v1.GetMessageRequest) returns (swarm.messaging.v1.GetMessageResponse);
+  rpc MarkRead(swarm.messaging.v1.MarkReadRequest) returns (swarm.messaging.v1.MarkReadResponse);
+  rpc UnreadSummary(swarm.messaging.v1.UnreadSummaryRequest) returns (swarm.messaging.v1.UnreadSummaryResponse);
+  rpc ListChannels(swarm.messaging.v1.ListChannelsRequest) returns (swarm.messaging.v1.ListChannelsResponse);
+  rpc SetDelivery(swarm.messaging.v1.SetDeliveryRequest) returns (swarm.messaging.v1.SetDeliveryResponse);
+  // Advise asks the room's advisor (ADR 0010).
+  rpc Advise(AdviseRequest) returns (AdviseResponse);
   // Hook reports a CLI hook event. For PermissionRequest it blocks until the
   // approval is answered (or the hook's own timeout ends the call).
   rpc Hook(HookRequest) returns (HookResponse);
@@ -68,4 +80,18 @@ message HookRequest {
 message HookResponse {
   // JSON to print on the hook's stdout; empty prints nothing.
   bytes output = 1;
+}
+
+message AdviseRequest {
+  string question = 1;
+  // Files in the work folder the advisor should read.
+  repeated string files = 2;
+  // Include the tail of the session's transcript. Default true.
+  optional bool include_context = 3;
+}
+message AdviseResponse {
+  string answer = 1;
+  string model = 2;
+  // Calls left this hour.
+  int32 remaining = 3;
 }
