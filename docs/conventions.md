@@ -19,7 +19,11 @@ Change them here first.
 | Egress proxy | Service `egress.swarmageddon-platform.svc:3128` (Deployment `egress`, 2 replicas; design §11.2); HTTP proxy with CONNECT, `Proxy-Authorization: Basic <room>:<egress_auth>`; health on 8080 |
 | Warden and egress tables | ConfigMaps `warden-keys` and `egress-allowlist` in the platform namespace, one data key `<workspace>.<room>` per room, written by the room controller (JSON: `keytable.Entry` in `internal/warden/keytable`, `egress.Entry` in `internal/egress`; keys and credentials as SHA-256 hex only) |
 | Registry cache | Service `registry-cache.swarmageddon-platform.svc:5000` (HTTP) |
-| ntfy | Service `ntfy.swarmageddon-platform.svc:80` |
+| ntfy | Service `ntfy.swarmageddon-platform.svc:80`; `auth-default-access: deny-all`: anonymous clients can neither publish nor subscribe. The operator provisions user `swarm-admin` (role admin) with a token (Secrets `ntfy-auth`, `ntfy-publisher`). Publish with `Authorization: Bearer <token>`; phones subscribe with the same user (or a user an admin adds with `ntfy user add` in the pod) |
+| Forgejo web UI | with `Platform.spec.hostname`: Ingress `forgejo` at `forge.<hostname>` behind the default IngressClass, TLS from the platform CA (Secret `forgejo-tls`), plus NetworkPolicy `forgejo-ingress` opening port 3000 to the ingress controller |
+| Device plugin | DaemonSet `devices` in namespace `swarmageddon-devices` (Pod Security `privileged`: it needs hostPath), only in the `userns` tier. Resources `swarmageddon.dev/fuse` and `swarmageddon.dev/tun` (250 units per node each; any number of units mounts `/dev/fuse` or `/dev/net/tun`); userns-tier room and runner containers request 1 of each |
+| Messaging deny list | ConfigMap `messaging-revoked` in the platform namespace: one key per revoked client certificate, its serial in lowercase hex; value `<notAfter RFC 3339> <CN>`. The room controller adds removed rooms' and rotated certificates and drops expired entries; messaging mounts it at `/etc/swarm/revoked` (`--revoked`) and refuses those certificates at the TLS handshake until they expire |
+| Runner pools | a pool with `spec.group: <g>` serves only repositories team `group-<g>` has (narrowed by `spec.repos`); its runners carry the extra label `group-<g>` (so workflows can ask `runs-on: group-<g>`) and are registered on the job's repository, so Forgejo can't give them another repository's job |
 | Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway` (the warden's pods), `litellm`, `egress`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
 | Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080 |
 | Operator | Deployment `swarmageddon-operator`; health on 8081, metrics 8080 |
@@ -44,6 +48,10 @@ Change them here first.
 | `warden-review` | platform | `key`: the gateway warden's own LiteLLM key for model reviews (monthly budget 100 USD) |
 | `postgres-<service>` | platform | `username`, `password`, `database`, `url` |
 | `room-secrets` | `ws-<ws>` | label `swarmageddon.dev/room-secret=true`; keys people enter in the control center for `secretEnv` and MCP `valueFrom` (design §6.6). The operator creates it empty and owns only its metadata; the control center writes the data and may get, update and patch this one Secret by name, nothing else in the namespace |
+| `ntfy-auth` | platform | `users` (`swarm-admin:<bcrypt>:admin`, ntfy's `NTFY_AUTH_USERS`), `tokens` (`swarm-admin:tk_…:control-center`, `NTFY_AUTH_TOKENS`), `username`, `password`, `token`; made once by the operator when ntfy is enabled |
+| `ntfy-publisher` | system | `token`, `username`, `password`, `url` (`http://ntfy.swarmageddon-platform.svc`): what the control center publishes to ntfy with |
+| `forgejo-tls` | platform | `tls.crt`, `tls.key`, `ca.crt` for `forge.<hostname>` |
+| repository credentials | `ws-<ws>` | named by `RepositorySpec.mirrorSecretName` (push mirror) and `importSecretName` (import): `token`, optional `username` (default `oauth2`). Read only by the operator and handed to Forgejo; never mounted in a room. The control center writes them in the workspace namespace |
 | `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
 
 ## Identities (internal CA)
@@ -57,7 +65,10 @@ Change them here first.
   `messaging.swarmageddon-platform.svc.cluster.local`, and
   `*.messaging-headless.swarmageddon-platform.svc.cluster.local`.
 - The control center sends `x-swarm-on-behalf-of: <handle>@<workspace>` to act
-  for a person.
+  for a person, and `x-swarm-operator-post: 1` on a channel post by a person
+  who may operate the workspace: messaging then skips channel membership (limits
+  and audit still apply; the audit record's reason is `operator post`). The
+  header is ignored from anyone but the control center acting for a person.
 
 ## Inside a room
 
@@ -118,17 +129,18 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 |---|---|
 | `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version`; env `POD_NAMESPACE`. `operator welcome` (the chart's welcome Job): waits for Platform `default` `status.url` and Secret `setup-token`, prints the URL, the token, `status.caFingerprint` and the port-forward fallback, exits 0 |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
-| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
+| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--revoked /etc/messaging/revoked` (the deny list directory; missing means empty), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
 | `warden` | `--listen :4000`, `--health :8080`, `--upstream` (LiteLLM URL), `--namespace` (of `warden-keys`), `--messaging-url`, `--client-cert`, `--client-key`, `--ca` (defaults under `/etc/warden/tls/`), `--review-key-file /etc/warden/review/key`, `--review-every 1m`, `--max-body 8388608`. Needs get/list/watch on ConfigMap `warden-keys`, get/patch on `rooms` (quarantine: `spec.quarantined` and annotations `swarmageddon.dev/quarantine-reason`, `-quarantined-by`, `-quarantined-at`) |
 | `egress` | `--listen :3128`, `--health :8080`, `--namespace` (of `egress-allowlist`), `--log-connections`. Needs get/list/watch on ConfigMap `egress-allowlist` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
 | `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>`, `swarm post`, `swarm read`, `swarm get`, `swarm mark-read`, `swarm unread`, `swarm channels`, `swarm delivery`, `swarm advise` (see `swarm help`) |
+| `devices` | `--dir /var/lib/kubelet/device-plugins/`, `--host-root` (where the host's `/dev` is mounted as `<root>/dev`), `--units 250`. Runs as root (writes its sockets in kubelet's directory), no capabilities |
 | `mockmodel` | `--listen :9999`, `--script <file>`; serves Anthropic `/v1/messages`, OpenAI `/v1/responses` and `/v1/chat/completions` |
 
 ## Images
 
 `ghcr.io/usr-lex/swarmageddon/<name>:<version>`: `operator`, `control-center`,
-`messaging`, `warden`, `egress`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
+`messaging`, `warden`, `egress`, `room`, `runner`, `mockmodel`, `devices`. Third-party images are pinned by
 the operator in `internal/operator/images/images.go`.
 
 Each image's ENTRYPOINT is its binary (`images/service/Dockerfile` is the

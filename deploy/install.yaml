@@ -1822,11 +1822,20 @@ spec:
                     group:
                       description: 'Group whose team owns it; empty: the default teams.'
                       type: string
+                    importSecretName:
+                      description: |-
+                        ImportSecretName is a Secret in the workspace namespace with the
+                        credential for ImportURL (keys token, and optionally username), used
+                        for the one import only.
+                      type: string
                     importURL:
                       description: ImportURL to clone from instead of creating an
                         empty repository.
                       type: string
                     mirrorSecretName:
+                      description: |-
+                        MirrorSecretName is a Secret in the workspace namespace (key token,
+                        optionally username), used only by Forgejo, never mounted in a room.
                       type: string
                     name:
                       pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
@@ -2290,6 +2299,10 @@ rules:
   - apiGroups: [""]
     resources: [nodes, endpoints]
     verbs: [get, list, watch]
+  # Kubelet's stats summary (free node disk for RunnerPools' minFreeDiskGB).
+  - apiGroups: [""]
+    resources: [nodes/proxy]
+    verbs: [get]
   - apiGroups: ["discovery.k8s.io"]
     resources: [endpointslices]
     verbs: [get, list, watch]

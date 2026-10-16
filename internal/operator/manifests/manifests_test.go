@@ -36,13 +36,18 @@ func testValues() Values {
 		Registry:  RegistryValues{Storage: "100Gi", RemoteURL: "https://registry-1.docker.io", TTL: "168h"},
 		Ntfy:      NtfyValues{Storage: "1Gi", BaseURL: "https://ntfy.example.com"},
 		Ingress:   IngressValues{ClassName: "traefik"},
+		Devices:   DevicesValues{Namespace: DevicesNamespace},
 	}
 }
 
 func TestGolden(t *testing.T) {
 	v := testValues()
-	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik} {
+	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik, Devices, ForgejoIngress} {
 		t.Run(name, func(t *testing.T) {
+			v := v
+			if name == ForgejoIngress {
+				v.Ingress.Hostname = "forge.example.com"
+			}
 			objs, err := Render(name, v)
 			if err != nil {
 				t.Fatal(err)

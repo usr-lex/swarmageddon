@@ -131,6 +131,7 @@ spec:
         - --tls-cert=/etc/swarm/tls/tls.crt
         - --tls-key=/etc/swarm/tls/tls.key
         - --ca=/etc/swarm/tls/ca.crt
+        - --revoked=/etc/swarm/revoked
         - --data=/data
         - --nats-routes=nats://messaging-0.messaging-headless:6222
         - --server-name=$(POD_NAME)
@@ -179,6 +180,9 @@ spec:
         - mountPath: /etc/swarm/tls
           name: tls
           readOnly: true
+        - mountPath: /etc/swarm/revoked
+          name: revoked
+          readOnly: true
       enableServiceLinks: false
       securityContext:
         fsGroup: 65532
@@ -193,6 +197,10 @@ spec:
       - name: tls
         secret:
           secretName: messaging-tls
+      - configMap:
+          name: messaging-revoked
+          optional: true
+        name: revoked
   volumeClaimTemplates:
   - metadata:
       name: data

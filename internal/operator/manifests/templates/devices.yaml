@@ -1,0 +1,54 @@
+# The device plugin (cmd/devices, ADR 0001): gives userns-tier room and
+# runner pods /dev/fuse and /dev/net/tun as swarmageddon.dev/fuse and
+# swarmageddon.dev/tun. It needs hostPath volumes, which the platform
+# namespace's baseline Pod Security level forbids, so it has its own.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Devices.Namespace }}
+  labels:
+    swarmageddon.dev/component: devices
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: devices
+  namespace: {{ .Devices.Namespace }}
+  labels: {swarmageddon.dev/component: devices, app.kubernetes.io/name: devices}
+spec:
+  selector:
+    matchLabels: {swarmageddon.dev/component: devices}
+  updateStrategy: {type: RollingUpdate}
+  template:
+    metadata:
+      labels: {swarmageddon.dev/component: devices, app.kubernetes.io/name: devices}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # Every node that may run a room, whatever its taints.
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: devices
+          image: {{ .Images.Devices }}
+          args: [--dir=/var/lib/kubelet/device-plugins, --host-root=/host]
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          # Root only to write its socket in kubelet's (root-owned) directory.
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: device-plugins, mountPath: /var/lib/kubelet/device-plugins}
+            - {name: dev, mountPath: /host/dev, readOnly: true}
+      volumes:
+        - name: device-plugins
+          hostPath: {path: /var/lib/kubelet/device-plugins, type: Directory}
+        - name: dev
+          hostPath: {path: /dev, type: Directory}

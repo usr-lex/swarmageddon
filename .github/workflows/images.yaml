@@ -55,7 +55,7 @@ jobs:
             PLATFORMS=linux/${{ matrix.arch }} \
             IMAGE_OUTPUT=--load
           if [ "${{ inputs.push }}" = true ]; then
-            for i in room runner operator control-center messaging warden egress mockmodel; do
+            for i in room runner operator control-center messaging warden egress mockmodel devices; do
               docker push "$REGISTRY/$i:${{ inputs.version }}-${{ matrix.arch }}"
             done
           fi
@@ -75,7 +75,7 @@ jobs:
       - name: Multi-arch manifests
         run: |
           v=${{ inputs.version }}
-          for i in room runner operator control-center messaging warden egress mockmodel; do
+          for i in room runner operator control-center messaging warden egress mockmodel devices; do
             docker buildx imagetools create -t "$REGISTRY/$i:$v" \
               "$REGISTRY/$i:$v-amd64" "$REGISTRY/$i:$v-arm64"
           done

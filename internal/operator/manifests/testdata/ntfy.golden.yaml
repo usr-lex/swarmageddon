@@ -48,6 +48,20 @@ spec:
           value: /var/cache/ntfy/cache.db
         - name: NTFY_BEHIND_PROXY
           value: "true"
+        - name: NTFY_AUTH_FILE
+          value: /var/cache/ntfy/user.db
+        - name: NTFY_AUTH_DEFAULT_ACCESS
+          value: deny-all
+        - name: NTFY_AUTH_USERS
+          valueFrom:
+            secretKeyRef:
+              key: users
+              name: ntfy-auth
+        - name: NTFY_AUTH_TOKENS
+          valueFrom:
+            secretKeyRef:
+              key: tokens
+              name: ntfy-auth
         image: docker.io/binwiederhier/ntfy:v2.31.0@sha256:803b2aaeb94df76c8b32ecd91039dc80b0fddb7041dcaf082b33bcdfd4ba39ad
         name: ntfy
         ports:

@@ -1,0 +1,48 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  labels:
+    app.kubernetes.io/name: forgejo
+    swarmageddon.dev/component: forgejo
+  name: forgejo
+  namespace: swarmageddon-platform
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: forge.example.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: forgejo
+            port:
+              number: 3000
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - forge.example.com
+    secretName: forgejo-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    swarmageddon.dev/component: forgejo
+  name: forgejo-ingress
+  namespace: swarmageddon-platform
+spec:
+  ingress:
+  - ports:
+    - port: 3000
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      swarmageddon.dev/component: forgejo
+  policyTypes:
+  - Ingress

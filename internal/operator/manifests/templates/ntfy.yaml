@@ -36,6 +36,15 @@ spec:
             - {name: NTFY_LISTEN_HTTP, value: ":8080"}
             - {name: NTFY_CACHE_FILE, value: /var/cache/ntfy/cache.db}
             - {name: NTFY_BEHIND_PROXY, value: "true"}
+            # Nobody reads or publishes without credentials; the operator
+            # provisions an admin with a token (Secret ntfy-auth, copied to
+            # ntfy-publisher in the system namespace for the control center).
+            - {name: NTFY_AUTH_FILE, value: /var/cache/ntfy/user.db}
+            - {name: NTFY_AUTH_DEFAULT_ACCESS, value: deny-all}
+            - name: NTFY_AUTH_USERS
+              valueFrom: {secretKeyRef: {name: ntfy-auth, key: users}}
+            - name: NTFY_AUTH_TOKENS
+              valueFrom: {secretKeyRef: {name: ntfy-auth, key: tokens}}
           ports:
             - {name: http, containerPort: 8080}
           readinessProbe:

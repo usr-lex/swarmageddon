@@ -41,6 +41,9 @@ type Plugin struct {
 	// HostPath is the device node on the host; ContainerPath where it
 	// appears in the container (defaults to HostPath).
 	HostPath, ContainerPath string
+	// HostRoot is where the host's root is mounted in the plugin's own
+	// container ("" for /), to check that HostPath exists.
+	HostRoot string
 	// Units advertised.
 	Units int
 	// Dir is kubelet's device plugin directory (pluginapi.DevicePluginPath).
@@ -140,7 +143,7 @@ func (p *Plugin) register(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	_, err = pluginapi.NewRegistrationClient(conn).Register(rctx, &pluginapi.RegisterRequest{
@@ -155,7 +158,7 @@ func (p *Plugin) register(ctx context.Context) error {
 // checkHealth records whether the host device exists, and wakes
 // ListAndWatch streams when that changes.
 func (p *Plugin) checkHealth() {
-	_, err := os.Stat(p.HostPath)
+	_, err := os.Stat(filepath.Join(p.HostRoot, p.HostPath))
 	ok := err == nil
 	p.mu.Lock()
 	defer p.mu.Unlock()

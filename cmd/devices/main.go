@@ -20,6 +20,7 @@ import (
 
 func main() {
 	dir := flag.String("dir", pluginapi.DevicePluginPath, "kubelet's device plugin directory")
+	hostRoot := flag.String("host-root", "", "where the host's /dev is mounted, as <host-root>/dev (empty: this container's /dev is the host's)")
 	units := flag.Int("units", devices.DefaultUnits, "units advertised per resource")
 	flag.Parse()
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
@@ -27,8 +28,8 @@ func main() {
 	defer stop()
 
 	plugins := []*devices.Plugin{
-		{Resource: devices.ResourceFuse, HostPath: "/dev/fuse", Units: *units, Dir: *dir, Log: log},
-		{Resource: devices.ResourceTun, HostPath: "/dev/net/tun", Units: *units, Dir: *dir, Log: log},
+		{Resource: devices.ResourceFuse, HostPath: "/dev/fuse", HostRoot: *hostRoot, Units: *units, Dir: *dir, Log: log},
+		{Resource: devices.ResourceTun, HostPath: "/dev/net/tun", HostRoot: *hostRoot, Units: *units, Dir: *dir, Log: log},
 	}
 	var wg sync.WaitGroup
 	for _, p := range plugins {

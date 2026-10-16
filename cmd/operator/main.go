@@ -20,6 +20,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/operator/addons"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 	"github.com/usr-lex/swarmageddon/internal/operator/platform"
@@ -133,6 +134,9 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	}
 	if err := runnerpool.SetupWithManager(mgr, d); err != nil {
 		return fmt.Errorf("runnerpool controller: %w", err)
+	}
+	if err := addons.SetupWithManager(mgr, d); err != nil {
+		return fmt.Errorf("addons controller: %w", err)
 	}
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return err

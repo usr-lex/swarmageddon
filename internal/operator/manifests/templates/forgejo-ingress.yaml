@@ -1,0 +1,44 @@
+# Forgejo's web UI at forge.<hostname>, when Platform.spec.hostname is set
+# (design §9.6), behind the default IngressClass. TLS terminates at the
+# ingress with a certificate from the platform CA (forgejo-tls), as for the
+# control center; Forgejo itself serves plain HTTP inside the cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: forgejo
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: forgejo, app.kubernetes.io/name: forgejo}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: {{ .Ingress.ClassName }}
+  tls:
+    - secretName: forgejo-tls
+      hosts: [{{ quote .Ingress.Hostname }}]
+  rules:
+    - host: {{ quote .Ingress.Hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: forgejo
+                port: {number: 3000}
+---
+# The ingress controller runs wherever the cluster put it, so Forgejo's
+# HTTP port is open to any source, like ntfy's.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forgejo-ingress
+  namespace: {{ .Namespace }}
+  labels: {swarmageddon.dev/component: forgejo}
+spec:
+  podSelector:
+    matchLabels: {swarmageddon.dev/component: forgejo}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 3000, protocol: TCP}]

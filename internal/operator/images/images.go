@@ -32,6 +32,8 @@ type Images struct {
 	Egress        string `json:"egress"`
 	Room          string `json:"room"`
 	Runner        string `json:"runner"`
+	// Devices is the device plugin (cmd/devices).
+	Devices string `json:"devices"`
 }
 
 // Third-party pins. Digests were read from the registries on 2026-10-16.
@@ -69,6 +71,7 @@ func Defaults(v string) Images {
 		Egress:        own("egress"),
 		Room:          own("room"),
 		Runner:        own("runner"),
+		Devices:       own("devices"),
 	}
 }
 

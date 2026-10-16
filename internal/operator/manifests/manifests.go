@@ -36,7 +36,16 @@ const (
 	Egress               = "egress"
 	ControlCenterIngress = "control-center-ingress"
 	ControlCenterTraefik = "control-center-traefik"
+	// Devices is the device plugin DaemonSet and its namespace (userns tier).
+	Devices = "devices"
+	// ForgejoIngress publishes Forgejo at forge.<hostname>; render it with
+	// Ingress.Hostname set to that name.
+	ForgejoIngress = "forgejo-ingress"
 )
+
+// DevicesNamespace is where the device plugin runs: it needs hostPath
+// volumes, which the platform namespace's Pod Security level forbids.
+const DevicesNamespace = "swarmageddon-devices"
 
 var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 	"quote": func(s string) string {
@@ -68,6 +77,11 @@ type Values struct {
 	Registry  RegistryValues
 	Ntfy      NtfyValues
 	Ingress   IngressValues
+	Devices   DevicesValues
+}
+
+type DevicesValues struct {
+	Namespace string
 }
 
 // Database is one service's role and database in PostgreSQL.
