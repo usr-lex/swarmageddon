@@ -8171,7 +8171,7 @@ type NotificationPref struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Empty: every workspace.
 	Workspace string `protobuf:"bytes,1,opt,name=workspace,proto3" json:"workspace,omitempty"`
-	// approvalWaiting, idleWithOpenWork, ciRed, budget, diskLow, roomCrashed.
+	// approvalWaiting, idleWithOpenWork, ciRed, budget, diskLow, roomCrashed, wardenFlag.
 	Event string `protobuf:"bytes,2,opt,name=event,proto3" json:"event,omitempty"`
 	// webPush, ntfy, slack, discord, email. Empty: off.
 	Channels      []string `protobuf:"bytes,3,rep,name=channels,proto3" json:"channels,omitempty"`

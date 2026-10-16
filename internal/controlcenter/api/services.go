@@ -302,7 +302,7 @@ func (s notificationSvc) UnsubscribeWebPush(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&ccv1.UnsubscribeWebPushResponse{}), nil
 }
 
-var notificationEvents = []string{"approvalWaiting", "idleWithOpenWork", "ciRed", "budget", "diskLow", "roomCrashed"}
+var notificationEvents = []string{"approvalWaiting", "idleWithOpenWork", "ciRed", "budget", "diskLow", "roomCrashed", "wardenFlag"}
 
 func (s notificationSvc) GetNotificationPrefs(ctx context.Context, _ *connect.Request[ccv1.GetNotificationPrefsRequest]) (*connect.Response[ccv1.GetNotificationPrefsResponse], error) {
 	p, db, err := s.db(ctx)
