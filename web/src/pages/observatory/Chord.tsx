@@ -21,11 +21,12 @@ export function chordModel(e: Edges): ChordModel {
   const parties = [
     ...[...e.agents].sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name)).map((a) => ({ id: a.name, group: a.group })),
     ...e.humans.map((h) => ({ id: h, group: "people" })),
+    ...(e.channels ?? []).map((c) => ({ id: c, group: "channels" })),
   ];
   const idx = new Map(parties.map((p, i) => [p.id, i]));
   const matrix = parties.map(() => parties.map(() => 0));
   const pairKind = new Map<string, EdgeKind>();
-  const rank: Record<EdgeKind, number> = { open: 0, human: 1, mediated: 2 };
+  const rank: Record<EdgeKind, number> = { open: 0, channel: 1, human: 2, mediated: 3 };
   for (const m of e.messages) {
     const i = idx.get(m.from);
     const j = idx.get(m.to);
@@ -79,7 +80,7 @@ export function ChordChart({ workspace, window, edges }: { workspace: string; wi
   return (
     <div ref={box} className="flex w-full min-w-0 flex-col gap-2 overflow-hidden">
       <Legend>
-        {(["open", "mediated", "human"] as EdgeKind[]).map((k) => (
+        {(["open", "mediated", "human", "channel"] as EdgeKind[]).map((k) => (
           <LegendItem key={k} color={kindColor[k]} label={kindLabel[k]} shape="rect" />
         ))}
       </Legend>
@@ -149,7 +150,7 @@ export function ChordChart({ workspace, window, edges }: { workspace: string; wi
                   tip.show(e, <TipRow value={total(g.index)} label={`messages, ${p.id}`} />);
                 }}
               >
-                <path d={arcGen(g)!} fill={p.group === "people" ? "var(--viz-2)" : "var(--fg)"} opacity={hover && hover.type === "arc" && hover.i !== g.index ? 0.3 : 0.85} />
+                <path d={arcGen(g)!} fill={p.group === "people" ? "var(--viz-2)" : p.group === "channels" ? kindColor.channel : "var(--fg)"} opacity={hover && hover.type === "arc" && hover.i !== g.index ? 0.3 : 0.85} />
                 <text
                   transform={`rotate(${(mid * 180) / Math.PI - 90}) translate(${outer + 6}) ${flip ? "rotate(180)" : ""}`}
                   textAnchor={flip ? "end" : "start"}

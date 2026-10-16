@@ -92,7 +92,7 @@ function AppHeader() {
     ...(firstWs ? [{ to: `/w/${firstWs}`, label: "Observatory" }] : []),
     { to: "/fleet", label: "Fleet" },
     { to: "/approvals", label: "Approvals", badge: pending },
-    { to: "/inbox", label: "Inbox" },
+    { to: "/channels", label: "Messages" },
     { to: "/workspaces", label: "Workspaces" },
     { to: "/spend", label: "Spend" },
     { to: "/audit", label: "Audit" },

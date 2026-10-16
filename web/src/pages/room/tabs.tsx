@@ -6,6 +6,7 @@ import { consume } from "@/api/stream";
 import type { EngineItem, LogComponent, PruneKind, RoomDetail, RoomSummary, TranscriptEntry } from "@/api/types";
 import { PresenceBadge } from "@/components/Presence";
 import { TerminalView } from "@/components/TerminalView";
+import { WardenPanel } from "@/components/Warden";
 import { Badge, Button, Card, Checkbox, Empty, ErrorText, Meter, Select, Spinner, cx } from "@/components/ui";
 import { ago, bytes, percent } from "@/lib/format";
 import { useApprovals } from "@/lib/live";
@@ -89,7 +90,7 @@ function Transcript({ workspace, room }: { workspace: string; room: string }) {
   );
 }
 
-export function ActivityTab({ detail, live }: { detail: RoomDetail; live: RoomSummary }) {
+export function ActivityTab({ detail, live, canOperate }: { detail: RoomDetail; live: RoomSummary; canOperate: boolean }) {
   const approvals = useApprovals();
   const mine = approvals.data?.filter((a) => a.workspace === live.workspace && a.room === live.name) ?? [];
   return (
@@ -123,6 +124,9 @@ export function ActivityTab({ detail, live }: { detail: RoomDetail; live: RoomSu
             </li>
           ))}
         </ul>
+      </Card>
+      <Card title="Warden" className="lg:col-span-2">
+        <WardenPanel workspace={live.workspace} room={live.name} canOperate={canOperate} />
       </Card>
       <Card title="Pending approvals">
         {mine.length === 0 ? (

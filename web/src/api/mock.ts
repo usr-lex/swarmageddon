@@ -23,8 +23,10 @@ import type {
   User,
   WorkspaceDraft,
 } from "./types";
-import { defaultRoles, defaultRoom, pickNames } from "@/lib/workspace";
+import { defaultChatChannels, defaultRoles, defaultRoom, defaultStorm, defaultWarden, pickNames } from "@/lib/workspace";
 import { createMockObservatory, demoLinks, demoSwarm } from "./mockObservatory";
+import { demoPosts, demoVerdicts } from "./mockSeeds";
+import { topSeverity, type ChannelAccess, type ChannelInfo, type ChatChannelDraft, type DeliveryMode, type InboxItem, type Verdict } from "./channels";
 
 export const MOCK_SETUP_TOKEN = "MOCKTOKENMOCKTOKENMOCKTOKENMOCKTO";
 const STORE_KEY = "swarm-mock-state";
@@ -44,6 +46,10 @@ interface State {
   users: User[];
   prefs: NotificationPrefs;
   pushSubs: string[];
+  posts: InboxItem[];
+  readIds: string[];
+  delivery: Record<string, DeliveryMode>;
+  verdicts: Verdict[];
 }
 
 const serviceConditions = [
@@ -151,6 +157,10 @@ function freshState(): State {
     users: [],
     prefs: { prefs: [], availableChannels: ["webPush"] },
     pushSubs: [],
+    posts: [],
+    readIds: [],
+    delivery: {},
+    verdicts: [],
   };
 }
 
@@ -180,8 +190,15 @@ function demoState(): State {
     links: demoLinks.map((l) => ({ ...l, mode: "mediated" as const, requirePrefix: l.from === "dirty" ? "to {recipient}:" : "" })),
     repositories: [{ name: "api", importURL: "", importCredential: "", group: "clean", pushMirror: "", mirrorToken: "" }],
     channels: [{ kind: "webPush", target: "" }],
-    events: ["approvalWaiting", "roomCrashed"],
+    events: ["approvalWaiting", "roomCrashed", "wardenFlag"],
+    chatChannels: [],
+    storm: defaultStorm(),
+    warden: defaultWarden(),
+    advisors: {},
   };
+  draft.chatChannels = defaultChatChannels(draft);
+  draft.warden = { ...defaultWarden(), model: "claude-haiku-5" };
+  draft.advisors = { implementer: { model: "claude-opus-5-5", effort: "max", maxCallsPerHour: 10, native: false } };
   s.workspaces.acme = draft;
   const demo: Record<string, [RoomSummary["presence"], string, number, number]> = {
     athena: ["working", "Splitting the billing epic into task cards", 42.1, 12],
@@ -210,6 +227,13 @@ function demoState(): State {
     };
   });
   s.rooms[3].updateAvailable = true;
+  s.posts = demoPosts();
+  s.readIds = s.posts.slice(0, 6).map((p) => p.id);
+  s.verdicts = demoVerdicts();
+  const heph = s.rooms.find((r) => r.name === "hephaestus")!;
+  heph.quarantined = true;
+  heph.quarantineReason = "Gateway guard: upload of ~/.ssh to an unknown host (critical)";
+  for (const r of s.rooms) r.verdict = topSeverity(s.verdicts.filter((v) => v.room === r.name));
   s.approvals = [
     {
       id: "01JDEMOAPPROVAL0000000001",
@@ -322,6 +346,42 @@ export function createMockApi(mode: string): Api {
     if (!r) throw new ApiError("not_found", `Room ${name}@${ws} not found.`);
     return r;
   };
+  const refreshVerdict = (ws: string, name: string) => {
+    const r = s.rooms.find((x) => x.workspace === ws && x.name === name);
+    if (!r) return;
+    r.verdict = topSeverity(s.verdicts.filter((v) => v.workspace === ws && v.room === name));
+    upsert(r);
+  };
+  const itemHub = new Hub<InboxItem>();
+  const access = (ws: string, ch: ChatChannelDraft): ChannelAccess | null => {
+    const handle = s.me?.handle ?? "";
+    let best: ChannelAccess | null = null;
+    const order = { read: 1, write: 1, readWrite: 2 };
+    for (const m of ch.members) {
+      if (m.select === "everyone" || m.select === "people" || m.select === `person:${handle}`) {
+        if (!best || order[m.access] > order[best]) best = m.access;
+      }
+    }
+    return best ?? (s.me?.role === "admin" && s.workspaces[ws] ? "read" : null);
+  };
+  const unreadIn = (ws: string, ch: string) => s.posts.filter((p) => p.workspace === ws && p.channel === ch && !s.readIds.includes(p.id) && p.from !== s.me?.handle).length;
+  const directItems = (ws: string): InboxItem[] =>
+    s.messages
+      .filter((m) => m.to.endsWith(`@${ws}`) || m.from.endsWith(`@${ws}`))
+      .map((m) => ({ id: m.id, workspace: ws, channel: "", from: m.from, fromKind: m.fromKind, body: m.body, at: m.at, read: m.fromKind === "human" || s.readIds.includes(m.id), mentionsMe: false }));
+  const mentions = (body: string) => [...body.matchAll(/@([a-z][a-z0-9-]*(?::[a-z0-9_-]+)?)/g)].map((m) => m[1]);
+  const newPost = (ws: string, channel: string, from: string, fromKind: "agent" | "human", body: string): InboxItem => ({
+    id: id("P"),
+    workspace: ws,
+    channel,
+    from,
+    fromKind,
+    body,
+    at: now(),
+    read: fromKind === "human" && from === s.me?.handle,
+    mentionsMe: !!s.me && mentions(body).includes(s.me.handle),
+  });
+
   const strip = ({ ticks: _t, ...r }: RoomSummary & { ticks: number }): RoomSummary => r;
   const upsert = (r: RoomSummary & { ticks: number }) => fleetHub.publish({ kind: "upsert", room: strip(r) });
 
@@ -405,7 +465,7 @@ export function createMockApi(mode: string): Api {
   };
 
   const api: Api = {
-    observatory: createMockObservatory(() => s.rooms),
+    observatory: createMockObservatory(() => s.rooms, () => s.posts),
     async getSetupState() {
       return { adminClaimed: s.adminClaimed, databaseReady: true, caFingerprint: s.platform.caFingerprint, url: s.platform.url };
     },
@@ -741,6 +801,14 @@ export function createMockApi(mode: string): Api {
             save();
           }, 500);
           break;
+        case "quarantine":
+          r.quarantined = true;
+          r.quarantineReason = action.reason || `Quarantined by ${s.me?.handle}`;
+          break;
+        case "release":
+          r.quarantined = false;
+          r.quarantineReason = "";
+          break;
         case "rotate":
           break;
       }
@@ -880,6 +948,100 @@ export function createMockApi(mode: string): Api {
     async setNotificationPrefs(p) {
       requireMe();
       s.prefs = structuredClone(p);
+      save();
+    },
+    async listChannels() {
+      requireMe();
+      const out: ChannelInfo[] = [];
+      for (const [ws, d] of Object.entries(s.workspaces)) {
+        for (const c of d.chatChannels) {
+          const a = access(ws, c);
+          if (!a) continue;
+          out.push({
+            workspace: ws,
+            name: c.name,
+            description: c.description,
+            access: a,
+            delivery: s.delivery[`${ws}/${c.name}`] ?? c.defaultDelivery,
+            allowedDelivery: c.allowedDelivery.length ? c.allowedDelivery : ["push", "digest", "pull"],
+            unread: unreadIn(ws, c.name),
+            members: c.members.length,
+          });
+        }
+      }
+      return out;
+    },
+    async readMessages(ws, scope, opts) {
+      requireMe();
+      let items: InboxItem[] =
+        scope === "direct" ? directItems(ws) : scope.startsWith("#") ? s.posts.filter((p) => p.workspace === ws && p.channel === scope.slice(1)) : [...s.posts.filter((p) => p.workspace === ws), ...directItems(ws)];
+      items = items.map((p) => ({ ...p, read: p.read || s.readIds.includes(p.id) }));
+      if (scope === "mentions") items = items.filter((p) => p.mentionsMe);
+      if (opts.unreadOnly) items = items.filter((p) => !p.read);
+      items.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      let end = items.length;
+      if (opts.cursor) end = Math.max(0, items.findIndex((p) => p.id === opts.cursor));
+      const start = Math.max(0, end - opts.limit);
+      const page = items.slice(start, end);
+      return { items: page, nextCursor: start > 0 ? page[0]?.id ?? "" : "", unreadRemaining: items.filter((p) => !p.read).length };
+    },
+    async post(ws, channel, body) {
+      const me = requireMe();
+      const p = newPost(ws, channel, me.handle, "human", body);
+      p.read = true;
+      s.posts.push(p);
+      itemHub.publish(p);
+      const agents = mentions(body).filter((m) => s.rooms.some((r) => r.workspace === ws && r.name === m));
+      // A mentioned agent answers in the channel a moment later.
+      if (agents[0]) {
+        setTimeout(() => {
+          const reply = newPost(ws, channel, agents[0], "agent", `@${me.handle} on it — I'll report back here.`);
+          s.posts.push(reply);
+          itemHub.publish(reply);
+          save();
+        }, 700);
+      }
+      save();
+      return { id: p.id, mentioned: agents };
+    },
+    async setDelivery(ws, channel, mode) {
+      requireMe();
+      s.delivery[`${ws}/${channel}`] = mode;
+      save();
+    },
+    async markRead(ws, scope, upTo) {
+      requireMe();
+      const items = scope.startsWith("#") ? s.posts.filter((p) => p.workspace === ws && p.channel === scope.slice(1)) : scope === "direct" ? directItems(ws) : [...s.posts.filter((p) => p.workspace === ws), ...directItems(ws)];
+      items.sort((a, b) => a.at.localeCompare(b.at));
+      const last = upTo ? items.findIndex((p) => p.id === upTo) : items.length - 1;
+      for (const p of items.slice(0, last + 1)) if (!s.readIds.includes(p.id)) s.readIds.push(p.id);
+      save();
+    },
+    async *watchItems(signal) {
+      requireMe();
+      yield* itemHub.subscribe(signal);
+    },
+    async mentionCandidates(ws) {
+      const d = s.workspaces[ws];
+      const rooms = s.rooms.filter((r) => r.workspace === ws);
+      return [
+        ...rooms.map((r) => ({ handle: r.name, kind: "agent" as const, detail: `${r.role}${r.group ? ` · ${r.group}` : ""}` })),
+        ...s.users.map((u) => ({ handle: u.handle, kind: "person" as const, detail: u.displayName })),
+        ...[...new Set(rooms.map((r) => r.role))].map((r) => ({ handle: `role:${r}`, kind: "group" as const, detail: "everyone with this role" })),
+        ...(d?.groups ?? []).map((g) => ({ handle: `group:${g}`, kind: "group" as const, detail: "everyone in this group" })),
+      ];
+    },
+    async listVerdicts(ws, room) {
+      requireMe();
+      return structuredClone(s.verdicts.filter((v) => v.workspace === ws && (!room || v.room === room))).sort((a, b) => b.at.localeCompare(a.at));
+    },
+    async decideVerdict(vid, decision) {
+      requireRole("admin", "operator");
+      const v = s.verdicts.find((x) => x.id === vid);
+      if (!v) throw new ApiError("not_found", "No such verdict.");
+      v.decision = { kind: decision, by: s.me!.handle, at: now() };
+      audit(`verdict.${decision === "confirmed" ? "confirm" : "dismiss"}`, `Room/${v.workspace}/${v.room}`, `${v.severity}: ${v.reason}`, v.workspace);
+      refreshVerdict(v.workspace, v.room);
       save();
     },
     async sendTestNotification(channel) {

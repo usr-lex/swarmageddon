@@ -238,6 +238,7 @@ const eventLabels: Record<string, string> = {
   budget: "A budget reached 80%",
   diskLow: "Disk is running low",
   roomCrashed: "A room crashed",
+  wardenFlag: "The warden flagged an agent",
 };
 export { eventLabels, channelLabels };
 

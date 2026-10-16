@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/api";
 import type { RoomAction, RoomSummary } from "@/api/types";
 import { Button, Checkbox, Dialog, ErrorText, Field, Input } from "@/components/ui";
+import { QuarantineAction } from "@/components/Warden";
 
 type Pending = "recreate" | "remove" | "rotate" | null;
 
@@ -48,6 +49,7 @@ export function Lifecycle({ room }: { room: RoomSummary }) {
       )}
       <Button onClick={() => open("rotate")}>Rotate keys</Button>
       <Button onClick={() => open("recreate")}>Recreate</Button>
+      <QuarantineAction room={room} />
       <Button variant="danger" onClick={() => open("remove")}>
         Remove
       </Button>

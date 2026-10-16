@@ -1,3 +1,5 @@
+import type { AdvisorDraft, ChatChannelDraft, Severity, StormDraft, WardenDraft, WardenMode } from "./channels";
+
 // Domain types the UI works with. They mirror the control center's Connect
 // API (proto/swarm/controlcenter/v1) and the CRDs (api/v1alpha1), flattened to
 // what the pages need. connect.ts maps generated messages onto them; mock.ts
@@ -169,6 +171,10 @@ export interface RoomDraft {
   homeGi: number;
   engineGi: number;
   repos: string[];
+  /** Overrides the role's advisor; null turns it off for this room; undefined inherits. */
+  advisor?: AdvisorDraft | null;
+  /** Overrides the workspace's warden mode; "" inherits. */
+  wardenMode?: WardenMode | "";
 }
 
 export interface GroupLink {
@@ -197,7 +203,8 @@ export type NotificationEvent =
   | "ciRed"
   | "budget"
   | "diskLow"
-  | "roomCrashed";
+  | "roomCrashed"
+  | "wardenFlag";
 export const notificationEvents: NotificationEvent[] = [
   "approvalWaiting",
   "idleWithOpenWork",
@@ -205,6 +212,7 @@ export const notificationEvents: NotificationEvent[] = [
   "budget",
   "diskLow",
   "roomCrashed",
+  "wardenFlag",
 ];
 
 export interface ChannelDraft {
@@ -226,6 +234,12 @@ export interface WorkspaceDraft {
   repositories: RepositoryDraft[];
   channels: ChannelDraft[];
   events: NotificationEvent[];
+  /** Channels for one-to-many conversation (§7.8). */
+  chatChannels: ChatChannelDraft[];
+  storm: StormDraft;
+  warden: WardenDraft;
+  /** Advisor per role template name (ADR 0010). */
+  advisors: Record<string, AdvisorDraft>;
   /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
   source?: unknown;
 }
@@ -283,6 +297,10 @@ export interface RoomSummary {
   paused: boolean;
   updateAvailable: boolean;
   pendingApprovals: number;
+  /** Most severe open warden verdict. */
+  verdict?: Severity;
+  quarantined?: boolean;
+  quarantineReason?: string;
 }
 
 export type FleetEvent =
@@ -382,7 +400,9 @@ export type RoomAction =
   | { kind: "recreate"; deleteHome: boolean; confirmName?: string }
   | { kind: "remove"; deleteDataNow: boolean }
   | { kind: "rotate" }
-  | { kind: "updateNow" };
+  | { kind: "updateNow" }
+  | { kind: "quarantine"; reason: string }
+  | { kind: "release" };
 
 // Approvals and inbox
 

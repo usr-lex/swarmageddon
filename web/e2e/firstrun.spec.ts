@@ -62,6 +62,16 @@ test("setup, first-run wizard, workspace wizard, fleet, approve", async ({ page 
   await page.getByRole("button", { name: "Add group" }).click();
   await page.getByLabel("athena's group").selectOption("clean");
   await expect(page.getByRole("img")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click(); // channels
+  // athena is walled off in "clean", so each side gets its own channels.
+  await expect(page.getByTestId("channel-row").first()).toBeVisible();
+  await expect(page.getByLabel("Name").first()).toHaveValue("announcements-clean");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "Next" }).click(); // warden & advisors
+  await page.getByLabel("Mode").selectOption("gate");
+  await page.getByLabel("implementer: advisor model").selectOption("claude-opus-5-5");
+  await page.getByLabel("Also Claude's native advisor").first().check();
+  await expect(page.getByText(/Unauditable/)).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click(); // notifications
   await page.getByRole("button", { name: "Next" }).click(); // review
   const plan = page.getByRole("list", { name: "Planned changes" });

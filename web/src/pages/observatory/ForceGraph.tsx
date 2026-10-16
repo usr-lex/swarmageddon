@@ -10,7 +10,7 @@ import { kindColor, Legend, LegendItem, presenceColor, TipRow, useTip, useWidth 
 interface Node extends SimulationNodeDatum {
   id: string;
   group: string;
-  presence: Presence | "human";
+  presence: Presence | "human" | "channel";
   activity: number;
 }
 
@@ -39,6 +39,7 @@ export function ForceGraph({ edges }: { edges?: Edges }) {
     const nodes: Node[] = [
       ...edges.agents.map((a) => ({ id: a.name, group: a.group, presence: a.presence as Node["presence"], activity: a.activity })),
       ...edges.humans.map((h) => ({ id: h, group: "people", presence: "human" as const, activity: edges.messages.filter((m) => m.from === h || m.to === h).reduce((s, m) => s + m.count, 0) })),
+      ...(edges.channels ?? []).map((c) => ({ id: c, group: "channels", presence: "channel" as const, activity: edges.messages.filter((m) => m.to === c).reduce((s, m) => s + m.count, 0) })),
     ].map((n) => Object.assign(prev.get(n.id) ?? {}, n));
     nodesRef.current = new Map(nodes.map((n) => [n.id, n]));
     const pair = new Map<string, Link>();
@@ -106,6 +107,7 @@ export function ForceGraph({ edges }: { edges?: Edges }) {
         <LegendItem color={kindColor.open} label="Messages" />
         <LegendItem color={kindColor.mediated} label="Crossing" />
         <LegendItem color="var(--fg)" label="Forge handoff" dashed />
+        <LegendItem color={kindColor.channel} label="Channel" shape="rect" />
         {(["working", "waitingOnHuman", "idle", "crashed", "offline"] as Presence[]).map((p) => (
           <LegendItem key={p} color={presenceColor[p]} label={presenceInfo[p].label} shape="dot" />
         ))}
@@ -136,7 +138,8 @@ export function ForceGraph({ edges }: { edges?: Edges }) {
           {data.nodes.map((n) => {
             const rad = r(n.activity);
             const human = n.presence === "human";
-            const label = human ? "person" : presenceInfo[n.presence as Presence].label;
+            const channel = n.presence === "channel";
+            const label = human ? "person" : channel ? "channel" : presenceInfo[n.presence as Presence].label;
             return (
               <g
                 key={n.id}
@@ -147,7 +150,7 @@ export function ForceGraph({ edges }: { edges?: Edges }) {
                 role="button"
                 aria-label={`${n.id}: ${label}, ${n.activity} events`}
                 onPointerEnter={() => setHover(n.id)}
-                onPointerMove={(e) => tip.show(e, <><TipRow value={n.activity} label={`events, ${n.id}`} color={human ? "var(--viz-2)" : presenceColor[n.presence as Presence]} /><div className="label">{label} · {n.group}</div></>)}
+                onPointerMove={(e) => tip.show(e, <><TipRow value={n.activity} label={channel ? `posts, ${n.id}` : `events, ${n.id}`} color={human ? "var(--viz-2)" : channel ? kindColor.channel : presenceColor[n.presence as Presence]} /><div className="label">{label} · {n.group}</div></>)}
                 onPointerLeave={() => {
                   setHover(null);
                   tip.hide();
@@ -181,12 +184,11 @@ export function ForceGraph({ edges }: { edges?: Edges }) {
                 }}
               >
                 <circle r={rad + 8} fill="transparent" />
-                <circle
-                  r={rad}
-                  fill={human ? "var(--surface)" : presenceColor[n.presence as Presence]}
-                  stroke={human ? "var(--viz-2)" : "var(--surface)"}
-                  strokeWidth={human ? 2 : 2}
-                />
+                {channel ? (
+                  <rect x={-rad} y={-rad} width={rad * 2} height={rad * 2} fill={kindColor.channel} stroke="var(--surface)" strokeWidth={2} />
+                ) : (
+                  <circle r={rad} fill={human ? "var(--surface)" : presenceColor[n.presence as Presence]} stroke={human ? "var(--viz-2)" : "var(--surface)"} strokeWidth={2} />
+                )}
                 {n.presence === "waitingOnHuman" && <circle r={rad + 4} fill="none" stroke="var(--alert)" strokeWidth={1} className="live-dot" />}
                 <text y={rad + 11} textAnchor="middle" fontSize={10} className="fill-fg font-mono" paintOrder="stroke" stroke="var(--surface)" strokeWidth={3}>
                   {n.id}

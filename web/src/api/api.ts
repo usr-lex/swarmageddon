@@ -34,6 +34,7 @@ import type {
   WorkspaceSummary,
 } from "./types";
 import type { ObservatoryApi } from "./observatory";
+import type { ChannelInfo, DeliveryMode, InboxItem, MentionCandidate, ReadPage, ReadScope, Verdict } from "./channels";
 
 /** Error with a Connect-like code, so pages can react to "unauthenticated". */
 export class ApiError extends Error {
@@ -109,6 +110,19 @@ export interface Api {
   listMessages(address: string): Promise<ChatMessage[]>;
   watchMessages(signal: AbortSignal): AsyncIterable<ChatMessage>;
   sendMessage(to: string, body: string): Promise<ChatMessage>;
+
+  // Channels (§7.8): the person reads and posts like any member.
+  listChannels(): Promise<ChannelInfo[]>;
+  readMessages(workspace: string, scope: ReadScope, opts: { unreadOnly: boolean; limit: number; cursor?: string }): Promise<ReadPage>;
+  post(workspace: string, channel: string, body: string): Promise<{ id: string; mentioned: string[] }>;
+  setDelivery(workspace: string, channel: string, mode: DeliveryMode): Promise<void>;
+  markRead(workspace: string, scope: ReadScope, upTo?: string): Promise<void>;
+  watchItems(signal: AbortSignal): AsyncIterable<InboxItem>;
+  mentionCandidates(workspace: string): Promise<MentionCandidate[]>;
+
+  // Warden (ADR 0011)
+  listVerdicts(workspace: string, room?: string): Promise<Verdict[]>;
+  decideVerdict(id: string, decision: "confirmed" | "dismissed"): Promise<void>;
 
   // Audit, spend, users, notifications
   queryAudit(filter: AuditFilter): Promise<AuditEntry[]>;

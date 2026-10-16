@@ -1,4 +1,5 @@
 import type { GroupLink, RoomDraft, WorkspaceDraft, Presence, RoomSummary } from "@/api/types";
+import type { ChannelMemberDraft, ChatChannelDraft, StormDraft, WardenDraft } from "@/api/channels";
 
 /** Default agent names (§8.3): Greek gods, in the order they're offered. */
 export const greekGods = [
@@ -89,8 +90,96 @@ export function emptyDraft(model: string): WorkspaceDraft {
     links: [],
     repositories: [],
     channels: [{ kind: "webPush", target: "" }],
-    events: ["approvalWaiting", "idleWithOpenWork", "ciRed", "budget", "diskLow", "roomCrashed"],
+    events: ["approvalWaiting", "idleWithOpenWork", "ciRed", "budget", "diskLow", "roomCrashed", "wardenFlag"],
+    chatChannels: [],
+    storm: defaultStorm(),
+    warden: defaultWarden(),
+    advisors: {},
   };
+}
+
+/** §7.8 defaults. */
+export const defaultStorm = (): StormDraft => ({ pushPerMinute: 6, coalesceBytes: 4096, digestMinutes: 15, fanoutPerMinute: 60 });
+
+/** ADR 0011 defaults: monitor, interrupt on high. */
+export const defaultWarden = (): WardenDraft => ({ mode: "monitor", model: "", interruptOnHigh: true, quarantineOnHigh: false, monthlyUSD: 20 });
+
+/**
+ * The wizard's default channels (§7.8): #announcements (everyone reads;
+ * people and coordinators write; push), #general (everyone, digest), and one
+ * per role with two or more rooms. In a walled workspace, one set per group,
+ * with members named per room so no selector spans the wall.
+ */
+export function defaultChatChannels(d: WorkspaceDraft): ChatChannelDraft[] {
+  const inUse = groupsInUse(d);
+  const walled = inUse.length > 1;
+  const sides = walled ? inUse : [""];
+  const out: ChatChannelDraft[] = [];
+  for (const g of sides) {
+    const rooms = d.rooms.filter((r) => !walled || r.group === g);
+    if (walled && rooms.length === 0) continue;
+    const suffix = walled ? `-${g || "main"}` : "";
+    // Rooms without a group have no group selector; name them one by one.
+    const scopeMembers = (access: ChannelMemberDraft["access"]): ChannelMemberDraft[] =>
+      !walled ? [{ select: "everyone", access }] : g ? [{ select: `group:${g}`, access }] : rooms.map((r) => ({ select: `room:${r.name}`, access }));
+    const coordinators: ChannelMemberDraft[] = rooms.filter((r) => r.role === "coordinator").map((r) => ({ select: `room:${r.name}`, access: "readWrite" }));
+    out.push({
+      name: `announcements${suffix}`,
+      description: walled ? `Announcements for the ${g || "ungrouped"} side` : "Announcements for everyone",
+      members: [...scopeMembers("read"), { select: "people", access: "readWrite" }, ...coordinators],
+      defaultDelivery: "push",
+      allowedDelivery: ["push", "digest"],
+      postsPerMinute: 5,
+    });
+    out.push({
+      name: `general${suffix}`,
+      description: "Running conversation",
+      members: [...scopeMembers("readWrite"), { select: "people", access: "readWrite" }],
+      defaultDelivery: "digest",
+      allowedDelivery: [],
+      postsPerMinute: 20,
+    });
+    const roles = [...new Set(rooms.map((r) => r.role))].filter((role) => rooms.filter((r) => r.role === role).length >= 2);
+    for (const role of roles) {
+      const members: ChannelMemberDraft[] = walled
+        ? rooms.filter((r) => r.role === role).map((r) => ({ select: `room:${r.name}`, access: "readWrite" }))
+        : [{ select: `role:${role}`, access: "readWrite" }];
+      out.push({
+        name: `${role}s${suffix}`.slice(0, 63),
+        description: `The ${role}s`,
+        members: [...members, ...coordinators.map((c) => ({ ...c, access: "write" as const }))],
+        defaultDelivery: "digest",
+        allowedDelivery: [],
+        postsPerMinute: 20,
+      });
+    }
+  }
+  return out;
+}
+
+/** Groups a channel's members come from. undefined means "every group". */
+function memberGroups(m: ChannelMemberDraft, d: WorkspaceDraft): string[] | undefined {
+  const [kind, value] = m.select.split(":");
+  if (kind === "people" || kind === "person") return [];
+  if (kind === "group") return [value];
+  if (kind === "room") return [d.rooms.find((r) => r.name === value)?.group ?? ""];
+  if (kind === "role") return [...new Set(d.rooms.filter((r) => r.role === value).map((r) => r.group))];
+  return undefined;
+}
+
+/** Walls (§7.8): a channel's members may only come from groups that open links join both ways. */
+export function wallProblems(d: WorkspaceDraft): string[] {
+  const groups = groupsInUse(d);
+  const open = (a: string, b: string) => a === b || d.links.some((l) => l.from === a && l.to === b && l.mode === "open");
+  const out: string[] = [];
+  for (const c of d.chatChannels) {
+    const spanned = new Set<string>();
+    for (const m of c.members) for (const g of memberGroups(m, d) ?? groups) spanned.add(g);
+    const list = [...spanned];
+    const bad = list.flatMap((a) => list.filter((b) => a < b && !(open(a, b) && open(b, a))).map((b) => `${a || "(no group)"} and ${b || "(no group)"}`));
+    if (bad.length) out.push(`#${c.name} spans a wall (${bad.join("; ")}); give each side its own channel.`);
+  }
+  return out;
 }
 
 /** Validation messages for a draft, keyed by section. Empty means valid. */
@@ -109,6 +198,15 @@ export function validateDraft(d: WorkspaceDraft): string[] {
   for (const l of d.links) {
     for (const g of [l.from, l.to]) if (g && !d.groups.includes(g)) errs.push(`Link uses unknown group "${g}".`);
   }
+  const names = new Set<string>();
+  for (const c of d.chatChannels) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(c.name)) errs.push(`Channel name "${c.name}" must be lower case letters, digits, - or _.`);
+    if (names.has(c.name)) errs.push(`Channel #${c.name} is defined twice.`);
+    names.add(c.name);
+    if (!c.members.length) errs.push(`Channel #${c.name} has no members.`);
+    if (c.allowedDelivery.length && !c.allowedDelivery.includes(c.defaultDelivery)) errs.push(`#${c.name}: the default delivery must be one of the allowed ones.`);
+  }
+  errs.push(...wallProblems(d));
   return errs;
 }
 

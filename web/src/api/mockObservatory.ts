@@ -5,6 +5,7 @@
 import { Hub } from "./stream";
 import type { ActivityEvent, ActivityKind, AgentAxes, EdgeKind, HandoffEdge, HeatCell, MessageEdge, MessageMeta, ObservatoryApi, ObsWindow, Report, ThroughputDay } from "./observatory";
 import type { Presence, RoomSummary } from "./types";
+import type { InboxItem } from "./channels";
 
 export interface SwarmAgent {
   name: string;
@@ -171,7 +172,7 @@ Quiet night. **3 PRs merged**, CI green on every default branch. athena opened t
  * `rooms` gives the mock's live rooms; a workspace's swarm is its rooms (the
  * demo workspace's rooms are demoSwarm).
  */
-export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryApi {
+export function createMockObservatory(rooms: () => RoomSummary[], posts: () => InboxItem[] = () => []): ObservatoryApi {
   const t0 = Date.now();
   const swarm = demoSwarm;
   const swarmOf = (ws: string): SwarmAgent[] =>
@@ -301,6 +302,13 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
       const swarm = swarmOf(ws);
       const messages = messageEdges(w, swarm);
       const handoffs = handoffEdges(w, swarm);
+      // Channel posts: poster -> #channel, scaled like the other edges.
+      const chan = new Map<string, number>();
+      for (const p of posts()) if (p.workspace === ws && p.fromKind === "agent") chan.set(`${p.from}>#${p.channel}`, (chan.get(`${p.from}>#${p.channel}`) ?? 0) + 1);
+      for (const [k, n] of chan) {
+        const [from, to] = k.split(">");
+        messages.push({ from, to, kind: "channel", count: Math.max(1, Math.round(n * 3 * windowScale[w])) });
+      }
       const activity = new Map<string, number>();
       for (const e of [...messages, ...handoffs]) {
         activity.set(e.from, (activity.get(e.from) ?? 0) + e.count);
@@ -309,6 +317,7 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
       return {
         agents: swarm.map((a) => ({ name: a.name, group: a.group, role: a.role, presence: presenceOf(ws, a.name), activity: activity.get(a.name) ?? 0 })),
         humans: [...new Set(messages.flatMap((m) => [m.from, m.to]).filter((p) => p.startsWith("@")))],
+        channels: [...new Set(messages.map((m) => m.to).filter((p) => p.startsWith("#")))],
         messages,
         handoffs,
       };

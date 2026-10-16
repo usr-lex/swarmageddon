@@ -10,6 +10,7 @@ import { ActivityTab, AgentTab, LogsTab, ResourcesTab, StorageTab } from "./tabs
 import { Lifecycle } from "./Lifecycle";
 import { TerminalView } from "@/components/TerminalView";
 import { DisplayView } from "@/components/DisplayView";
+import { QuarantineBadge, QuarantineBanner, VerdictBadge } from "@/components/Warden";
 
 export const roomTabs = ["agent", "shell", "display", "activity", "resources", "storage", "logs"] as const;
 export type RoomTab = (typeof roomTabs)[number];
@@ -63,8 +64,15 @@ export function RoomPage() {
         <div className="flex flex-wrap gap-1">
           {s.updateAvailable && <Badge tone="info">Update available</Badge>}
           {s.budgetUSD > 0 && s.spendUSD >= s.budgetUSD && <Badge tone="bad">Budget exhausted</Badge>}
+          {s.quarantined && <QuarantineBadge />}
+          {s.verdict && (
+            <Link to="/rooms/$workspace/$room" params={{ workspace, room }} search={{ tab: "activity" }}>
+              <VerdictBadge severity={s.verdict} />
+            </Link>
+          )}
         </div>
       </div>
+      <QuarantineBanner room={s} canOperate={canOperate} />
       {canOperate && <Lifecycle room={s} />}
       <Tabs.Root value={current} onValueChange={(v) => navigate({ search: { tab: v as RoomTab }, replace: true })}>
         <Tabs.List aria-label="Room" className="flex gap-1 overflow-x-auto border-b border-border">
@@ -82,7 +90,7 @@ export function RoomPage() {
           {current === "agent" && <AgentTab workspace={workspace} room={room} canOperate={canOperate} />}
           {current === "shell" && <TerminalView workspace={workspace} room={room} mode="shell" readOnly={false} />}
           {current === "display" && <DisplayView workspace={workspace} room={room} />}
-          {current === "activity" && <ActivityTab detail={detail.data} live={s} />}
+          {current === "activity" && <ActivityTab detail={detail.data} live={s} canOperate={canOperate} />}
           {current === "resources" && <ResourcesTab workspace={workspace} room={room} />}
           {current === "storage" && <StorageTab workspace={workspace} room={room} canOperate={canOperate} />}
           {current === "logs" && <LogsTab workspace={workspace} room={room} />}

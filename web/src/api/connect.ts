@@ -9,6 +9,7 @@ import { Code, ConnectError, createClient, type Transport } from "@connectrpc/co
 import { createConnectTransport } from "@connectrpc/connect-web";
 import * as pb from "@/gen/swarm/controlcenter/v1/controlcenter_pb";
 import { ApiError, type Api } from "./api";
+import { defaultStorm, defaultWarden } from "@/lib/workspace";
 import type { ActivityEvent, ActivityKind, AgentAxes, Edges, HandoffKind, MessageEdge, ObservatoryApi, ObsWindow, ThroughputDay } from "./observatory";
 import type {
   Approval,
@@ -253,6 +254,11 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     // Write-only channel settings come back empty; an empty target keeps what's stored.
     channels: p.notificationChannels.map((c) => ({ kind: c.kind as ChannelKind, target: c.kind === "ntfy" ? c.topic : "" })),
     events: p.notificationEvents as NotificationEvent[],
+    // Not in the control center's WorkspacePlan yet; edited in the wizard but not sent.
+    chatChannels: [],
+    storm: defaultStorm(),
+    warden: defaultWarden(),
+    advisors: {},
     source: p,
   };
 }
@@ -385,6 +391,7 @@ export function createConnectApi(transport: Transport = createConnectTransport({
   };
   /** Party names may be addresses (name@ws); agents of this workspace are shown by name, people as @handle. */
   const party = (p: string, workspace: string, agents: Set<string>) => {
+    if (p.startsWith("#")) return p;
     const name = p.endsWith(`@${workspace}`) ? p.slice(0, -workspace.length - 1) : p;
     return agents.has(name) ? name : `@${name.split("@")[0]}`;
   };
@@ -421,6 +428,7 @@ export function createConnectApi(transport: Transport = createConnectTransport({
       return {
         agents: rs.map((r) => ({ name: r.name, group: r.group, role: r.role, presence: roomFrom(r).presence, activity: activity.get(r.name) ?? 0 })),
         humans: [...new Set(messages.flatMap((m) => [m.from, m.to]).filter((p) => p.startsWith("@")))],
+        channels: [...new Set(messages.flatMap((m) => [m.from, m.to]).filter((p) => p.startsWith("#")))],
         messages,
         handoffs,
       };
@@ -731,6 +739,9 @@ export function createConnectApi(transport: Transport = createConnectTransport({
         case "updateNow":
           await rooms.updateRoomNow(r);
           break;
+        case "quarantine":
+        case "release":
+          throw unimplemented("Quarantine");
       }
     },
 
@@ -873,6 +884,37 @@ export function createConnectApi(transport: Transport = createConnectTransport({
     },
     async sendTestNotification(channel) {
       await notify.sendTestNotification({ channel });
+    },
+
+    // Channels and the warden are not in the control center proto yet.
+    async listChannels() {
+      throw unimplemented("Channels");
+    },
+    async readMessages() {
+      throw unimplemented("Channels");
+    },
+    async post() {
+      throw unimplemented("Channels");
+    },
+    async setDelivery() {
+      throw unimplemented("Channels");
+    },
+    async markRead() {
+      throw unimplemented("Channels");
+    },
+    // eslint-disable-next-line require-yield
+    async *watchItems() {
+      throw unimplemented("Channels");
+    },
+    async mentionCandidates(workspace) {
+      const rs = await listRooms(workspace);
+      return rs.map((r) => ({ handle: r.name, kind: "agent" as const, detail: r.role }));
+    },
+    async listVerdicts() {
+      throw unimplemented("Warden verdicts");
+    },
+    async decideVerdict() {
+      throw unimplemented("Warden verdicts");
     },
   };
   return withErrors({ ...api, observatory } as Api);

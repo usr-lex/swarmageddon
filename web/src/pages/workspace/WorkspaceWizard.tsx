@@ -7,10 +7,12 @@ import { Button, ErrorText, Spinner, cx } from "@/components/ui";
 import { emptyDraft, validateDraft } from "@/lib/workspace";
 import { AgentsStep, BasicsStep, NotifyStep, ReposStep, ResourcesStep } from "./steps";
 import { GroupsStep } from "./GroupsStep";
+import { ChannelsStep } from "./ChannelsStep";
+import { WardenStep } from "./WardenStep";
 import { ReviewStep } from "./ReviewStep";
 import { ProvisioningProgress } from "./ProvisioningProgress";
 
-const steps = ["Basics", "Agents", "Resources", "Repositories", "Groups & links", "Notifications", "Review"] as const;
+const steps = ["Basics", "Agents", "Resources", "Repositories", "Groups & links", "Channels", "Warden & advisors", "Notifications", "Review"] as const;
 type Step = (typeof steps)[number];
 
 export interface DraftProps {
@@ -93,6 +95,8 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
         {step === "Resources" && <ResourcesStep {...props} />}
         {step === "Repositories" && <ReposStep {...props} />}
         {step === "Groups & links" && <GroupsStep {...props} />}
+        {step === "Channels" && <ChannelsStep {...props} />}
+        {step === "Warden & advisors" && <WardenStep {...props} models={models.data ?? []} />}
         {step === "Notifications" && <NotifyStep {...props} />}
         {step === "Review" && (
           <ReviewStep

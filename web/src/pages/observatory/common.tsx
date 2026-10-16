@@ -59,9 +59,10 @@ export const kindColor: Record<EdgeKind, string> = {
   open: "var(--viz-neutral)",
   mediated: "var(--viz-1)",
   human: "var(--viz-2)",
+  channel: "color-mix(in srgb, var(--fg) 60%, var(--surface))",
 };
 
-export const kindLabel: Record<EdgeKind, string> = { open: "Open link", mediated: "Mediated crossing", human: "Human" };
+export const kindLabel: Record<EdgeKind, string> = { open: "Open link", mediated: "Mediated crossing", human: "Human", channel: "Channel post" };
 
 /** Status colors for presence; always shown with a label or legend. */
 export const presenceColor: Record<Presence, string> = {

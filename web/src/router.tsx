@@ -15,6 +15,7 @@ import { SpendPage } from "./pages/Spend";
 import { UsersPage } from "./pages/Users";
 import { NotificationsPage } from "./pages/Notifications";
 import { WorkspacesPage } from "./pages/Workspaces";
+import { ChannelsPage, ChannelView, type FeedScope } from "./pages/messages/ChannelsPage";
 import { HomeRedirect, ObservatoryPage } from "./pages/observatory/ObservatoryPage";
 
 export const queryClient = new QueryClient({
@@ -87,6 +88,17 @@ const conversationRoute = createRoute({
   },
 });
 
+const channelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/channels",
+  validateSearch: (s: Record<string, unknown>): { scope: FeedScope } => ({
+    scope: s.scope === "mentions" || s.scope === "all" ? s.scope : "unread",
+  }),
+  component: ChannelsPage,
+});
+
+const channelRoute = createRoute({ getParentRoute: () => rootRoute, path: "/channels/$workspace/$channel", component: ChannelView });
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   observatoryRoute,
@@ -101,6 +113,8 @@ const routeTree = rootRoute.addChildren([
   r("/approvals", () => <ApprovalsPage />),
   approvalRoute,
   r("/inbox", () => <InboxPage />),
+  channelsRoute,
+  channelRoute,
   conversationRoute,
   r("/audit", AuditPage),
   r("/spend", SpendPage),

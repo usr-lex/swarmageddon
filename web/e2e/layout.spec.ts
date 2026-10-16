@@ -3,6 +3,10 @@ import { expect, test } from "@playwright/test";
 // Every page fits the viewport width (no horizontal page scroll), in both themes.
 const pages = [
   "/w/acme",
+  "/channels",
+  "/channels/acme/general-clean",
+  "/rooms/acme/hephaestus?tab=activity",
+  "/workspaces/acme/edit",
   "/fleet",
   "/rooms/acme/athena?tab=activity",
   "/rooms/acme/athena?tab=storage",

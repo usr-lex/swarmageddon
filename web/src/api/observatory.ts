@@ -2,7 +2,7 @@
 
 import type { Presence } from "./types";
 
-export type EdgeKind = "open" | "mediated" | "human";
+export type EdgeKind = "open" | "mediated" | "human" | "channel";
 export type HandoffKind = "reviewRequested" | "assigned" | "mentioned";
 export type ObsWindow = "1h" | "24h" | "7d" | "30d";
 
@@ -35,6 +35,8 @@ export interface Edges {
   agents: ObsAgent[];
   /** People who messaged agents in the window, as "@<handle>". */
   humans: string[];
+  /** Channels posted to in the window, as "#<name>"; their edges have kind "channel". */
+  channels: string[];
   messages: MessageEdge[];
   handoffs: HandoffEdge[];
 }

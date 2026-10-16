@@ -4,15 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/api";
 import { consume } from "@/api/stream";
 import type { ChatMessage } from "@/api/types";
-import { PresenceBadge } from "@/components/Presence";
 import { useMe } from "@/components/Shell";
-import { Button, Empty, ErrorText, PageHeader, Spinner, Textarea, cx } from "@/components/ui";
+import { Button, Empty, ErrorText, Spinner, Textarea, cx } from "@/components/ui";
+import { MessagesLayout } from "./messages/MessagesLayout";
 import { ago } from "@/lib/format";
 
 /** Messages between people and agents, one conversation per agent. */
 export function InboxPage({ address }: { address?: string }) {
   const qc = useQueryClient();
-  const convs = useQuery({ queryKey: ["conversations"], queryFn: () => api().listConversations() });
   useEffect(() => {
     const ctl = new AbortController();
     void consume(
@@ -27,35 +26,9 @@ export function InboxPage({ address }: { address?: string }) {
   }, [qc]);
 
   return (
-    <div>
-      <PageHeader title="Inbox" />
-      <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
-        <nav aria-label="Conversations" className={cx(address && "hidden md:block")}>
-          {convs.isPending && <Spinner label="Loading" />}
-          <ErrorText error={convs.error} />
-          {convs.data?.length === 0 && <Empty>No agents yet.</Empty>}
-          <ul className="divide-y divide-border rounded-xs border border-border bg-surface">
-            {convs.data?.map((c) => (
-              <li key={c.address}>
-                <Link
-                  to="/inbox/$address"
-                  params={{ address: c.address }}
-                  className={cx("block min-h-12 px-3 py-2 hover:bg-surface-2", c.address === address && "bg-surface-2")}
-                  aria-current={c.address === address ? "page" : undefined}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{c.displayName}</span>
-                    <PresenceBadge presence={c.presence} />
-                  </div>
-                  <p className="truncate text-xs text-muted">{c.lastMessage ? c.lastMessage.body : c.address}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        {address ? <Conversation address={address} /> : <div className="hidden md:block"><Empty>Pick a conversation.</Empty></div>}
-      </div>
-    </div>
+    <MessagesLayout selected={address ? { kind: "direct", address } : { kind: "none" }}>
+      {address ? <Conversation address={address} /> : <Empty>Pick a conversation.</Empty>}
+    </MessagesLayout>
   );
 }
 
@@ -75,9 +48,9 @@ function Conversation({ address }: { address: string }) {
   useEffect(() => end.current?.scrollIntoView?.({ block: "end" }), [msgs.data?.length]);
   const canSend = me.data?.role !== "viewer";
   return (
-    <section aria-label={`Conversation with ${address}`} className="flex min-h-[60vh] flex-col rounded-xs border border-border bg-surface">
+    <section aria-label={`Conversation with ${address}`} className="panel flex min-h-[60vh] flex-col">
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <Link to="/inbox" className="min-h-10 content-center px-1 md:hidden" aria-label="Back to conversations">
+        <Link to="/channels" search={{ scope: "unread" }} className="min-h-10 content-center px-1 md:hidden" aria-label="Back to messages">
           ←
         </Link>
         <h2 className="font-semibold">{address}</h2>

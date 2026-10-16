@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Presence, RoomSummary } from "@/api/types";
 import { PresenceBadge, presenceInfo } from "@/components/Presence";
+import { QuarantineBadge, VerdictBadge } from "@/components/Warden";
 import { Badge, Empty, Input, Meter, PageHeader, Select, Spinner, cx } from "@/components/ui";
 import { bytes, percent, usd } from "@/lib/format";
 import { useFleet } from "@/lib/live";
@@ -136,6 +137,8 @@ function RoomCard({ r }: { r: RoomSummary }) {
         <Badge>{r.model}</Badge>
         {r.phase !== "Running" && <Badge tone={r.phase === "Failed" ? "bad" : "info"}>{r.phase}</Badge>}
         {r.updateAvailable && <Badge tone="info">Update available</Badge>}
+        {r.quarantined && <QuarantineBadge />}
+        {r.verdict && <VerdictBadge severity={r.verdict} />}
         {r.pendingApprovals > 0 && (
           <Link to="/approvals">
             <Badge tone="warn">{r.pendingApprovals} approval{r.pendingApprovals > 1 && "s"}</Badge>
@@ -187,7 +190,11 @@ function RoomTable({ rooms }: { rooms: RoomSummary[] }) {
                 <span className="block text-xs text-muted">{r.workspace}</span>
               </td>
               <td className="px-3 py-2">
-                <PresenceBadge presence={r.presence} />
+                <span className="flex flex-wrap gap-1">
+                  <PresenceBadge presence={r.presence} />
+                  {r.quarantined && <QuarantineBadge />}
+                  {r.verdict && <VerdictBadge severity={r.verdict} />}
+                </span>
               </td>
               <td className="px-3 py-2">{r.cli}</td>
               <td className="px-3 py-2">{r.model}</td>
