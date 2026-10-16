@@ -1,4 +1,4 @@
-import type { Capacity, GroupLink, RoomDraft, WorkspaceDraft, Presence, RoomSummary } from "@/api/types";
+import type { GroupLink, RoomDraft, WorkspaceDraft, Presence, RoomSummary } from "@/api/types";
 
 /** Default agent names (§8.3): Greek gods, in the order they're offered. */
 export const greekGods = [
@@ -34,19 +34,19 @@ export function pickNames(n: number, used: Iterable<string>): string[] {
 }
 
 /**
- * The default role mix for n agents (§8.3): one coordinator, one reviewer,
- * implementers for the rest, plus CI/infra and QA past five agents.
+ * The default role mix for n agents (§8.3, §8.7): one coordinator, one
+ * reviewer, implementers for the rest, a chronicler from four agents up, and
+ * CI and QA past five. The server's SuggestAgentNames is authoritative; this
+ * is the mock's copy.
  */
 export function defaultRoles(n: number): string[] {
   if (n <= 0) return [];
   if (n === 1) return ["implementer"];
   if (n === 2) return ["coordinator", "implementer"];
-  const roles = ["coordinator"];
-  const extras = n > 5 ? ["ci-infra", "qa"] : [];
-  const implementers = n - 2 - extras.length;
-  for (let i = 0; i < implementers; i++) roles.push("implementer");
-  roles.push("reviewer", ...extras);
-  return roles;
+  if (n === 3) return ["coordinator", "implementer", "reviewer"];
+  const extras = n > 5 ? ["ci", "qa"] : [];
+  const implementers = n - 3 - extras.length;
+  return ["coordinator", ...Array<string>(implementers).fill("implementer"), "reviewer", ...extras, "chronicler"];
 }
 
 export const defaultRoom = (name: string, role: string, model: string): RoomDraft => ({
@@ -63,12 +63,17 @@ export const defaultRoom = (name: string, role: string, model: string): RoomDraf
   repos: [],
 });
 
-/** Resizes the room list to n, keeping existing rooms and naming new ones from the pool. */
-export function resizeRooms(rooms: RoomDraft[], n: number, used: string[], model: string): RoomDraft[] {
+/**
+ * Resizes the room list to n, keeping existing rooms. `suggested` is
+ * SuggestAgentNames(n, current names): fresh names, and the role mix for n.
+ */
+export function resizeRooms(rooms: RoomDraft[], n: number, suggested: { names: string[]; roles: string[] }, model: string): RoomDraft[] {
   if (n <= rooms.length) return rooms.slice(0, n);
-  const roles = defaultRoles(n);
-  const names = pickNames(n - rooms.length, [...used, ...rooms.map((r) => r.name)]);
-  return [...rooms, ...names.map((name, i) => defaultRoom(name, roles[rooms.length + i] ?? "implementer", model))];
+  const added = [];
+  for (let i = rooms.length; i < n; i++) {
+    added.push(defaultRoom(suggested.names[i - rooms.length] ?? `agent-${i + 1}`, suggested.roles[i] ?? "implementer", model));
+  }
+  return [...rooms, ...added];
 }
 
 export function emptyDraft(model: string): WorkspaceDraft {
@@ -86,27 +91,6 @@ export function emptyDraft(model: string): WorkspaceDraft {
     channels: [{ kind: "webPush", target: "" }],
     events: ["approvalWaiting", "idleWithOpenWork", "ciRed", "budget", "diskLow", "roomCrashed"],
   };
-}
-
-export interface Fit {
-  fits: boolean;
-  cpu: number;
-  memoryGi: number;
-  diskGi: number;
-  /** Which resources are short. */
-  short: ("cpu" | "memory" | "disk")[];
-}
-
-/** Sums the rooms' requests and compares them with free capacity. */
-export function estimateFit(rooms: RoomDraft[], cap: Capacity): Fit {
-  const cpu = rooms.reduce((a, r) => a + r.cpu, 0);
-  const memoryGi = rooms.reduce((a, r) => a + r.memoryGi, 0);
-  const diskGi = rooms.reduce((a, r) => a + r.homeGi + r.engineGi, 0);
-  const short: Fit["short"] = [];
-  if (cpu > cap.cpu) short.push("cpu");
-  if (memoryGi > cap.memoryGi) short.push("memory");
-  if (diskGi > cap.diskGi) short.push("disk");
-  return { fits: short.length === 0, cpu, memoryGi, diskGi, short };
 }
 
 /** Validation messages for a draft, keyed by section. Empty means valid. */

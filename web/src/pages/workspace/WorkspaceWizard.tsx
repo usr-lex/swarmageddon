@@ -39,8 +39,8 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
 
   const skip = useMutation({
     mutationFn: async () => {
-      const p = await api().getPlatform();
-      return api().updatePlatform({ ...p.spec, wizardStep: "done" });
+      await api().setWizardStep("done");
+      return api().getPlatform();
     },
     onSuccess: async (p) => {
       qc.setQueryData(["platform"], p);
@@ -102,7 +102,7 @@ export function WorkspaceWizard({ existing }: { existing?: string }) {
               setApplied(draft.name);
               if (firstRun) {
                 const p = await api().getPlatform();
-                if (p.spec.wizardStep === "workspace") await api().updatePlatform({ ...p.spec, wizardStep: "done" });
+                if (p.spec.wizardStep === "workspace") await api().setWizardStep("done");
               }
               await qc.invalidateQueries({ queryKey: ["platform"] });
               await qc.invalidateQueries({ queryKey: ["me"] });

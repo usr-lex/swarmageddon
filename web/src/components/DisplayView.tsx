@@ -28,7 +28,7 @@ export function DisplayView({ workspace, room }: { workspace: string; room: stri
     let cancelled = false;
     void import("@novnc/novnc").then(({ default: RFB }) => {
       if (cancelled || !ref.current) return;
-      rfb = new RFB(ref.current, vncURL(workspace, room)) as RFBType;
+      rfb = new RFB(ref.current, vncURL(workspace, room), { wsProtocols: ["binary"] }) as RFBType;
       rfb.scaleViewport = true;
       rfb.resizeSession = false;
       rfb.viewOnly = true;

@@ -219,10 +219,10 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
   };
 
   const kindsFor: Record<string, ActivityKind[]> = {
-    coordinator: ["message", "message", "issueOpened", "comment", "issueClosed", "review"],
-    implementer: ["commit", "commit", "commit", "prOpened", "message", "ciPassed", "prMerged", "ciFailed"],
-    reviewer: ["review", "review", "review", "comment", "message", "prMerged"],
-    qa: ["issueOpened", "commit", "comment", "ciFailed", "message"],
+    coordinator: ["message", "message", "issue_opened", "comment", "issue_closed", "assigned", "review_comment"],
+    implementer: ["commit", "commit", "commit", "pr_opened", "message", "ci_passed", "pr_merged", "ci_failed", "review_requested"],
+    reviewer: ["review_approved", "review_approved", "review_changes", "review_comment", "message", "pr_merged"],
+    qa: ["issue_opened", "commit", "comment", "ci_failed", "message", "mentioned"],
     chronicler: ["message"],
   };
 
@@ -243,16 +243,24 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
       crossing: `crossed the wall to ${peer} (mediated)`,
       refusal: `message to ${peer} refused by policy`,
       commit: `pushed ${1 + Math.floor(r() * 3)} commit(s) to ${title.toLowerCase().replace(/[^a-z]+/g, "-").slice(0, 24)}`,
-      prOpened: `opened #${n} ${title}`,
-      prMerged: `merged #${n} ${title}`,
-      prClosed: `closed #${n}`,
-      review: `${r() < 0.7 ? "approved" : "requested changes on"} #${n} ${title}`,
-      issueOpened: `opened issue #${n} ${title}`,
-      issueClosed: `closed issue #${n}`,
+      human: `message to @lex`,
+      pr_opened: `opened #${n} ${title}`,
+      pr_merged: `merged #${n} ${title}`,
+      pr_closed: `closed #${n}`,
+      review_approved: `approved #${n} ${title}`,
+      review_changes: `requested changes on #${n} ${title}`,
+      review_comment: `commented in review of #${n}`,
+      issue_opened: `opened issue #${n} ${title}`,
+      issue_closed: `closed issue #${n}`,
       comment: `commented on #${n}`,
-      ciFailed: `CI failed on #${n} (tests)`,
-      ciPassed: `CI passed on #${n}`,
+      ci_failed: `CI failed on #${n} (tests)`,
+      ci_passed: `CI passed on #${n}`,
+      review_requested: `requested review from ${peer} on #${n}`,
+      assigned: `assigned #${n} to ${peer}`,
+      mentioned: `mentioned ${peer} on #${n}`,
       presence: `is now working`,
+      task: `started: ${title}`,
+      tokens: `used tokens`,
     };
     return {
       id: `E${at.toString(36)}${Math.floor(r() * 1e6).toString(36)}`,
@@ -391,13 +399,11 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
         const weekend = dow === 0 || dow === 6 ? 0.4 : 1;
         const prs: Record<string, number> = {};
         const tokens: Record<string, number> = {};
-        const spend: Record<string, number> = {};
         for (const a of swarm) {
           const builder = a.role === "implementer" ? 1 : a.role === "qa" ? 0.3 : 0.08;
           prs[a.name] = Math.round(builder * 3.2 * weekend * r() * 1.4);
           const tok = Math.round((a.role === "chronicler" ? 0.3 : 1) * weekend * (1.2e6 + r() * 2.4e6));
           tokens[a.name] = tok;
-          spend[a.name] = Math.round(tok * 6e-6 * 100) / 100;
         }
         const merged = Object.values(prs).reduce((x, y) => x + y, 0);
         out.push({
@@ -406,10 +412,10 @@ export function createMockObservatory(rooms: () => RoomSummary[]): ObservatoryAp
           reviewLatencyHours: merged ? Math.round((0.4 + r() * 2.2 + (i < 2 ? 1 : 0)) * 10) / 10 : null,
           ciFailures: Math.floor(r() * r() * 6 * weekend),
           tokens,
-          spendUSD: spend,
         });
       }
-      return out;
+      const spendUSD = Object.fromEntries(swarm.map((a) => [a.name, rooms().find((x) => x.workspace === ws && x.name === a.name)?.spendUSD ?? 0]));
+      return { days: out, spendUSD };
     },
     async latestReport(ws) {
       return getReports(ws)[0] ?? null;

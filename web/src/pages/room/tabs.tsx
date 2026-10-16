@@ -3,11 +3,11 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/api";
 import { consume } from "@/api/stream";
-import type { EngineItem, LogLine, PruneKind, RoomDetail, RoomSummary, TranscriptEntry } from "@/api/types";
+import type { EngineItem, LogComponent, PruneKind, RoomDetail, RoomSummary, TranscriptEntry } from "@/api/types";
 import { PresenceBadge } from "@/components/Presence";
 import { TerminalView } from "@/components/TerminalView";
 import { Badge, Button, Card, Checkbox, Empty, ErrorText, Meter, Select, Spinner, cx } from "@/components/ui";
-import { ago, bytes, percent, time } from "@/lib/format";
+import { ago, bytes, percent } from "@/lib/format";
 import { useApprovals } from "@/lib/live";
 
 export function AgentTab({ workspace, room, canOperate }: { workspace: string; room: string; canOperate: boolean }) {
@@ -172,6 +172,7 @@ export function ResourcesTab({ workspace, room }: { workspace: string; room: str
   const r = q.data;
   return (
     <div className="space-y-4">
+      {!r.metricsAvailable && <p className="text-sm text-warn">metrics-server isn't installed in this cluster, so CPU and memory use are unknown.</p>}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card title="CPU">
           <p className="text-sm">
@@ -185,13 +186,15 @@ export function ResourcesTab({ workspace, room }: { workspace: string; room: str
           </p>
           <Meter value={r.memoryBytes} max={r.memoryLimitBytes} label="Memory use" />
         </Card>
-        <Card title="Network">
-          <p className="text-sm">
-            ↓ {bytes(r.netRxBytesPerSec)}/s · ↑ {bytes(r.netTxBytesPerSec)}/s
-          </p>
-        </Card>
+        {r.netRxBytesPerSec !== undefined && (
+          <Card title="Network">
+            <p className="text-sm">
+              ↓ {bytes(r.netRxBytesPerSec)}/s · ↑ {bytes(r.netTxBytesPerSec ?? 0)}/s
+            </p>
+          </Card>
+        )}
       </div>
-      <Card title="Processes">
+      {r.processes && <Card title="Processes">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-muted">
@@ -216,7 +219,7 @@ export function ResourcesTab({ workspace, room }: { workspace: string; room: str
             </tbody>
           </table>
         </div>
-      </Card>
+      </Card>}
     </div>
   );
 }
@@ -316,28 +319,27 @@ function EngineList({ title, items }: { title: string; items: EngineItem[] }) {
 }
 
 export function LogsTab({ workspace, room }: { workspace: string; room: string }) {
-  const [lines, setLines] = useState<LogLine[]>([]);
-  const [component, setComponent] = useState<LogLine["component"] | "">("");
+  const [lines, setLines] = useState<string[]>([]);
+  const [component, setComponent] = useState<LogComponent | "">("");
   const [follow, setFollow] = useState(true);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setLines([]);
     const ctl = new AbortController();
     void consume(
-      (s) => api().watchLogs(workspace, room, s),
-      (l) => setLines((old) => [...old.slice(-4999), l]),
+      (s) => api().watchLogs(workspace, room, component, s),
+      (l) => setLines((old) => [...old.slice(-4999), l.text]),
       ctl.signal,
     );
     return () => ctl.abort();
-  }, [workspace, room]);
-  const shown = component ? lines.filter((l) => l.component === component) : lines;
+  }, [workspace, room, component]);
   useEffect(() => {
     if (follow && box.current) box.current.scrollTop = box.current.scrollHeight;
-  }, [shown.length, follow]);
+  }, [lines.length, follow]);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Select aria-label="Component" value={component} onChange={(e) => setComponent(e.target.value as LogLine["component"] | "")} className="w-auto">
+        <Select aria-label="Component" value={component} onChange={(e) => setComponent(e.target.value as LogComponent | "")} className="w-auto">
           <option value="">All components</option>
           <option value="supervisor">supervisor</option>
           <option value="cli">CLI</option>
@@ -347,12 +349,10 @@ export function LogsTab({ workspace, room }: { workspace: string; room: string }
         <Checkbox label="Follow" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
       </div>
       <div ref={box} role="log" aria-label="Logs" className="h-[60vh] min-h-64 overflow-auto rounded-xs border border-border bg-surface-2 p-2 font-mono text-xs">
-        {shown.length === 0 && <Empty>No log lines yet.</Empty>}
-        {shown.map((l, i) => (
+        {lines.length === 0 && <Empty>No log lines yet.</Empty>}
+        {lines.map((l, i) => (
           <div key={i} className="whitespace-pre-wrap break-all">
-            <span className="text-muted">{time(l.at)} </span>
-            <span className="text-info">[{l.component}] </span>
-            {l.text}
+            {l}
           </div>
         ))}
       </div>

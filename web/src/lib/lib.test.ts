@@ -9,7 +9,7 @@ import { applyApprovalEvent, applyFleetEvent } from "./live";
 import { serviceProgress } from "./platform";
 import { urlBase64ToUint8Array } from "./push";
 import { groupSpend } from "./spend";
-import { defaultRoles, defaultRoom, emptyDraft, estimateFit, pickNames, reachability, resizeRooms, sortFleet, validateDraft } from "./workspace";
+import { defaultRoles, defaultRoom, emptyDraft, pickNames, reachability, resizeRooms, sortFleet, validateDraft } from "./workspace";
 
 const room = (name: string, presence: RoomSummary["presence"], workspace = "acme"): RoomSummary => ({
   workspace,
@@ -42,17 +42,16 @@ describe("names and roles", () => {
   it("builds the default role mix", () => {
     expect(defaultRoles(1)).toEqual(["implementer"]);
     expect(defaultRoles(3)).toEqual(["coordinator", "implementer", "reviewer"]);
-    expect(defaultRoles(5)).toEqual(["coordinator", "implementer", "implementer", "implementer", "reviewer"]);
+    expect(defaultRoles(4)).toEqual(["coordinator", "implementer", "reviewer", "chronicler"]);
     const six = defaultRoles(6);
     expect(six).toHaveLength(6);
-    expect(six).toContain("ci-infra");
-    expect(six).toContain("qa");
+    expect(six).toEqual(expect.arrayContaining(["ci", "qa", "chronicler"]));
   });
 
   it("resizes rooms keeping existing ones", () => {
-    const r = resizeRooms([defaultRoom("zeus", "coordinator", "m")], 3, ["athena"], "m");
-    expect(r.map((x) => x.name)).toEqual(["zeus", "hermes", "metis"]);
-    expect(resizeRooms(r, 1, [], "m").map((x) => x.name)).toEqual(["zeus"]);
+    const r = resizeRooms([defaultRoom("zeus", "coordinator", "m")], 3, { names: ["hermes", "metis"], roles: ["coordinator", "implementer", "reviewer"] }, "m");
+    expect(r.map((x) => `${x.name}:${x.role}`)).toEqual(["zeus:coordinator", "hermes:implementer", "metis:reviewer"]);
+    expect(resizeRooms(r, 1, { names: [], roles: [] }, "m").map((x) => x.name)).toEqual(["zeus"]);
   });
 });
 
@@ -69,13 +68,6 @@ describe("drafts", () => {
     expect(errs.join("\n")).toMatch(/DNS label/);
     expect(errs.join("\n")).toMatch(/used twice/);
     expect(errs.join("\n")).toMatch(/unknown group "ghost"/);
-  });
-
-  it("estimates fit", () => {
-    const f = estimateFit(draft().rooms, { cpu: 3, memoryGi: 100, diskGi: 1000, roomEstimate: 1 });
-    expect(f.fits).toBe(false);
-    expect(f.short).toEqual(["cpu"]);
-    expect(f.diskGi).toBe(180);
   });
 
   it("computes reachability with mediated links", () => {
@@ -166,14 +158,22 @@ describe("helpers", () => {
   });
 
   it("groups spend", () => {
-    const rows = [
-      { workspace: "w", room: "a", model: "m1", usd: 2, budgetUSD: 10, inputTokens: 1, outputTokens: 1 },
-      { workspace: "w", room: "b", model: "m1", usd: 3, budgetUSD: 10, inputTokens: 1, outputTokens: 1 },
-      { workspace: "v", room: "c", model: "m2", usd: 1, budgetUSD: 0, inputTokens: 1, outputTokens: 1 },
-    ];
-    expect(groupSpend(rows, "workspace").map((g) => [g.key, g.usd, g.budgetUSD])).toEqual([["w", 5, 20], ["v", 1, 0]]);
-    expect(groupSpend(rows, "model")[0]).toMatchObject({ key: "m1", usd: 5, budgetUSD: 0 });
-    expect(groupSpend(rows, "room")[0].key).toBe("b@w");
+    const r = {
+      available: true,
+      updatedAt: "",
+      rooms: [
+        { workspace: "w", room: "a", usd: 2, budgetUSD: 10, exhausted: false },
+        { workspace: "w", room: "b", usd: 3, budgetUSD: 10, exhausted: false },
+        { workspace: "v", room: "c", usd: 1, budgetUSD: 0, exhausted: false },
+      ],
+      workspaces: [
+        { workspace: "w", usd: 5, models: [{ model: "m1", usd: 5 }] },
+        { workspace: "v", usd: 1, models: [{ model: "m1", usd: 0.5 }, { model: "m2", usd: 0.5 }] },
+      ],
+    };
+    expect(groupSpend(r, "workspace").map((g) => [g.key, g.usd, g.budgetUSD])).toEqual([["w", 5, 20], ["v", 1, 0]]);
+    expect(groupSpend(r, "model")[0]).toMatchObject({ key: "m1", usd: 5.5, budgetUSD: 0 });
+    expect(groupSpend(r, "room")[0].key).toBe("b@w");
   });
 
   it("decodes VAPID keys", () => {
@@ -188,6 +188,7 @@ describe("helpers", () => {
   });
 
   it("builds provider login URLs", () => {
-    expect(providerLoginURL({ kind: "oidc", name: "keycloak" }, "/wizard", true)).toBe("/auth/oidc/keycloak/login?next=%2Fwizard&test=1");
+    expect(providerLoginURL({ kind: "oidc", name: "keycloak" }, "/wizard")).toBe("/auth/oidc/keycloak/login?return=%2Fwizard");
+    expect(providerLoginURL({ kind: "saml", name: "x", loginURL: "/auth/saml/x/login" })).toBe("/auth/saml/x/login?return=%2F");
   });
 });

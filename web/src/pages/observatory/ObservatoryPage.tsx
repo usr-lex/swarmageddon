@@ -37,7 +37,7 @@ export function ObservatoryPage() {
 
   const groupOf = useMemo(() => new Map(edges.data?.agents.map((a) => [a.name, a.group]) ?? []), [edges.data]);
   const groups = useMemo(() => [...new Set(edges.data?.agents.map((a) => a.group))].sort(), [edges.data]);
-  const today = tp.data?.[tp.data.length - 1];
+  const today = tp.data?.days[tp.data.days.length - 1];
   const sum = (r?: Record<string, number>) => Object.values(r ?? {}).reduce((a, b) => a + b, 0);
   const ws = rooms?.filter((r) => r.workspace === workspace) ?? [];
   const waiting = ws.filter((r) => r.presence === "waitingOnHuman").length;
@@ -69,7 +69,7 @@ export function ObservatoryPage() {
         <Stat label="Waiting on you" value={waiting} alert={waiting > 0} to="/approvals" />
         <Stat label="PRs merged today" value={today ? sum(today.prsMerged) : "–"} />
         <Stat label="CI failures today" value={today ? today.ciFailures : "–"} alert={!!today?.ciFailures} />
-        <Stat label="Spend today" value={today ? usd(sum(today.spendUSD)) : "–"} />
+        <Stat label="Spend this period" value={tp.data ? usd(sum(tp.data.spendUSD)) : "–"} />
       </dl>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -86,7 +86,7 @@ export function ObservatoryPage() {
           <ForceGraph edges={edges.data} />
         </Panel>
         <Panel id="panel-throughput" label="Throughput" meta={`${TP_DAYS} days`} className="lg:col-span-7">
-          <Throughput days={tp.data} groupOf={groupOf} groups={groups} />
+          <Throughput days={tp.data?.days} groupOf={groupOf} groups={groups} />
         </Panel>
         <Panel id="panel-timeline" label="Timeline" meta="live" className="lg:col-span-5">
           <Timeline workspace={workspace} agents={[...groupOf.keys()].sort()} />

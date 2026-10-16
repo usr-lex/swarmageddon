@@ -4,7 +4,6 @@ import { line } from "d3-shape";
 import { useState, type ReactNode } from "react";
 import type { ThroughputDay } from "@/api/observatory";
 import { Spinner } from "@/components/ui";
-import { usd } from "@/lib/format";
 import { Legend, LegendItem, TipRow, useTip, useWidth } from "./common";
 
 interface Props {
@@ -42,7 +41,7 @@ export function Throughput({ days, groupOf, groups }: Props) {
         <TipRow value={sum(d.prsMerged)} label="PRs merged" color="var(--viz-1)" />
         <TipRow value={d.reviewLatencyHours ?? "–"} label="h median review latency" color="var(--fg)" />
         <TipRow value={d.ciFailures} label="CI failures" color="var(--alert)" />
-        <TipRow value={`${(sum(d.tokens) / 1e6).toFixed(1)}M`} label={`tokens · ${usd(sum(d.spendUSD))}`} color="var(--viz-1)" />
+        <TipRow value={`${(sum(d.tokens) / 1e6).toFixed(1)}M`} label="tokens" color="var(--viz-1)" />
       </>,
     );
   };

@@ -64,18 +64,20 @@ describe("mock API", () => {
       sessionStorage.clear();
       const api = createMockApi("1");
       await expect(api.me()).rejects.toThrow(/Sign in/);
-      const p1 = expect(api.claimSetup("nope")).rejects.toThrow(/not right/);
+      const admin = { username: "a", email: "a@x", password: "long enough password" };
+      const p1 = expect(api.claimAdmin("nope", admin)).rejects.toThrow(/not right/);
       await vi.advanceTimersByTimeAsync(100);
       await p1;
-      const p2 = api.claimSetup(MOCK_SETUP_TOKEN.toLowerCase());
+      const p2 = expect(api.claimAdmin(MOCK_SETUP_TOKEN, { ...admin, password: "short" })).rejects.toThrow(/12/);
       await vi.advanceTimersByTimeAsync(100);
-      const { claim } = await p2;
-      await expect(api.createLocalAdmin(claim, { username: "a", email: "a@x", password: "short" })).rejects.toThrow(/12/);
-      await api.createLocalAdmin(claim, { username: "a", email: "a@x", password: "long enough password" });
+      await p2;
+      const p3 = api.claimAdmin(MOCK_SETUP_TOKEN.toLowerCase(), admin);
+      await vi.advanceTimersByTimeAsync(100);
+      await p3;
       expect((await api.me()).role).toBe("admin");
 
       const draft = { ...emptyDraft("m"), name: "acme", org: "acme", rooms: [defaultRoom("athena", "implementer", "m")] };
-      expect((await api.planWorkspace(draft)).map((c) => `${c.op} ${c.kind}`)).toContain("create Room");
+      expect((await api.planWorkspace(draft)).changes.map((c) => `${c.op} ${c.kind}`)).toContain("create Room");
       await api.applyWorkspace(draft);
       await vi.advanceTimersByTimeAsync(2000);
       const approvals = await api.listApprovals();
@@ -83,7 +85,7 @@ describe("mock API", () => {
       await api.answerApproval(approvals[0].id, "allow", "");
       expect(await api.listApprovals()).toHaveLength(0);
       const plan = await api.planWorkspace(draft);
-      expect(plan.every((c) => c.op === "unchanged")).toBe(true);
+      expect(plan.changes.every((c) => c.op === "unchanged")).toBe(true);
     } finally {
       vi.useRealTimers();
     }

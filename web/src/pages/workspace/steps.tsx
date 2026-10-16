@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 import { notificationEvents, type ChannelKind, type CLI, type RepositoryDraft, type RoomDraft } from "@/api/types";
 import { Badge, Button, Card, Checkbox, Field, Input, Select } from "@/components/ui";
-import { defaultRoles, estimateFit, resizeRooms, roomNamePattern } from "@/lib/workspace";
+import { resizeRooms, roomNamePattern } from "@/lib/workspace";
 import type { DraftProps } from "./WorkspaceWizard";
 
 const dnsLabel = roomNamePattern.source.slice(1, -1);
@@ -47,16 +47,19 @@ export function BasicsStep({ draft, set, existing, models }: DraftProps & { mode
   );
 }
 
-export function AgentsStep({ draft, set, existing, models }: DraftProps & { models: string[] }) {
-  const used = useQuery({ queryKey: ["usedNames"], queryFn: () => api().usedRoomNames() });
+export function AgentsStep({ draft, set, models }: DraftProps & { models: string[] }) {
   const templates = useQuery({ queryKey: ["roleTemplates"], queryFn: () => api().listRoleTemplates() });
-  // Names are unique across the platform; an existing workspace's own names are fine.
-  const taken = existing ? [] : (used.data ?? []);
   const setRoom = (i: number, patch: Partial<RoomDraft>) => set({ ...draft, rooms: draft.rooms.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
-  const resize = (n: number) => set({ ...draft, rooms: resizeRooms(draft.rooms, Math.max(0, Math.min(50, n)), used.data ?? [], draft.defaultModel) });
-  const resetRoles = () => {
-    const roles = defaultRoles(draft.rooms.length);
-    set({ ...draft, rooms: draft.rooms.map((r, i) => ({ ...r, role: roles[i] })) });
+  // Names come from the server's pool, skipping names used anywhere on the platform.
+  const suggest = useMutation({ mutationFn: (n: number) => api().suggestAgentNames(n, draft.rooms.map((r) => r.name)) });
+  const resize = async (n: number) => {
+    n = Math.max(0, Math.min(50, n));
+    const s = n > draft.rooms.length ? await suggest.mutateAsync(n) : { names: [], roles: [] };
+    set({ ...draft, rooms: resizeRooms(draft.rooms, n, s, draft.defaultModel) });
+  };
+  const resetRoles = async () => {
+    const { roles } = await suggest.mutateAsync(draft.rooms.length);
+    set({ ...draft, rooms: draft.rooms.map((r, i) => ({ ...r, role: roles[i] ?? r.role })) });
   };
   const setAllCLI = (cli: CLI) => set({ ...draft, rooms: draft.rooms.map((r) => ({ ...r, cli })) });
   return (
@@ -76,11 +79,7 @@ export function AgentsStep({ draft, set, existing, models }: DraftProps & { mode
       {draft.rooms.length === 0 && <p className="text-sm text-muted">Choose how many agents this workspace has. Names come from a pool of Greek gods; change any of them.</p>}
       <ul className="space-y-3" aria-label="Agents">
         {draft.rooms.map((r, i) => {
-          const clash = taken.includes(r.name)
-            ? "Already used on this platform."
-            : draft.rooms.findIndex((x) => x.name === r.name) !== i
-              ? "Used twice."
-              : undefined;
+          const clash = draft.rooms.findIndex((x) => x.name === r.name) !== i ? "Used twice." : undefined;
           return (
             <li key={i} className="grid gap-2 rounded-xs border border-border p-3 sm:grid-cols-6" data-testid="agent-row">
               <Field label="Name" error={clash}>
@@ -137,10 +136,10 @@ export function AgentsStep({ draft, set, existing, models }: DraftProps & { mode
 }
 
 export function ResourcesStep({ draft, set }: DraftProps) {
-  const cap = useQuery({ queryKey: ["capacity"], queryFn: () => api().capacity() });
+  // The server's preview says whether the rooms fit (from preflight's capacity).
+  const plan = useQuery({ queryKey: ["plan", draft], queryFn: () => api().planWorkspace(draft), placeholderData: (p) => p, enabled: draft.rooms.length > 0 });
   const setRoom = (i: number, patch: Partial<RoomDraft>) => set({ ...draft, rooms: draft.rooms.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
   const setAll = (patch: Partial<RoomDraft>) => set({ ...draft, rooms: draft.rooms.map((r) => ({ ...r, ...patch })) });
-  const fit = cap.data && estimateFit(draft.rooms, cap.data);
   const num = (v: string) => Math.max(0, Number(v));
   const cols: [keyof RoomDraft, string, number][] = [
     ["cpu", "CPU", 0.5],
@@ -150,15 +149,9 @@ export function ResourcesStep({ draft, set }: DraftProps) {
   ];
   return (
     <div className="space-y-4">
-      {fit && cap.data && (
-        <div
-          role="status"
-          data-testid="fit"
-          className={`rounded-xs border p-3 text-sm ${fit.fits ? "border-ok/40 bg-ok/10" : "border-bad/40 bg-bad/10"}`}
-        >
-          <Badge tone={fit.fits ? "ok" : "bad"}>{fit.fits ? "Fits" : "Doesn't fit"}</Badge>{" "}
-          {fit.cpu} of {cap.data.cpu} CPU, {fit.memoryGi} of {cap.data.memoryGi} GiB memory, {fit.diskGi} of {cap.data.diskGi} GiB disk.
-          {!fit.fits && <> Short on {fit.short.join(", ")}.</>}
+      {plan.data && (
+        <div role="status" data-testid="fit" className={`border p-3 text-sm ${plan.data.fits ? "border-ok/40 bg-ok/10" : "border-alert/50 bg-alert/10"}`}>
+          <Badge tone={plan.data.fits ? "ok" : "alert"}>{plan.data.fits ? "Fits" : "Doesn't fit"}</Badge> {plan.data.fitNote}
         </div>
       )}
       <Card

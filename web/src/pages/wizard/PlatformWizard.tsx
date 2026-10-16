@@ -36,9 +36,17 @@ export function PlatformWizard() {
     if (!step && saved) setStep(saved === "done" ? "preflight" : saved);
   }, [saved, step]);
 
+  // Each step saves its own part of the Platform, then the wizard's step moves forward.
   const m = useMutation({
-    mutationFn: async (v: { spec: PlatformSpec; next?: WizardStep; secrets?: PlatformSecrets }) =>
-      api().updatePlatform(v.next ? { ...v.spec, wizardStep: furthest(v.spec.wizardStep, v.next) } : v.spec, v.secrets),
+    mutationFn: async (v: { step: WizardStep; spec: PlatformSpec; next?: WizardStep; secrets?: PlatformSecrets }) => {
+      const a = api();
+      if (v.step === "preflight") await a.updateIsolation(v.spec.isolationTier, v.spec.privilegedAccepted);
+      else if (v.step === "signin") await a.updateSignIn(v.spec, v.secrets);
+      else if (v.step === "services") await a.updateServices(v.spec, v.secrets);
+      else if (v.step === "hostname") await a.updateHostname(v.spec);
+      if (v.next) await a.setWizardStep(furthest(v.spec.wizardStep, v.next));
+      return a.getPlatform();
+    },
     onSuccess: async (p, v) => {
       qc.setQueryData(["platform"], p);
       if (v.next === "workspace") await navigate({ to: "/workspaces/new" });
@@ -51,7 +59,7 @@ export function PlatformWizard() {
   const props: StepProps = {
     platform: platform.data,
     save: async (spec, next, secrets) => {
-      await m.mutateAsync({ spec, next, secrets });
+      await m.mutateAsync({ step, spec, next, secrets });
     },
     saving: m.isPending,
   };

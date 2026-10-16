@@ -4,30 +4,32 @@ import type {
   AuditEntry,
   AuditFilter,
   AuthProvider,
-  Capacity,
   ChatMessage,
   Conversation,
   Decision,
   FleetEvent,
+  IsolationTier,
+  LogComponent,
   LogLine,
   Me,
   NotificationPrefs,
   Platform,
   PlatformSecrets,
   PlatformSpec,
-  PlanChange,
+  PlanResult,
   PruneKind,
   Resources,
+  Role,
   RoleTemplate,
   RoomAction,
   RoomDetail,
   RoomProgress,
   SetupState,
-  SpendRow,
+  SpendReport,
   Storage,
   TranscriptEntry,
   User,
-  Role,
+  WizardStep,
   WorkspaceDraft,
   WorkspaceSummary,
 } from "./types";
@@ -36,7 +38,7 @@ import type { ObservatoryApi } from "./observatory";
 /** Error with a Connect-like code, so pages can react to "unauthenticated". */
 export class ApiError extends Error {
   constructor(
-    public code: "unauthenticated" | "permission_denied" | "invalid_argument" | "not_found" | "resource_exhausted" | "unknown",
+    public code: "unauthenticated" | "permission_denied" | "invalid_argument" | "not_found" | "resource_exhausted" | "unimplemented" | "unknown",
     message: string,
   ) {
     super(message);
@@ -44,8 +46,8 @@ export class ApiError extends Error {
 }
 
 /**
- * Everything the UI asks of the control center. Streams are async iterables
- * that end when the signal aborts.
+ * Everything the UI asks of the control center (proto/swarm/controlcenter/v1).
+ * Streams are async iterables that end when the signal aborts.
  */
 export interface Api {
   /** The workspace home page (§8.7). */
@@ -53,11 +55,11 @@ export interface Api {
 
   // Setup (§3.3)
   getSetupState(): Promise<SetupState>;
-  /** Checks the setup token; returns a short-lived claim the next call needs. */
-  claimSetup(token: string): Promise<{ claim: string }>;
-  createLocalAdmin(claim: string, admin: { username: string; email: string; password: string }): Promise<void>;
-  /** Skip the local admin and configure an IdP first (the claim keeps the wizard's sign-in step open). */
-  continueWithIdP(claim: string): Promise<void>;
+  /**
+   * Checks the setup token and creates the local admin; with admin null, signs
+   * the browser in as a temporary admin to set up OIDC or SAML first.
+   */
+  claimAdmin(token: string, admin: { username: string; email: string; password: string } | null): Promise<void>;
 
   // Auth (§8.1)
   me(): Promise<Me>;
@@ -65,10 +67,14 @@ export interface Api {
   loginLocal(username: string, password: string): Promise<void>;
   logout(): Promise<void>;
 
-  // Platform (§3.4)
+  // Platform (§3.4). Each update sends only its part of the spec.
   getPlatform(): Promise<Platform>;
   watchPlatform(signal: AbortSignal): AsyncIterable<Platform>;
-  updatePlatform(spec: PlatformSpec, secrets?: PlatformSecrets): Promise<Platform>;
+  updateIsolation(tier: IsolationTier, privilegedAccepted: boolean): Promise<Platform>;
+  updateSignIn(spec: PlatformSpec, secrets?: PlatformSecrets): Promise<Platform>;
+  updateServices(spec: PlatformSpec, secrets?: PlatformSecrets): Promise<Platform>;
+  updateHostname(spec: PlatformSpec): Promise<Platform>;
+  setWizardStep(step: WizardStep): Promise<void>;
   rerunPreflight(): Promise<void>;
 
   // Workspaces (§8.3)
@@ -76,10 +82,9 @@ export interface Api {
   getWorkspaceDraft(name: string): Promise<WorkspaceDraft>;
   listRoleTemplates(): Promise<RoleTemplate[]>;
   listModels(): Promise<string[]>;
-  /** Room names used anywhere on the platform. */
-  usedRoomNames(): Promise<string[]>;
-  capacity(): Promise<Capacity>;
-  planWorkspace(draft: WorkspaceDraft): Promise<PlanChange[]>;
+  /** Names from the default pool not used anywhere, and the default role mix for that many. */
+  suggestAgentNames(count: number, exclude: string[]): Promise<{ names: string[]; roles: string[] }>;
+  planWorkspace(draft: WorkspaceDraft): Promise<PlanResult>;
   applyWorkspace(draft: WorkspaceDraft): Promise<void>;
   watchProvisioning(workspace: string, signal: AbortSignal): AsyncIterable<RoomProgress[]>;
 
@@ -87,7 +92,7 @@ export interface Api {
   watchFleet(signal: AbortSignal): AsyncIterable<FleetEvent>;
   getRoom(workspace: string, room: string): Promise<RoomDetail>;
   watchTranscript(workspace: string, room: string, signal: AbortSignal): AsyncIterable<TranscriptEntry>;
-  watchLogs(workspace: string, room: string, signal: AbortSignal): AsyncIterable<LogLine>;
+  watchLogs(workspace: string, room: string, component: LogComponent | "", signal: AbortSignal): AsyncIterable<LogLine>;
   getResources(workspace: string, room: string): Promise<Resources>;
   getStorage(workspace: string, room: string): Promise<Storage>;
   prune(workspace: string, room: string, kind: PruneKind): Promise<{ reclaimedBytes: number }>;
@@ -107,12 +112,13 @@ export interface Api {
 
   // Audit, spend, users, notifications
   queryAudit(filter: AuditFilter): Promise<AuditEntry[]>;
-  getSpend(period: "month" | "week" | "day"): Promise<SpendRow[]>;
+  getSpend(): Promise<SpendReport>;
   listUsers(): Promise<User[]>;
-  updateUser(handle: string, role: Role, workspaces: string[]): Promise<void>;
+  updateUser(id: string, change: { role?: Role; workspaces?: string[]; disabled?: boolean }): Promise<void>;
   getVapidPublicKey(): Promise<string>;
   subscribePush(sub: PushSubscriptionJSON): Promise<void>;
   unsubscribePush(endpoint: string): Promise<void>;
   getNotificationPrefs(): Promise<NotificationPrefs>;
   setNotificationPrefs(p: NotificationPrefs): Promise<void>;
+  sendTestNotification(channel: string): Promise<void>;
 }

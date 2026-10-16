@@ -133,28 +133,35 @@ export function NowTable({ workspace, rows }: { workspace: string; rows?: NowRow
 }
 
 export const kindGroups: { id: string; label: string; kinds: ActivityKind[] }[] = [
-  { id: "code", label: "Code", kinds: ["commit", "prOpened", "prMerged", "prClosed"] },
-  { id: "review", label: "Review", kinds: ["review", "comment"] },
-  { id: "issues", label: "Issues", kinds: ["issueOpened", "issueClosed"] },
-  { id: "messages", label: "Messages", kinds: ["message", "crossing", "refusal"] },
-  { id: "ci", label: "CI", kinds: ["ciFailed", "ciPassed"] },
+  { id: "code", label: "Code", kinds: ["commit", "pr_opened", "pr_merged", "pr_closed"] },
+  { id: "review", label: "Review", kinds: ["review_approved", "review_changes", "review_comment", "comment", "review_requested"] },
+  { id: "issues", label: "Issues", kinds: ["issue_opened", "issue_closed", "assigned", "mentioned"] },
+  { id: "messages", label: "Messages", kinds: ["message", "human", "crossing", "refusal"] },
+  { id: "ci", label: "CI", kinds: ["ci_failed", "ci_passed"] },
 ];
 
 const kindGlyph: Partial<Record<ActivityKind, string>> = {
   commit: "●",
-  prOpened: "◇",
-  prMerged: "◆",
-  prClosed: "◌",
-  review: "✓",
+  pr_opened: "◇",
+  pr_merged: "◆",
+  pr_closed: "◌",
+  review_approved: "✓",
+  review_changes: "±",
+  review_comment: "¶",
+  review_requested: "↻",
+  assigned: "▸",
+  mentioned: "@",
   comment: "¶",
-  issueOpened: "○",
-  issueClosed: "⊘",
+  issue_opened: "○",
+  issue_closed: "⊘",
   message: "→",
+  human: "⇄",
   crossing: "⇢",
   refusal: "⨯",
-  ciFailed: "✕",
-  ciPassed: "✓",
+  ci_failed: "✕",
+  ci_passed: "✓",
   presence: "·",
+  task: "▹",
 };
 
 /** Timeline (§8.7): a merged, filterable, live feed. */
@@ -209,7 +216,7 @@ export function Timeline({ workspace, agents }: { workspace: string; agents: str
             <time dateTime={e.at} className="text-muted tabular-nums">
               {new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
             </time>
-            <span aria-hidden className={cx(e.kind === "ciFailed" || e.kind === "refusal" ? "text-alert" : e.kind === "crossing" ? "text-viz-1" : "text-muted")}>
+            <span aria-hidden className={cx(e.kind === "ci_failed" || e.kind === "refusal" ? "text-alert" : e.kind === "crossing" ? "text-viz-1" : "text-muted")}>
               {kindGlyph[e.kind] ?? "·"}
             </span>
             <span className="truncate">{e.actor}</span>

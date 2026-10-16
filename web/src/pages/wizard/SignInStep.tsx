@@ -4,8 +4,17 @@ import { Button, Card, Checkbox, Field, Input, Select, Textarea } from "@/compon
 import { providerLoginURL } from "@/lib/auth";
 import type { StepProps } from "./PlatformWizard";
 
-const newOIDC = (): OIDCProvider => ({ name: "", displayName: "", issuer: "", clientID: "", groupsClaim: "groups", scopes: ["openid", "email", "profile"] });
-const newSAML = (): SAMLProvider => ({ name: "", displayName: "", metadataURL: "", metadataXML: "", groupsAttribute: "groups" });
+const newOIDC = (): OIDCProvider => ({
+  name: "",
+  displayName: "",
+  issuer: "",
+  clientID: "",
+  groupsClaim: "groups",
+  scopes: ["openid", "email", "profile"],
+  clientSecretSet: false,
+  redirectURL: "",
+});
+const newSAML = (): SAMLProvider => ({ name: "", displayName: "", metadataURL: "", metadataXML: "", groupsAttribute: "groups", spMetadataURL: "", acsURL: "" });
 
 function update<T>(list: T[], i: number, patch: Partial<T>): T[] {
   return list.map((x, j) => (j === i ? { ...x, ...patch } : x));
@@ -38,7 +47,8 @@ export function SignInStep({ platform, save, saving }: StepProps) {
 
   const test = async (kind: "oidc" | "saml", name: string) => {
     await save(next, undefined, secretsToSave);
-    window.open(providerLoginURL({ kind, name }, "/wizard", true), "_blank", "noopener");
+    // A sign-in in a new tab: if it lands back on the wizard signed in, the provider works.
+    window.open(providerLoginURL({ kind, name }, "/wizard"), "_blank", "noopener");
   };
 
   return (
@@ -70,7 +80,7 @@ export function SignInStep({ platform, save, saving }: StepProps) {
               {(id) => <Input id={id} type="url" value={p.issuer} required onChange={(e) => setOIDC(update(oidc, i, { issuer: e.target.value }))} />}
             </Field>
             <Field label="Client ID">{(id) => <Input id={id} value={p.clientID} required onChange={(e) => setOIDC(update(oidc, i, { clientID: e.target.value }))} />}</Field>
-            <Field label="Client secret" hint="Stored in a Secret; leave empty to keep the current one.">
+            <Field label="Client secret" hint={p.clientSecretSet ? "A secret is stored; leave empty to keep it." : "Stored in a Secret, never shown again."}>
               {(id, d) => (
                 <Input id={id} aria-describedby={d} type="password" autoComplete="off" value={secrets[p.name] ?? ""} onChange={(e) => setSecrets({ ...secrets, [p.name]: e.target.value })} />
               )}
@@ -82,7 +92,7 @@ export function SignInStep({ platform, save, saving }: StepProps) {
               )}
             </Field>
             <p className="text-xs text-muted sm:col-span-2">
-              Redirect URI to register: <code>{`${location.origin}/auth/oidc/${p.name || "<name>"}/callback`}</code>
+              Redirect URI to register: <code className="break-all">{p.redirectURL || `${location.origin}/auth/oidc/${p.name || "<name>"}/callback`}</code>
             </p>
             <div className="flex gap-2 sm:col-span-2">
               <Button disabled={!p.name || !p.issuer} onClick={() => test("oidc", p.name)}>
@@ -97,14 +107,6 @@ export function SignInStep({ platform, save, saving }: StepProps) {
       </Card>
 
       <Card title="SAML providers" actions={<Button onClick={() => setSAML([...saml, newSAML()])}>Add SAML provider</Button>}>
-        {saml.length > 0 && (
-          <p className="mb-3 text-sm">
-            Our service provider metadata, to give your IdP:{" "}
-            <a className="text-accent underline" href={platform.spMetadataURL} target="_blank" rel="noreferrer">
-              {new URL(platform.spMetadataURL, location.origin).href}
-            </a>
-          </p>
-        )}
         {saml.map((p, i) => (
           <fieldset key={i} className="mb-4 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
             <legend className="px-1 text-sm font-medium">SAML provider {i + 1}</legend>
@@ -117,6 +119,10 @@ export function SignInStep({ platform, save, saving }: StepProps) {
               {(id) => <Textarea id={id} rows={4} value={p.metadataXML} onChange={(e) => setSAML(update(saml, i, { metadataXML: e.target.value }))} />}
             </Field>
             <Field label="Groups attribute">{(id) => <Input id={id} value={p.groupsAttribute} onChange={(e) => setSAML(update(saml, i, { groupsAttribute: e.target.value }))} />}</Field>
+            <p className="text-xs text-muted sm:col-span-2">
+              Our SP metadata for the IdP:{" "}
+              <code className="break-all">{p.spMetadataURL || `${location.origin}/auth/saml/${p.name || "<name>"}/metadata`}</code>
+            </p>
             <div className="flex items-end gap-2">
               <Button disabled={!p.name || !(p.metadataURL || p.metadataXML)} onClick={() => test("saml", p.name)}>
                 Test sign-in

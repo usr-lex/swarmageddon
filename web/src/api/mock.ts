@@ -11,7 +11,6 @@ import type {
   ChatMessage,
   Condition,
   FleetEvent,
-  LogLine,
   Me,
   NotificationPrefs,
   Platform,
@@ -24,7 +23,7 @@ import type {
   User,
   WorkspaceDraft,
 } from "./types";
-import { defaultRoom } from "@/lib/workspace";
+import { defaultRoles, defaultRoom, pickNames } from "@/lib/workspace";
 import { createMockObservatory, demoLinks, demoSwarm } from "./mockObservatory";
 
 export const MOCK_SETUP_TOKEN = "MOCKTOKENMOCKTOKENMOCKTOKENMOCKTO";
@@ -34,7 +33,6 @@ const GiB = 1024 ** 3;
 interface State {
   adminClaimed: boolean;
   admin?: { username: string; email: string; password: string };
-  claims: string[];
   me: Me | null;
   platform: Platform;
   serviceTicks: number;
@@ -72,6 +70,7 @@ function freshPlatform(): Platform {
     hostname: "",
     tlsMode: "selfSigned",
     issuerName: "",
+    issuerKind: "",
     isolationTier: "auto",
     privilegedAccepted: false,
     localDisabled: false,
@@ -86,6 +85,7 @@ function freshPlatform(): Platform {
       messagingReplicas: 1,
       messagingStorage: "10Gi",
       registryCacheStorage: "100Gi",
+      registryUpstreams: ["docker.io"],
       ntfyEnabled: false,
       ntfyStorage: "5Gi",
       providers: [],
@@ -134,14 +134,12 @@ function freshPlatform(): Platform {
     },
     conditions: [{ type: "PreflightDone", status: "True", reason: "Completed", message: "" }],
     versions: { operator: "0.1.0", roomImage: "0.1.0", claudeCode: "2.4.1", ore: "1.161.0", forgejo: "16.0.2" },
-    spMetadataURL: "/auth/saml/metadata",
   };
 }
 
 function freshState(): State {
   return {
     adminClaimed: false,
-    claims: [],
     me: null,
     platform: freshPlatform(),
     serviceTicks: 0,
@@ -151,7 +149,7 @@ function freshState(): State {
     messages: [],
     audit: [],
     users: [],
-    prefs: { prefs: {} },
+    prefs: { prefs: [], availableChannels: ["webPush"] },
     pushSubs: [],
   };
 }
@@ -247,14 +245,15 @@ function demoState(): State {
     { id: id("M"), from: "hermes@acme", to: "admin@acme", body: "Can I add left-pad? See the approval.", at: now(), fromKind: "agent" },
   ];
   s.audit = [
-    { id: id("A"), at: now(), actor: "admin", action: "platform.update", object: "Platform/default", workspace: "", sourceIP: "192.168.1.5", detail: "wizard.step: services -> hostname" },
-    { id: id("A"), at: now(), actor: "admin", action: "workspace.apply", object: "Workspace/acme", workspace: "acme", sourceIP: "192.168.1.5", detail: "6 rooms created" },
-    { id: id("A"), at: now(), actor: "alice", action: "terminal.open", object: "Room/acme/athena", workspace: "acme", sourceIP: "10.0.0.9", detail: "mode=shell" },
+    { id: id("A"), source: "controlCenter", at: now(), actor: "admin", action: "platform.update", object: "Platform/default", workspace: "", sourceIP: "192.168.1.5", result: "ok", detail: "wizard.step: services -> hostname" },
+    { id: id("A"), source: "controlCenter", at: now(), actor: "admin", action: "workspace.apply", object: "Workspace/acme", workspace: "acme", sourceIP: "192.168.1.5", result: "ok", detail: "10 rooms created" },
+    { id: id("A"), source: "controlCenter", at: now(), actor: "alice", action: "terminal.open", object: "Room/acme/athena", workspace: "acme", sourceIP: "10.0.0.9", result: "ok", detail: '{"mode":"shell"}' },
+    { id: id("A"), source: "messaging", at: now(), actor: "hermes@acme", action: "crossing", object: "metis@acme", workspace: "acme", sourceIP: "", result: "ok", detail: "clean->dirty" },
   ];
   s.users = [
-    { handle: "admin", email: "admin@example.com", displayName: "Admin", role: "admin", workspaces: [], source: "local", lastSeen: now() },
-    { handle: "alice", email: "alice@example.com", displayName: "Alice", role: "operator", workspaces: ["acme"], source: "oidc", lastSeen: now() },
-    { handle: "bob", email: "bob@example.com", displayName: "Bob", role: "viewer", workspaces: ["acme"], source: "saml", lastSeen: now() },
+    { id: "u1", handle: "admin", email: "admin@example.com", displayName: "Admin", role: "admin", workspaces: [], provider: "local", disabled: false, roleOverride: false, lastSeen: now() },
+    { id: "u2", handle: "alice", email: "alice@example.com", displayName: "Alice", role: "operator", workspaces: ["acme"], provider: "oidc:keycloak", disabled: false, roleOverride: false, lastSeen: now() },
+    { id: "u3", handle: "bob", email: "bob@example.com", displayName: "Bob", role: "viewer", workspaces: ["acme"], provider: "saml:corp", disabled: false, roleOverride: true, lastSeen: now() },
   ];
   return s;
 }
@@ -308,7 +307,7 @@ export function createMockApi(mode: string): Api {
   const provisionHub = new Hub<string>();
 
   const audit = (action: string, object: string, detail = "", workspace = "") =>
-    s.audit.unshift({ id: id("A"), at: now(), actor: s.me?.handle ?? "anonymous", action, object, workspace, sourceIP: "127.0.0.1", detail });
+    s.audit.unshift({ id: id("A"), source: "controlCenter", at: now(), actor: s.me?.handle ?? "anonymous", action, object, workspace, sourceIP: "127.0.0.1", result: "ok", detail });
 
   const requireMe = () => {
     if (!s.me) throw new ApiError("unauthenticated", "Sign in first.");
@@ -395,34 +394,37 @@ export function createMockApi(mode: string): Api {
 
   setInterval(tick, 250);
 
+  const update = async (spec: PlatformSpec) => {
+    requireRole("admin");
+    const before = s.platform.spec;
+    s.platform.spec = spec;
+    audit("platform.update", "Platform/default", before.wizardStep !== spec.wizardStep ? `wizard.step: ${before.wizardStep} -> ${spec.wizardStep}` : "");
+    save();
+    platformHub.publish(structuredClone(s.platform));
+    return structuredClone(s.platform);
+  };
+
   const api: Api = {
     observatory: createMockObservatory(() => s.rooms),
     async getSetupState() {
-      return { adminClaimed: s.adminClaimed, caFingerprint: s.platform.caFingerprint, url: s.platform.url };
+      return { adminClaimed: s.adminClaimed, databaseReady: true, caFingerprint: s.platform.caFingerprint, url: s.platform.url };
     },
-    async claimSetup(token) {
+    async claimAdmin(token, admin) {
       await sleep(50);
       if (token.trim().toUpperCase() !== MOCK_SETUP_TOKEN) throw new ApiError("permission_denied", "That setup token is not right.");
-      const claim = id("CLAIM");
-      s.claims.push(claim);
-      save();
-      return { claim };
-    },
-    async createLocalAdmin(claim, admin) {
-      if (!s.claims.includes(claim)) throw new ApiError("permission_denied", "Setup claim expired; enter the token again.");
+      if (!admin) {
+        s.me = { handle: "setup", email: "", displayName: "Setup", role: "admin", workspaces: [] };
+        s.platform.spec.wizardStep = "signin";
+        save();
+        return;
+      }
       if (admin.password.length < 12) throw new ApiError("invalid_argument", "Use at least 12 characters.");
       s.admin = admin;
       s.adminClaimed = true;
       s.platform.adminClaimed = true;
       s.me = { handle: admin.username, email: admin.email, displayName: admin.username, role: "admin", workspaces: [] };
-      s.users.push({ ...s.me, workspaces: [], source: "local", lastSeen: now() });
+      s.users.push({ id: id("U"), ...s.me, workspaces: [], provider: "local", disabled: false, roleOverride: false, lastSeen: now() });
       audit("setup.claim", "Platform/default", "local admin created");
-      save();
-    },
-    async continueWithIdP(claim) {
-      if (!s.claims.includes(claim)) throw new ApiError("permission_denied", "Setup claim expired; enter the token again.");
-      s.me = { handle: "setup", email: "", displayName: "Setup", role: "admin", workspaces: [] };
-      s.platform.spec.wizardStep = "signin";
       save();
     },
 
@@ -431,8 +433,8 @@ export function createMockApi(mode: string): Api {
     },
     async listAuthProviders() {
       return [
-        ...s.platform.spec.oidc.map((p) => ({ kind: "oidc" as const, name: p.name, displayName: p.displayName || p.name })),
-        ...s.platform.spec.saml.map((p) => ({ kind: "saml" as const, name: p.name, displayName: p.displayName || p.name })),
+        ...s.platform.spec.oidc.map((p) => ({ kind: "oidc" as const, name: p.name, displayName: p.displayName || p.name, loginURL: `/auth/oidc/${p.name}/login` })),
+        ...s.platform.spec.saml.map((p) => ({ kind: "saml" as const, name: p.name, displayName: p.displayName || p.name, loginURL: `/auth/saml/${p.name}/login` })),
       ];
     },
     async loginLocal(username, password) {
@@ -455,22 +457,37 @@ export function createMockApi(mode: string): Api {
       requireMe();
       yield* platformHub.subscribe(signal, [structuredClone(s.platform)]);
     },
-    async updatePlatform(spec, secrets) {
-      requireRole("admin");
-      const before = s.platform.spec;
-      s.platform.spec = structuredClone(spec);
-      for (const p of s.platform.spec.services.providers) {
-        if (secrets?.providerKeys?.[p.name]) p.hasKey = true;
+    async updateIsolation(tier, privilegedAccepted) {
+      return update({ ...s.platform.spec, isolationTier: tier, privilegedAccepted });
+    },
+    async updateSignIn(spec, secrets) {
+      const next = structuredClone(spec);
+      for (const o of next.oidc) {
+        o.redirectURL = `${location.origin}/auth/oidc/${o.name}/callback`;
+        if (secrets?.oidcClientSecrets?.[o.name]) o.clientSecretSet = true;
       }
-      if (spec.hostname && spec.hostname !== before.hostname) {
+      for (const x of next.saml) {
+        x.spMetadataURL = `${location.origin}/auth/saml/${x.name}/metadata`;
+        x.acsURL = `${location.origin}/auth/saml/${x.name}/acs`;
+      }
+      return update({ ...s.platform.spec, oidc: next.oidc, saml: next.saml, roleMappings: spec.roleMappings, defaultRole: spec.defaultRole, localDisabled: spec.localDisabled, services: { ...s.platform.spec.services, forgejoOIDCLogin: spec.services.forgejoOIDCLogin } });
+    },
+    async updateServices(spec, secrets) {
+      const services = structuredClone(spec.services);
+      for (const pr of services.providers) if (secrets?.providerKeys?.[pr.name]) pr.hasKey = true;
+      return update({ ...s.platform.spec, services, servicesApproved: spec.servicesApproved });
+    },
+    async updateHostname(spec) {
+      const before = s.platform.spec.hostname;
+      if (spec.hostname && spec.hostname !== before) {
         s.platform.url = `https://${spec.hostname}/`;
         s.platform.conditions = s.platform.conditions.filter((c) => c.type !== "ControlCenterTLSReady");
         s.platform.conditions.push({ type: "ControlCenterTLSReady", status: "True", reason: "Issued", message: "" });
       }
-      audit("platform.update", "Platform/default", `wizard.step: ${before.wizardStep} -> ${spec.wizardStep}`);
-      save();
-      platformHub.publish(structuredClone(s.platform));
-      return structuredClone(s.platform);
+      return update({ ...s.platform.spec, hostname: spec.hostname, tlsMode: spec.tlsMode, issuerName: spec.issuerName, issuerKind: spec.issuerKind });
+    },
+    async setWizardStep(step) {
+      await update({ ...s.platform.spec, wizardStep: step });
     },
     async rerunPreflight() {
       requireRole("admin");
@@ -508,11 +525,8 @@ export function createMockApi(mode: string): Api {
       const fromProviders = s.platform.spec.services.providers.flatMap((p) => p.models);
       return fromProviders.length ? fromProviders : ["claude-opus-5-5", "claude-sonnet-5", "gpt-5.5"];
     },
-    async usedRoomNames() {
-      return s.rooms.map((r) => r.name);
-    },
-    async capacity() {
-      return { cpu: 15.2, memoryGi: 58, diskGi: 820, roomEstimate: s.platform.preflight.roomEstimate };
+    async suggestAgentNames(count, exclude) {
+      return { names: pickNames(count, [...s.rooms.map((r) => r.name), ...exclude]), roles: defaultRoles(count) };
     },
     async planWorkspace(draft) {
       const old = s.workspaces[draft.name];
@@ -535,7 +549,17 @@ export function createMockApi(mode: string): Api {
         if (!draft.rooms.some((r) => r.name === prev.name)) changes.push({ op: "delete", kind: "Room", name: prev.name, details: [] });
       }
       if (!old) changes.push({ op: "create", kind: "RunnerPool", name: "default", details: [] });
-      return changes;
+      // Capacity from the mock cluster: 15 CPU, 58 GiB memory, 820 GiB disk.
+      const cpu = draft.rooms.reduce((a, r) => a + r.cpu, 0);
+      const mem = draft.rooms.reduce((a, r) => a + r.memoryGi, 0);
+      const disk = draft.rooms.reduce((a, r) => a + r.homeGi + r.engineGi, 0);
+      const short = [cpu > 15 && "CPU", mem > 58 && "memory", disk > 820 && "disk"].filter(Boolean);
+      return {
+        changes,
+        problems: [],
+        fits: short.length === 0,
+        fitNote: `${cpu} of 15 CPU, ${mem} of 58 GiB memory, ${disk} of 820 GiB disk${short.length ? `; short on ${short.join(", ")}` : ""}.`,
+      };
     },
     async applyWorkspace(draft) {
       requireRole("admin", "operator");
@@ -634,12 +658,12 @@ export function createMockApi(mode: string): Api {
         yield { id: String(i++), at: now(), kind: "assistant", text: "Still working on it…" };
       }
     },
-    async *watchLogs(ws, name, signal) {
+    async *watchLogs(ws, name, component, signal) {
       room(ws, name);
-      const comps: LogLine["component"][] = ["supervisor", "cli", "engine", "janitor"];
+      const comps = component ? [component] : ["supervisor", "cli", "engine", "janitor"];
       let i = 0;
       while (!signal.aborted) {
-        yield { at: now(), component: comps[i % 4], text: `${comps[i % 4]}: line ${i}` };
+        yield { text: `${now()} [${comps[i % comps.length]}] line ${i}` };
         i++;
         await sleep(i < 20 ? 10 : 1500);
       }
@@ -647,6 +671,7 @@ export function createMockApi(mode: string): Api {
     async getResources(ws, name) {
       room(ws, name);
       return {
+        metricsAvailable: true,
         cpuMillis: 850,
         cpuLimitMillis: 2000,
         memoryBytes: 2.4 * GiB,
@@ -809,30 +834,31 @@ export function createMockApi(mode: string): Api {
         .filter((e) => !f.until || e.at <= f.until)
         .slice(0, f.limit ?? 500);
     },
-    async getSpend(period) {
+    async getSpend() {
       requireMe();
-      const scale = period === "month" ? 1 : period === "week" ? 0.3 : 0.05;
-      return s.rooms.map((r) => ({
-        workspace: r.workspace,
-        room: r.name,
-        model: r.model,
-        usd: Math.round(r.spendUSD * scale * 100) / 100,
-        budgetUSD: r.budgetUSD,
-        inputTokens: Math.round(r.spendUSD * scale * 40_000),
-        outputTokens: Math.round(r.spendUSD * scale * 6_000),
-      }));
+      const rooms = s.rooms.map((r) => ({ workspace: r.workspace, room: r.name, usd: r.spendUSD, budgetUSD: r.budgetUSD, exhausted: r.budgetUSD > 0 && r.spendUSD >= r.budgetUSD }));
+      const workspaces = [...new Set(s.rooms.map((r) => r.workspace))].map((ws) => {
+        const mine = s.rooms.filter((r) => r.workspace === ws);
+        const models = [...new Set(mine.map((r) => r.model))].map((model) => ({ model, usd: mine.filter((r) => r.model === model).reduce((a, r) => a + r.spendUSD, 0) }));
+        return { workspace: ws, usd: mine.reduce((a, r) => a + r.spendUSD, 0), models };
+      });
+      return { available: true, updatedAt: now(), rooms, workspaces };
     },
     async listUsers() {
       requireRole("admin");
       return structuredClone(s.users);
     },
-    async updateUser(handle, role, workspaces) {
+    async updateUser(uid, change) {
       requireRole("admin");
-      const u = s.users.find((x) => x.handle === handle);
+      const u = s.users.find((x) => x.id === uid);
       if (!u) throw new ApiError("not_found", "No such user.");
-      u.role = role;
-      u.workspaces = workspaces;
-      audit("user.update", `User/${handle}`, `role=${role} workspaces=${workspaces.join(",")}`);
+      if (change.role) {
+        u.role = change.role;
+        u.roleOverride = true;
+      }
+      if (change.workspaces) u.workspaces = change.workspaces;
+      if (change.disabled !== undefined) u.disabled = change.disabled;
+      audit("user.update", `User/${u.handle}`, JSON.stringify(change));
       save();
     },
     async getVapidPublicKey() {
@@ -855,6 +881,10 @@ export function createMockApi(mode: string): Api {
       requireMe();
       s.prefs = structuredClone(p);
       save();
+    },
+    async sendTestNotification(channel) {
+      requireMe();
+      audit("notify.test", `Channel/${channel}`);
     },
   };
   return api;

@@ -34,7 +34,15 @@ function UserRow({ u, workspaces, self }: { u: User; workspaces: string[]; self:
   const [ws, setWs] = useState<string[]>(u.workspaces);
   const dirty = role !== u.role || ws.join() !== u.workspaces.join();
   const save = useMutation({
-    mutationFn: () => api().updateUser(u.handle, role, ws),
+    mutationFn: () =>
+      api().updateUser(u.id, {
+        role: role !== u.role ? role : undefined,
+        workspaces: ws.join() !== u.workspaces.join() ? ws : undefined,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+  const disable = useMutation({
+    mutationFn: () => api().updateUser(u.id, { disabled: !u.disabled }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
   return (
@@ -45,7 +53,8 @@ function UserRow({ u, workspaces, self }: { u: User; workspaces: string[]; self:
             {u.displayName} <span className="font-normal text-muted">({u.handle})</span>
           </p>
           <p className="text-sm text-muted">
-            {u.email} · <Badge>{u.source}</Badge> · seen {ago(u.lastSeen)}
+            {u.email} · <Badge>{u.provider}</Badge> {u.roleOverride && <Badge tone="info">role set by admin</Badge>} {u.disabled && <Badge tone="alert">disabled</Badge>} · seen{" "}
+            {ago(u.lastSeen)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -57,6 +66,11 @@ function UserRow({ u, workspaces, self }: { u: User; workspaces: string[]; self:
           <Button variant="primary" disabled={!dirty} busy={save.isPending} onClick={() => save.mutate()}>
             Save
           </Button>
+          {!self && (
+            <Button variant={u.disabled ? "secondary" : "danger"} busy={disable.isPending} onClick={() => disable.mutate()}>
+              {u.disabled ? "Enable" : "Disable"}
+            </Button>
+          )}
         </div>
       </div>
       {role !== "admin" && (
@@ -72,7 +86,7 @@ function UserRow({ u, workspaces, self }: { u: User; workspaces: string[]; self:
           </div>
         </fieldset>
       )}
-      <ErrorText error={save.error} />
+      <ErrorText error={save.error ?? disable.error} />
     </Card>
   );
 }

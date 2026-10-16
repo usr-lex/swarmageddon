@@ -13,14 +13,15 @@ export function ReviewStep({ draft, errors, onApplied }: DraftProps & { errors: 
     enabled: errors.length === 0,
   });
   const apply = useMutation({ mutationFn: () => api().applyWorkspace(draft), onSuccess: onApplied });
-  const changes = plan.data?.filter((c) => c.op !== "unchanged") ?? [];
+  const changes = plan.data?.changes.filter((c) => c.op !== "unchanged") ?? [];
+  const problems = [...errors, ...(plan.data?.problems ?? [])];
   return (
     <div className="space-y-4">
-      {errors.length > 0 && (
+      {problems.length > 0 && (
         <div role="alert" className="rounded-xs border border-bad/40 bg-bad/10 p-3 text-sm">
           <p className="font-medium text-bad">Fix these first:</p>
           <ul className="list-disc pl-5">
-            {errors.map((e) => (
+            {problems.map((e) => (
               <li key={e}>{e}</li>
             ))}
           </ul>
@@ -31,7 +32,7 @@ export function ReviewStep({ draft, errors, onApplied }: DraftProps & { errors: 
         <ErrorText error={plan.error} />
         {plan.data && changes.length === 0 && <p className="text-sm text-muted">Nothing changes.</p>}
         <ul className="divide-y divide-border" aria-label="Planned changes">
-          {plan.data?.map((c) => (
+          {plan.data?.changes.map((c) => (
             <li key={`${c.kind}/${c.name}`} className="flex flex-wrap items-start gap-2 py-2 text-sm">
               <Badge tone={opTone[c.op]} className="w-20 justify-center">
                 {c.op}
@@ -52,7 +53,7 @@ export function ReviewStep({ draft, errors, onApplied }: DraftProps & { errors: 
       </Card>
       <ErrorText error={apply.error} />
       <div className="flex justify-end">
-        <Button variant="primary" disabled={errors.length > 0 || !plan.data || changes.length === 0} busy={apply.isPending} onClick={() => apply.mutate()}>
+        <Button variant="primary" disabled={problems.length > 0 || !plan.data || changes.length === 0} busy={apply.isPending} onClick={() => apply.mutate()}>
           Apply
         </Button>
       </div>

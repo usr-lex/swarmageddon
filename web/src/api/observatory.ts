@@ -77,21 +77,30 @@ export interface AgentAxes {
   messages: number;
 }
 
+/** Event kinds, as the Observatory service names them. */
 export type ActivityKind =
   | "message"
+  | "human"
   | "crossing"
   | "refusal"
   | "commit"
-  | "prOpened"
-  | "prMerged"
-  | "prClosed"
-  | "review"
-  | "issueOpened"
-  | "issueClosed"
+  | "pr_opened"
+  | "pr_merged"
+  | "pr_closed"
+  | "review_approved"
+  | "review_changes"
+  | "review_comment"
+  | "issue_opened"
+  | "issue_closed"
   | "comment"
-  | "ciFailed"
-  | "ciPassed"
-  | "presence";
+  | "ci_failed"
+  | "ci_passed"
+  | "review_requested"
+  | "assigned"
+  | "mentioned"
+  | "presence"
+  | "task"
+  | "tokens";
 
 export interface ActivityEvent {
   id: string;
@@ -101,6 +110,7 @@ export interface ActivityEvent {
   target: string;
   repo: string;
   summary: string;
+  url?: string;
 }
 
 export interface ThroughputDay {
@@ -111,6 +121,11 @@ export interface ThroughputDay {
   reviewLatencyHours: number | null;
   ciFailures: number;
   tokens: Record<string, number>;
+}
+
+export interface Throughput {
+  days: ThroughputDay[];
+  /** Spend this budget period per agent (not per day; the gateway reports periods). */
   spendUSD: Record<string, number>;
 }
 
@@ -136,7 +151,7 @@ export interface ObservatoryApi {
   axes(workspace: string, window: ObsWindow): Promise<AgentAxes[]>;
   timeline(workspace: string, filter: TimelineFilter): Promise<ActivityEvent[]>;
   watchTimeline(workspace: string, signal: AbortSignal): AsyncIterable<ActivityEvent>;
-  throughput(workspace: string, days: number): Promise<ThroughputDay[]>;
+  throughput(workspace: string, days: number): Promise<Throughput>;
   latestReport(workspace: string): Promise<Report | null>;
   reports(workspace: string, limit: number): Promise<Report[]>;
   requestReport(workspace: string): Promise<void>;

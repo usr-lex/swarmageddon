@@ -3,7 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef, useState } from "react";
 import { apiMode } from "@/api";
-import { terminalURL, type TerminalMode } from "@/lib/sockets";
+import { parseControl, terminalURL, type TerminalMode } from "@/lib/sockets";
 import { Badge } from "./ui";
 
 type Status = "connecting" | "open" | "closed";
@@ -60,13 +60,17 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
       sendResize();
       if (!readOnly) term.focus();
     };
+    let exitError = "";
     ws.onmessage = (ev) => {
-      if (typeof ev.data === "string") term.write(ev.data);
-      else term.write(new Uint8Array(ev.data as ArrayBuffer));
+      if (typeof ev.data === "string") {
+        const c = parseControl(ev.data);
+        if (c?.type === "exit") exitError = c.error ?? "";
+        else if (!c) term.write(ev.data);
+      } else term.write(new Uint8Array(ev.data as ArrayBuffer));
     };
     ws.onclose = (ev) => {
       setStatus("closed");
-      setReason(ev.reason || (ev.code === 1000 ? "Session ended." : `Disconnected (${ev.code}).`));
+      setReason(exitError || ev.reason || (ev.code === 1000 ? "Session ended." : `Disconnected (${ev.code}).`));
     };
     const data = term.onData((s) => {
       if (!readOnly && ws.readyState === WebSocket.OPEN) ws.send(enc.encode(s));

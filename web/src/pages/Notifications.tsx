@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "@/api";
-import { notificationEvents, type ChannelKind, type NotificationPrefs } from "@/api/types";
+import { notificationEvents, type ChannelKind, type NotificationEvent, type NotificationPrefs } from "@/api/types";
 import { useMe } from "@/components/Shell";
 import { Badge, Button, Card, ErrorText, PageHeader, Spinner } from "@/components/ui";
 import { currentSubscription, disablePush, enablePush, pushSupported } from "@/lib/push";
 import { channelLabels, eventLabels } from "./workspace/steps";
 
-const channels: ChannelKind[] = ["webPush", "ntfy", "slack", "discord", "email"];
+const allChannels: ChannelKind[] = ["webPush", "ntfy", "slack", "discord", "email"];
 
 /** Browser push and each person's channels per event and workspace (§10.3). */
 export function NotificationsPage() {
@@ -19,18 +19,25 @@ export function NotificationsPage() {
     if (prefs.data && !draft) setDraft(prefs.data);
   }, [prefs.data, draft]);
   const save = useMutation({ mutationFn: (p: NotificationPrefs) => api().setNotificationPrefs(p), onSuccess: () => qc.invalidateQueries({ queryKey: ["prefs"] }) });
-  const workspaces = me.data?.workspaces ?? [];
+  // Admins get an empty workspace list from GetMe (they see all).
+  const all = useQuery({ queryKey: ["workspaces"], queryFn: () => api().listWorkspaces(), enabled: me.data?.role === "admin" });
+  const workspaces = me.data?.role === "admin" ? (all.data?.map((w) => w.name) ?? []) : (me.data?.workspaces ?? []);
+  const channels = allChannels.filter((c) => c === "webPush" || draft?.availableChannels.includes(c));
+  const test = useMutation({ mutationFn: (c: ChannelKind) => api().sendTestNotification(c) });
 
-  const isOn = (ws: string, ev: string, ch: ChannelKind) => {
-    const set = draft?.prefs[ws]?.[ev as keyof NotificationPrefs["prefs"][string]];
+  const find = (ws: string, ev: NotificationEvent) =>
+    draft?.prefs.find((p) => p.workspace === ws && p.event === ev) ?? draft?.prefs.find((p) => p.workspace === "" && p.event === ev);
+  const isOn = (ws: string, ev: NotificationEvent, ch: ChannelKind) => {
+    const p = find(ws, ev);
     // Default: browser push for everything until the person chooses.
-    return set ? set.includes(ch) : ch === "webPush";
+    return p ? p.channels.includes(ch) : ch === "webPush";
   };
-  const toggle = (ws: string, ev: string, ch: ChannelKind, on: boolean) => {
+  const toggle = (ws: string, ev: NotificationEvent, ch: ChannelKind, on: boolean) => {
     if (!draft) return;
     const cur = channels.filter((c) => isOn(ws, ev, c));
     const next = on ? [...cur, ch] : cur.filter((c) => c !== ch);
-    setDraft({ prefs: { ...draft.prefs, [ws]: { ...draft.prefs[ws], [ev]: next } } });
+    const rest = draft.prefs.filter((p) => !(p.workspace === ws && p.event === ev));
+    setDraft({ ...draft, prefs: [...rest, { workspace: ws, event: ev, channels: next }] });
   };
 
   return (
@@ -82,6 +89,19 @@ export function NotificationsPage() {
           </Card>
         ))}
       {draft && workspaces.length === 0 && <p className="text-sm text-muted">You're not assigned to any workspace yet.</p>}
+      {draft && (
+        <Card title="Test a channel">
+          <div className="flex flex-wrap gap-2">
+            {channels.map((c) => (
+              <Button key={c} onClick={() => test.mutate(c)} busy={test.isPending && test.variables === c}>
+                Send a test via {channelLabels[c]}
+              </Button>
+            ))}
+          </div>
+          {test.isSuccess && <p role="status" className="mt-2 text-sm text-ok">Sent.</p>}
+          <ErrorText error={test.error} />
+        </Card>
+      )}
       {draft && workspaces.length > 0 && (
         <div className="flex items-center justify-end gap-2">
           {save.isSuccess && <span role="status" className="text-sm text-ok">Saved.</span>}

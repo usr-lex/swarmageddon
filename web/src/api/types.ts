@@ -16,6 +16,8 @@ export interface Me {
 
 export interface SetupState {
   adminClaimed: boolean;
+  /** PostgreSQL is connected; before that the control center keeps no users. */
+  databaseReady: boolean;
   /** SHA-256 fingerprint of the platform CA, to compare with the welcome output. */
   caFingerprint: string;
   url: string;
@@ -25,6 +27,8 @@ export interface AuthProvider {
   kind: "oidc" | "saml";
   name: string;
   displayName: string;
+  /** Where the browser goes to sign in; the UI appends ?return=/path. */
+  loginURL: string;
 }
 
 export type CheckResult = "pass" | "warn" | "fail" | "pending";
@@ -60,6 +64,10 @@ export interface OIDCProvider {
   clientID: string;
   groupsClaim: string;
   scopes: string[];
+  /** Read-only: a client secret is stored. */
+  clientSecretSet: boolean;
+  /** Read-only: the redirect URL to register at the provider. */
+  redirectURL: string;
 }
 
 export interface SAMLProvider {
@@ -68,6 +76,9 @@ export interface SAMLProvider {
   metadataURL: string;
   metadataXML: string;
   groupsAttribute: string;
+  /** Read-only: our SP metadata and ACS URLs, for the IdP. */
+  spMetadataURL: string;
+  acsURL: string;
 }
 
 export interface RoleMapping {
@@ -93,6 +104,7 @@ export interface PlatformServices {
   messagingReplicas: number;
   messagingStorage: string;
   registryCacheStorage: string;
+  registryUpstreams: string[];
   ntfyEnabled: boolean;
   ntfyStorage: string;
   providers: ModelProvider[];
@@ -105,6 +117,7 @@ export interface PlatformSpec {
   hostname: string;
   tlsMode: "selfSigned" | "certManager";
   issuerName: string;
+  issuerKind: string;
   isolationTier: IsolationTier;
   privilegedAccepted: boolean;
   localDisabled: boolean;
@@ -125,8 +138,6 @@ export interface Platform {
   preflight: Preflight;
   conditions: Condition[];
   versions: Record<string, string>;
-  /** Our SAML service provider metadata, to paste into the IdP. */
-  spMetadataURL: string;
 }
 
 /** Secret values entered in the wizard; stored in Secrets, never in specs. */
@@ -215,6 +226,8 @@ export interface WorkspaceDraft {
   repositories: RepositoryDraft[];
   channels: ChannelDraft[];
   events: NotificationEvent[];
+  /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
+  source?: unknown;
 }
 
 export interface PlanChange {
@@ -225,11 +238,13 @@ export interface PlanChange {
   details: string[];
 }
 
-export interface Capacity {
-  cpu: number;
-  memoryGi: number;
-  diskGi: number;
-  roomEstimate: number;
+export interface PlanResult {
+  changes: PlanChange[];
+  /** Validation problems that would refuse the apply. */
+  problems: string[];
+  /** Whether the rooms fit the cluster, per the preflight estimate. */
+  fits: boolean;
+  fitNote: string;
 }
 
 export interface WorkspaceSummary {
@@ -309,9 +324,9 @@ export interface TranscriptEntry {
   text: string;
 }
 
+export type LogComponent = "supervisor" | "cli" | "engine" | "janitor";
+
 export interface LogLine {
-  at: string;
-  component: "supervisor" | "cli" | "engine" | "janitor";
   text: string;
 }
 
@@ -328,9 +343,11 @@ export interface Resources {
   cpuLimitMillis: number;
   memoryBytes: number;
   memoryLimitBytes: number;
-  netRxBytesPerSec: number;
-  netTxBytesPerSec: number;
-  processes: Process[];
+  /** False when metrics-server is missing. */
+  metricsAvailable: boolean;
+  netRxBytesPerSec?: number;
+  netTxBytesPerSec?: number;
+  processes?: Process[];
 }
 
 export interface Volume {
@@ -403,12 +420,14 @@ export interface Conversation {
 
 export interface AuditEntry {
   id: string;
+  source: "controlCenter" | "messaging";
   at: string;
   actor: string;
   action: string;
   object: string;
   workspace: string;
   sourceIP: string;
+  result: string;
   detail: string;
 }
 
@@ -421,27 +440,47 @@ export interface AuditFilter {
   limit?: number;
 }
 
-export interface SpendRow {
+export interface RoomSpend {
   workspace: string;
   room: string;
-  model: string;
   usd: number;
   budgetUSD: number;
-  inputTokens: number;
-  outputTokens: number;
+  exhausted: boolean;
+}
+
+export interface SpendReport {
+  /** False until the gateway is reachable. */
+  available: boolean;
+  updatedAt: string;
+  rooms: RoomSpend[];
+  workspaces: { workspace: string; usd: number; models: { model: string; usd: number }[] }[];
 }
 
 export interface User {
+  id: string;
   handle: string;
   email: string;
   displayName: string;
   role: Role;
   workspaces: string[];
-  source: "local" | "oidc" | "saml";
+  /** "local", "oidc:<name>", "saml:<name>" or "setup". */
+  provider: string;
+  disabled: boolean;
+  /** The role was set by an admin, not by identity-provider groups. */
+  roleOverride: boolean;
   lastSeen: string;
 }
 
+export interface NotificationPref {
+  /** "" means every workspace. */
+  workspace: string;
+  event: NotificationEvent;
+  /** Empty: off. */
+  channels: ChannelKind[];
+}
+
 export interface NotificationPrefs {
-  /** workspace -> event -> enabled channels */
-  prefs: Record<string, Partial<Record<NotificationEvent, ChannelKind[]>>>;
+  prefs: NotificationPref[];
+  /** Channels the person's workspaces have configured. */
+  availableChannels: ChannelKind[];
 }

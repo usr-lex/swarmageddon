@@ -8,14 +8,13 @@ test("setup, first-run wizard, workspace wizard, fleet, approve", async ({ page 
   // Setup: token, then the local admin.
   await expect(page).toHaveURL(/\/setup$/);
   await expect(page.getByTestId("ca-fingerprint")).toContainText("SHA256:");
-  await page.getByLabel("Setup token").fill("wrong");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("alert")).toContainText("not right");
-  await page.getByLabel("Setup token").fill(TOKEN);
-  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Email").fill("admin@example.com");
   await page.getByLabel("Password", { exact: true }).fill("correct horse battery");
   await page.getByLabel("Confirm password").fill("correct horse battery");
+  await page.getByLabel("Setup token").fill("wrong");
+  await page.getByRole("button", { name: "Create admin" }).click();
+  await expect(page.getByRole("alert")).toContainText("not right");
+  await page.getByLabel("Setup token").fill(TOKEN);
   await page.getByRole("button", { name: "Create admin" }).click();
 
   // Wizard 1: preflight.
