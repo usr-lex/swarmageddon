@@ -159,7 +159,12 @@ func (d *Dispatcher) Clear(ws, room string, kind v1alpha1.NotificationEvent) {
 // SendTest sends a test notification on one channel to one person's push
 // subscriptions or the workspace channels.
 func (d *Dispatcher) SendTest(ctx context.Context, subs []store.PushSubscription) error {
-	ev := Event{Kind: "test", Title: "swarmageddon", Body: "Notifications work.", URL: "/"}
+	return d.PushTo(ctx, subs, Event{Kind: "test", Title: "swarmageddon", Body: "Notifications work.", URL: "/"})
+}
+
+// PushTo sends ev to the given browser subscriptions (a person's messages),
+// without deduplication.
+func (d *Dispatcher) PushTo(ctx context.Context, subs []store.PushSubscription, ev Event) error {
 	var first error
 	for _, s := range subs {
 		if err := d.webPush(ctx, s, ev); err != nil && first == nil {

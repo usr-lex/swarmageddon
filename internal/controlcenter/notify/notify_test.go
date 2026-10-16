@@ -31,8 +31,10 @@ func (f *fakeDir) Settings(context.Context, string) (v1alpha1.NotificationSettin
 func (f *fakeDir) Recipients(context.Context, string, v1alpha1.NotificationEvent) ([]Recipient, error) {
 	return f.recips, nil
 }
-func (f *fakeDir) Secret(_ context.Context, n string) (map[string][]byte, error) { return f.secrets[n], nil }
-func (f *fakeDir) DropPush(_ context.Context, e string)                         { f.dropped = append(f.dropped, e) }
+func (f *fakeDir) Secret(_ context.Context, n string) (map[string][]byte, error) {
+	return f.secrets[n], nil
+}
+func (f *fakeDir) DropPush(_ context.Context, e string) { f.dropped = append(f.dropped, e) }
 
 type hits struct {
 	mu   sync.Mutex

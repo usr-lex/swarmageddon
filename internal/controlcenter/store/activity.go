@@ -214,7 +214,7 @@ func (s *Store) Heatmap(ctx context.Context, ws, actor string, since time.Time) 
 
 // AxesRow is an agent's activity profile.
 type AxesRow struct {
-	Actor                                             string
+	Actor                                            string
 	Commits, PullRequests, Reviews, Issues, Messages int64
 }
 

@@ -75,8 +75,8 @@ type Handler struct {
 	CIRed func(ctx context.Context, ev notify.Event)
 	// Record stores observatory events (§8.7); optional.
 	Record func(ctx context.Context, evs ...store.Activity)
-	Audit func(ctx context.Context, ev store.AuditEvent)
-	Log   *slog.Logger
+	Audit  func(ctx context.Context, ev store.AuditEvent)
+	Log    *slog.Logger
 
 	mu      sync.Mutex
 	seenRun map[string]time.Time // workspace/run ID, so the two CI event kinds don't both notify

@@ -8,14 +8,14 @@ import (
 // Limiter rate-limits setup token attempts per client IP: Max attempts per
 // Window, then a lockout that doubles with every further lockout (§3.3).
 type Limiter struct {
-	Max      int
-	Window   time.Duration
-	Lockout  time.Duration // first lockout
-	MaxLock  time.Duration
-	Now      func() time.Time
-	mu       sync.Mutex
-	clients  map[string]*limitState
-	lastGC   time.Time
+	Max     int
+	Window  time.Duration
+	Lockout time.Duration // first lockout
+	MaxLock time.Duration
+	Now     func() time.Time
+	mu      sync.Mutex
+	clients map[string]*limitState
+	lastGC  time.Time
 }
 
 type limitState struct {
