@@ -373,7 +373,19 @@ message NotificationChannelPlan {
   // webPush, ntfy, slack, discord or email.
   string kind = 1;
   string topic = 2;
+  // Secret in the system namespace with the channel's settings
+  // (notify-<workspace>-<kind>); set by the control center.
   string secret_name = 3;
+  // Write-only: the Slack or Discord webhook URL.
+  string webhook_url = 4;
+  // Write-only: SMTP settings for email.
+  string smtp_host = 5;
+  int32 smtp_port = 6;
+  string smtp_username = 7;
+  string smtp_password = 8;
+  string email_from = 9;
+  // Comma-separated recipients.
+  string email_to = 10;
 }
 
 message WorkspacePlan {
@@ -401,6 +413,9 @@ message WorkspacePlan {
   // Runner labels; empty: no RunnerPool.
   repeated string runner_labels = 19;
   int32 runner_max_concurrent = 20;
+  // Forge events delivered to agents (assigned, reviewRequested, mentioned,
+  // reviewSubmitted, commented, ciFailed); empty: all.
+  repeated string forge_notifications = 21;
 }
 
 message WorkspaceSummary {
@@ -435,6 +450,8 @@ message SuggestAgentNamesRequest {
 }
 message SuggestAgentNamesResponse {
   repeated string names = 1;
+  // The default role mix for that many agents, parallel to names.
+  repeated string roles = 2;
 }
 
 message RoleTemplateSummary {

@@ -2941,9 +2941,21 @@ func (x *LinkPlan) GetRequirePrefix() string {
 type NotificationChannelPlan struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// webPush, ntfy, slack, discord or email.
-	Kind          string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	Topic         string `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	SecretName    string `protobuf:"bytes,3,opt,name=secret_name,json=secretName,proto3" json:"secret_name,omitempty"`
+	Kind  string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Topic string `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	// Secret in the system namespace with the channel's settings
+	// (notify-<workspace>-<kind>); set by the control center.
+	SecretName string `protobuf:"bytes,3,opt,name=secret_name,json=secretName,proto3" json:"secret_name,omitempty"`
+	// Write-only: the Slack or Discord webhook URL.
+	WebhookUrl string `protobuf:"bytes,4,opt,name=webhook_url,json=webhookUrl,proto3" json:"webhook_url,omitempty"`
+	// Write-only: SMTP settings for email.
+	SmtpHost     string `protobuf:"bytes,5,opt,name=smtp_host,json=smtpHost,proto3" json:"smtp_host,omitempty"`
+	SmtpPort     int32  `protobuf:"varint,6,opt,name=smtp_port,json=smtpPort,proto3" json:"smtp_port,omitempty"`
+	SmtpUsername string `protobuf:"bytes,7,opt,name=smtp_username,json=smtpUsername,proto3" json:"smtp_username,omitempty"`
+	SmtpPassword string `protobuf:"bytes,8,opt,name=smtp_password,json=smtpPassword,proto3" json:"smtp_password,omitempty"`
+	EmailFrom    string `protobuf:"bytes,9,opt,name=email_from,json=emailFrom,proto3" json:"email_from,omitempty"`
+	// Comma-separated recipients.
+	EmailTo       string `protobuf:"bytes,10,opt,name=email_to,json=emailTo,proto3" json:"email_to,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2999,6 +3011,55 @@ func (x *NotificationChannelPlan) GetSecretName() string {
 	return ""
 }
 
+func (x *NotificationChannelPlan) GetWebhookUrl() string {
+	if x != nil {
+		return x.WebhookUrl
+	}
+	return ""
+}
+
+func (x *NotificationChannelPlan) GetSmtpHost() string {
+	if x != nil {
+		return x.SmtpHost
+	}
+	return ""
+}
+
+func (x *NotificationChannelPlan) GetSmtpPort() int32 {
+	if x != nil {
+		return x.SmtpPort
+	}
+	return 0
+}
+
+func (x *NotificationChannelPlan) GetSmtpUsername() string {
+	if x != nil {
+		return x.SmtpUsername
+	}
+	return ""
+}
+
+func (x *NotificationChannelPlan) GetSmtpPassword() string {
+	if x != nil {
+		return x.SmtpPassword
+	}
+	return ""
+}
+
+func (x *NotificationChannelPlan) GetEmailFrom() string {
+	if x != nil {
+		return x.EmailFrom
+	}
+	return ""
+}
+
+func (x *NotificationChannelPlan) GetEmailTo() string {
+	if x != nil {
+		return x.EmailTo
+	}
+	return ""
+}
+
 type WorkspacePlan struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Name         string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -3025,8 +3086,11 @@ type WorkspacePlan struct {
 	// Runner labels; empty: no RunnerPool.
 	RunnerLabels        []string `protobuf:"bytes,19,rep,name=runner_labels,json=runnerLabels,proto3" json:"runner_labels,omitempty"`
 	RunnerMaxConcurrent int32    `protobuf:"varint,20,opt,name=runner_max_concurrent,json=runnerMaxConcurrent,proto3" json:"runner_max_concurrent,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Forge events delivered to agents (assigned, reviewRequested, mentioned,
+	// reviewSubmitted, commented, ciFailed); empty: all.
+	ForgeNotifications []string `protobuf:"bytes,21,rep,name=forge_notifications,json=forgeNotifications,proto3" json:"forge_notifications,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *WorkspacePlan) Reset() {
@@ -3197,6 +3261,13 @@ func (x *WorkspacePlan) GetRunnerMaxConcurrent() int32 {
 		return x.RunnerMaxConcurrent
 	}
 	return 0
+}
+
+func (x *WorkspacePlan) GetForgeNotifications() []string {
+	if x != nil {
+		return x.ForgeNotifications
+	}
+	return nil
 }
 
 type WorkspaceSummary struct {
@@ -3530,8 +3601,10 @@ func (x *SuggestAgentNamesRequest) GetExclude() []string {
 }
 
 type SuggestAgentNamesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Names         []string               `protobuf:"bytes,1,rep,name=names,proto3" json:"names,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Names []string               `protobuf:"bytes,1,rep,name=names,proto3" json:"names,omitempty"`
+	// The default role mix for that many agents, parallel to names.
+	Roles         []string `protobuf:"bytes,2,rep,name=roles,proto3" json:"roles,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3569,6 +3642,13 @@ func (*SuggestAgentNamesResponse) Descriptor() ([]byte, []int) {
 func (x *SuggestAgentNamesResponse) GetNames() []string {
 	if x != nil {
 		return x.Names
+	}
+	return nil
+}
+
+func (x *SuggestAgentNamesResponse) GetRoles() []string {
+	if x != nil {
+		return x.Roles
 	}
 	return nil
 }
@@ -8606,12 +8686,22 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\n" +
 	"recipients\x18\x05 \x03(\tR\n" +
 	"recipients\x12%\n" +
-	"\x0erequire_prefix\x18\x06 \x01(\tR\rrequirePrefix\"d\n" +
+	"\x0erequire_prefix\x18\x06 \x01(\tR\rrequirePrefix\"\xc3\x02\n" +
 	"\x17NotificationChannelPlan\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x1f\n" +
 	"\vsecret_name\x18\x03 \x01(\tR\n" +
-	"secretName\"\x9e\a\n" +
+	"secretName\x12\x1f\n" +
+	"\vwebhook_url\x18\x04 \x01(\tR\n" +
+	"webhookUrl\x12\x1b\n" +
+	"\tsmtp_host\x18\x05 \x01(\tR\bsmtpHost\x12\x1b\n" +
+	"\tsmtp_port\x18\x06 \x01(\x05R\bsmtpPort\x12#\n" +
+	"\rsmtp_username\x18\a \x01(\tR\fsmtpUsername\x12#\n" +
+	"\rsmtp_password\x18\b \x01(\tR\fsmtpPassword\x12\x1d\n" +
+	"\n" +
+	"email_from\x18\t \x01(\tR\temailFrom\x12\x19\n" +
+	"\bemail_to\x18\n" +
+	" \x01(\tR\aemailTo\"\xcf\a\n" +
 	"\rWorkspacePlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -8634,7 +8724,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x12required_approvals\x18\x11 \x01(\x05R\x11requiredApprovals\x12\x1a\n" +
 	"\binternet\x18\x12 \x01(\bR\binternet\x12#\n" +
 	"\rrunner_labels\x18\x13 \x03(\tR\frunnerLabels\x122\n" +
-	"\x15runner_max_concurrent\x18\x14 \x01(\x05R\x13runnerMaxConcurrent\"\xea\x01\n" +
+	"\x15runner_max_concurrent\x18\x14 \x01(\x05R\x13runnerMaxConcurrent\x12/\n" +
+	"\x13forge_notifications\x18\x15 \x03(\tR\x12forgeNotifications\"\xea\x01\n" +
 	"\x10WorkspaceSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -8658,9 +8749,10 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x05rooms\x18\x03 \x03(\v2#.swarm.controlcenter.v1.RoomSummaryR\x05rooms\"J\n" +
 	"\x18SuggestAgentNamesRequest\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x18\n" +
-	"\aexclude\x18\x02 \x03(\tR\aexclude\"1\n" +
+	"\aexclude\x18\x02 \x03(\tR\aexclude\"G\n" +
 	"\x19SuggestAgentNamesResponse\x12\x14\n" +
-	"\x05names\x18\x01 \x03(\tR\x05names\"t\n" +
+	"\x05names\x18\x01 \x03(\tR\x05names\x12\x14\n" +
+	"\x05roles\x18\x02 \x03(\tR\x05roles\"t\n" +
 	"\x13RoleTemplateSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +
