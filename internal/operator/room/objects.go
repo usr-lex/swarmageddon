@@ -18,6 +18,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/devices"
 )
 
 // Platform endpoints (docs/conventions.md).
@@ -80,7 +81,9 @@ func objectLabels(r *v1.Room, ws string) map[string]string {
 }
 
 // ApplyTier sets the pod and container fields of an isolation tier
-// (ADR 0001, design §6.2). Unknown tiers get userns, the default.
+// (ADR 0001, design §6.2). Unknown tiers get userns, the default. In the
+// userns tier the container also gets /dev/fuse and /dev/net/tun from our
+// device plugin (cmd/devices). Call it after setting c.Resources.
 func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
 	switch v1.IsolationTier(tier) {
 	case v1.TierPrivileged:
@@ -98,6 +101,16 @@ func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
 				"SYS_ADMIN", "NET_ADMIN", "SETUID", "SETGID", "MKNOD", "CHOWN",
 				"DAC_OVERRIDE", "FOWNER", "SYS_CHROOT", "SETFCAP", "KILL", "AUDIT_WRITE",
 			}},
+		}
+		one := resource.MustParse("1")
+		for _, rn := range []corev1.ResourceName{devices.ResourceFuse, devices.ResourceTun} {
+			if c.Resources.Limits == nil {
+				c.Resources.Limits = corev1.ResourceList{}
+			}
+			if c.Resources.Requests == nil {
+				c.Resources.Requests = corev1.ResourceList{}
+			}
+			c.Resources.Limits[rn], c.Resources.Requests[rn] = one, one
 		}
 	}
 }

@@ -6,7 +6,9 @@ package runnerpool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"time"
@@ -18,6 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +40,8 @@ const (
 	LabelPool       = "swarmageddon.dev/runner-pool"
 	AnnJobID        = "swarmageddon.dev/job-id"
 	AnnRunnerID     = "swarmageddon.dev/runner-id"
+	// AnnRunnerRepo is owner/name for a runner registered on one repository.
+	AnnRunnerRepo = "swarmageddon.dev/runner-repo"
 
 	ConditionReady   = "Ready"
 	ConditionDiskLow = "DiskLow"
@@ -54,23 +60,48 @@ var (
 // node, in bytes; ok is false when it can't tell.
 type FreeDiskFunc func(ctx context.Context) (free int64, ok bool, err error)
 
+// SummaryFunc returns a node's kubelet stats summary (GET
+// /api/v1/nodes/<node>/proxy/stats/summary).
+type SummaryFunc func(ctx context.Context, node string) ([]byte, error)
+
 // Reconciler reconciles RunnerPools.
 type Reconciler struct {
 	client.Client
 	Deps deps.Deps
-	// FreeDisk measures node disk; nil uses node allocatable minus requests.
+	// FreeDisk measures node disk; nil uses the kubelet summary (Summary),
+	// falling back to node allocatable minus requests.
 	FreeDisk FreeDiskFunc
+	// Summary reads kubelet stats through the API server proxy; nil skips it.
+	Summary SummaryFunc
+}
+
+// KubeletSummary returns a SummaryFunc that reads stats through the API
+// server's node proxy (RBAC: nodes/proxy get).
+func KubeletSummary(cfg *rest.Config) (SummaryFunc, error) {
+	cs, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	rc := cs.CoreV1().RESTClient()
+	return func(ctx context.Context, node string) ([]byte, error) {
+		return rc.Get().Resource("nodes").Name(node).SubResource("proxy").Suffix("stats/summary").DoRaw(ctx)
+	}, nil
 }
 
 // +kubebuilder:rbac:groups=swarmageddon.dev,resources=runnerpools;runnerpools/status,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=swarmageddon.dev,resources=workspaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=nodes/proxy,verbs=get
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 
 // SetupWithManager registers the RunnerPool controller.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps) error {
-	r := &Reconciler{Client: mgr.GetClient(), Deps: d}
+	sum, err := KubeletSummary(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+	r := &Reconciler{Client: mgr.GetClient(), Deps: d, Summary: sum}
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("runnerpool").
 		For(&v1.RunnerPool{}).
@@ -143,7 +174,12 @@ func (r *Reconciler) round(ctx context.Context, pool *v1.RunnerPool, st *v1.Runn
 		p := &pods.Items[i]
 		if p.Status.Phase == corev1.PodSucceeded || p.Status.Phase == corev1.PodFailed {
 			if id, err := strconv.ParseInt(p.Annotations[AnnRunnerID], 10, 64); err == nil {
-				_ = fc.DeleteOrgRunner(ctx, org, id) // ephemeral runners are removed by Forgejo; this catches the rest
+				// Ephemeral runners are removed by Forgejo; this catches the rest.
+				if o, n, ok := cutSlash(p.Annotations[AnnRunnerRepo]); ok {
+					_ = fc.DeleteRepoRunner(ctx, o, n, id)
+				} else {
+					_ = fc.DeleteOrgRunner(ctx, org, id)
+				}
 			}
 			if err := r.Delete(ctx, p, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -156,17 +192,18 @@ func (r *Reconciler) round(ctx context.Context, pool *v1.RunnerPool, st *v1.Runn
 	}
 	st.Running = int32(len(active))
 
-	jobs, err := fc.WaitingJobs(ctx, org, pool.Spec.Labels)
+	labels := Labels(pool)
+	jobs, err := fc.WaitingJobs(ctx, org, labels)
 	if err != nil {
 		return fmt.Errorf("waiting jobs: %w", err)
 	}
-	repoIDs, err := r.repoIDs(ctx, fc, org, pool.Spec.Repos)
+	repos, err := r.scope(ctx, fc, org, pool)
 	if err != nil {
 		return err
 	}
 	var todo []forgejo.RunJob
 	for _, j := range jobs {
-		if active[strconv.FormatInt(j.ID, 10)] || !servable(j, pool.Spec.Labels, repoIDs) {
+		if active[strconv.FormatInt(j.ID, 10)] || !servable(j, labels, repos) {
 			continue
 		}
 		todo = append(todo, j)
@@ -194,7 +231,7 @@ func (r *Reconciler) round(ctx context.Context, pool *v1.RunnerPool, st *v1.Runn
 		if int32(len(active)) >= maxC {
 			break
 		}
-		if err := r.startJob(ctx, fc, pool, &ws, j); err != nil {
+		if err := r.startJob(ctx, fc, pool, &ws, j, repos); err != nil {
 			return err
 		}
 		active[strconv.FormatInt(j.ID, 10)] = true
@@ -206,9 +243,24 @@ func (r *Reconciler) round(ctx context.Context, pool *v1.RunnerPool, st *v1.Runn
 	return nil
 }
 
+// GroupLabel is the label every runner of a group's pool carries, so the
+// group's workflows can ask for its runners (runs-on: group-<name>), and no
+// other pool ever has it.
+func GroupLabel(group string) string { return "group-" + group }
+
+// Labels are the labels a pool's runners carry: its own, plus its group's.
+func Labels(pool *v1.RunnerPool) []string {
+	l := slices.Clone(pool.Spec.Labels)
+	if g := pool.Spec.Group; g != "" && !slices.Contains(l, GroupLabel(g)) {
+		l = append(l, GroupLabel(g))
+	}
+	return l
+}
+
 // servable: the runner gets exactly the pool's labels, so it can take a job
-// only if every runs-on label is one of them.
-func servable(j forgejo.RunJob, labels []string, repoIDs map[int64]bool) bool {
+// only if every runs-on label is one of them; and the job's repository must
+// be in scope (nil: the whole org).
+func servable(j forgejo.RunJob, labels []string, repos map[int64]string) bool {
 	if len(j.RunsOn) == 0 {
 		return false
 	}
@@ -217,15 +269,39 @@ func servable(j forgejo.RunJob, labels []string, repoIDs map[int64]bool) bool {
 			return false
 		}
 	}
-	return repoIDs == nil || repoIDs[j.RepoID]
+	if repos == nil {
+		return true
+	}
+	_, ok := repos[j.RepoID]
+	return ok
 }
 
-func (r *Reconciler) repoIDs(ctx context.Context, fc *forgejo.Client, org string, repos []string) (map[int64]bool, error) {
-	if len(repos) == 0 {
-		return nil, nil
+// scope returns the repositories a pool serves, by ID with their full
+// names: nil for the whole org; with spec.group only the repositories its
+// team (group-<name>) has, narrowed by spec.repos (design §9.4).
+func (r *Reconciler) scope(ctx context.Context, fc *forgejo.Client, org string, pool *v1.RunnerPool) (map[int64]string, error) {
+	var out map[int64]string
+	if g := pool.Spec.Group; g != "" {
+		out = map[int64]string{}
+		team, err := fc.FindTeam(ctx, org, GroupLabel(g))
+		if err != nil {
+			return nil, fmt.Errorf("team %s: %w", GroupLabel(g), err)
+		}
+		if team != nil {
+			rs, err := fc.ListTeamRepos(ctx, team.ID)
+			if err != nil {
+				return nil, fmt.Errorf("repositories of %s: %w", team.Name, err)
+			}
+			for _, rp := range rs {
+				out[rp.ID] = rp.FullName
+			}
+		}
 	}
-	ids := map[int64]bool{}
-	for _, full := range repos {
+	if len(pool.Spec.Repos) == 0 {
+		return out, nil
+	}
+	named := map[int64]string{}
+	for _, full := range pool.Spec.Repos {
 		owner, name := org, full
 		if o, n, ok := cutSlash(full); ok {
 			owner, name = o, n
@@ -237,9 +313,14 @@ func (r *Reconciler) repoIDs(ctx context.Context, fc *forgejo.Client, org string
 		if err != nil {
 			return nil, err
 		}
-		ids[rp.ID] = true
+		if out != nil {
+			if _, ok := out[rp.ID]; !ok {
+				continue
+			}
+		}
+		named[rp.ID] = owner + "/" + name
 	}
-	return ids, nil
+	return named, nil
 }
 
 func cutSlash(s string) (string, string, bool) {
@@ -254,11 +335,31 @@ func cutSlash(s string) (string, string, bool) {
 // PodName is the pod of a pool's job.
 func PodName(pool string, jobID int64) string { return fmt.Sprintf("runner-%s-%d", pool, jobID) }
 
-func (r *Reconciler) startJob(ctx context.Context, fc *forgejo.Client, pool *v1.RunnerPool, ws *v1.Workspace, j forgejo.RunJob) error {
+func (r *Reconciler) startJob(ctx context.Context, fc *forgejo.Client, pool *v1.RunnerPool, ws *v1.Workspace, j forgejo.RunJob, repos map[int64]string) error {
 	name := PodName(pool.Name, j.ID)
-	reg, err := fc.RegisterOrgRunner(ctx, ws.Spec.Forge.Org, name, "swarmageddon runner pool "+pool.Namespace+"/"+pool.Name, true)
+	desc := "swarmageddon runner pool " + pool.Namespace + "/" + pool.Name
+	// A group's runner registers on the job's repository, so Forgejo can't
+	// hand it another repository's job.
+	repo := ""
+	var reg *forgejo.RegisteredRunner
+	var err error
+	if pool.Spec.Group != "" {
+		repo = repos[j.RepoID]
+		owner, rname, _ := cutSlash(repo)
+		reg, err = fc.RegisterRepoRunner(ctx, owner, rname, name, desc, true)
+	} else {
+		reg, err = fc.RegisterOrgRunner(ctx, ws.Spec.Forge.Org, name, desc, true)
+	}
 	if err != nil {
 		return fmt.Errorf("register runner: %w", err)
+	}
+	unregister := func() {
+		if repo != "" {
+			owner, rname, _ := cutSlash(repo)
+			_ = fc.DeleteRepoRunner(ctx, owner, rname, reg.ID)
+		} else {
+			_ = fc.DeleteOrgRunner(ctx, ws.Spec.Forge.Org, reg.ID)
+		}
 	}
 	image := pool.Spec.Image
 	if image == "" && r.Deps.Images != nil {
@@ -271,11 +372,14 @@ func (r *Reconciler) startJob(ctx context.Context, fc *forgejo.Client, pool *v1.
 		}
 	}
 	pod := desiredPod(pool, ws.Name, name, image, tier, reg, j)
+	if repo != "" {
+		pod.Annotations[AnnRunnerRepo] = repo
+	}
 	if err := controllerutil.SetControllerReference(pool, pod, r.Scheme()); err != nil {
 		return err
 	}
 	if err := r.Create(ctx, pod); err != nil {
-		_ = fc.DeleteOrgRunner(ctx, ws.Spec.Forge.Org, reg.ID)
+		unregister()
 		if apierrors.IsAlreadyExists(err) {
 			return nil
 		}
@@ -306,7 +410,7 @@ func desiredPod(pool *v1.RunnerPool, ws, name, image, tier string, reg *forgejo.
 	if j.Handle != "" {
 		args = append(args, "--handle", j.Handle)
 	}
-	for _, l := range pool.Spec.Labels {
+	for _, l := range Labels(pool) {
 		args = append(args, "--label", l+":host") // the pod itself is the job's isolation
 	}
 	labels := map[string]string{
@@ -402,7 +506,7 @@ func (r *Reconciler) diskLow(ctx context.Context, pool *v1.RunnerPool) (bool, st
 	}
 	f := r.FreeDisk
 	if f == nil {
-		f = r.allocatableFree
+		f = r.nodeFree
 	}
 	free, ok, err := f(ctx)
 	if err != nil || !ok {
@@ -410,6 +514,55 @@ func (r *Reconciler) diskLow(ctx context.Context, pool *v1.RunnerPool) (bool, st
 	}
 	msg := fmt.Sprintf("most free on a node: %d GB, minimum %d GB", free>>30, minGB)
 	return free < minGB<<30, msg
+}
+
+// nodeFree is the most free disk on a schedulable node, from kubelet's
+// stats summary (node.fs.availableBytes, where emptyDir lives). Without any
+// summary it falls back to allocatableFree.
+func (r *Reconciler) nodeFree(ctx context.Context) (int64, bool, error) {
+	if r.Summary == nil {
+		return r.allocatableFree(ctx)
+	}
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		return 0, false, err
+	}
+	best, ok := int64(0), false
+	for _, n := range nodes.Items {
+		if n.Spec.Unschedulable {
+			continue
+		}
+		raw, err := r.Summary(ctx, n.Name)
+		if err != nil {
+			log.FromContext(ctx).V(1).Info("kubelet summary", "node", n.Name, "err", err.Error())
+			continue
+		}
+		free, has := availableBytes(raw)
+		if !has {
+			continue
+		}
+		ok = true
+		best = max(best, free)
+	}
+	if !ok {
+		return r.allocatableFree(ctx)
+	}
+	return best, true, nil
+}
+
+// availableBytes reads node.fs.availableBytes from a stats summary.
+func availableBytes(raw []byte) (int64, bool) {
+	var s struct {
+		Node struct {
+			Fs *struct {
+				AvailableBytes *uint64 `json:"availableBytes"`
+			} `json:"fs"`
+		} `json:"node"`
+	}
+	if json.Unmarshal(raw, &s) != nil || s.Node.Fs == nil || s.Node.Fs.AvailableBytes == nil {
+		return 0, false
+	}
+	return int64(min(*s.Node.Fs.AvailableBytes, math.MaxInt64)), true
 }
 
 // allocatableFree is the fallback measure: per schedulable node, allocatable

@@ -155,7 +155,28 @@ type Forge struct {
 	Teams []forgejo.Team
 	// Jobs answers GET .../actions/runners/jobs.
 	Jobs []forgejo.RunJob
-	URL  string
+	// TeamRepos answers GET /teams/{id}/repos; Repos answers GET /repos/{o}/{r}.
+	TeamRepos map[int64][]forgejo.Repository
+	Repos     []forgejo.Repository
+	URL       string
+}
+
+func (f *Forge) repo(full string) *forgejo.Repository {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.Repos {
+		if f.Repos[i].FullName == full {
+			return &f.Repos[i]
+		}
+	}
+	return nil
+}
+
+// SetRepos sets the repositories and which teams have them.
+func (f *Forge) SetRepos(repos []forgejo.Repository, teamRepos map[int64][]forgejo.Repository) {
+	f.mu.Lock()
+	f.Repos, f.TeamRepos = repos, teamRepos
+	f.mu.Unlock()
 }
 
 // NewForge starts a fake Forgejo with the given teams in every org.
@@ -174,6 +195,18 @@ func NewForge(t *testing.T, teams ...string) *Forge {
 			write(404, map[string]string{"message": "not found"})
 		case c.Method == "GET" && strings.HasSuffix(p, "/teams"):
 			write(200, f.Teams)
+		case c.Method == "GET" && strings.HasPrefix(p, "/teams/") && strings.HasSuffix(p, "/repos"):
+			var id int64
+			_, _ = fmt.Sscanf(p, "/teams/%d/repos", &id)
+			f.mu.Lock()
+			rs := f.TeamRepos[id]
+			f.mu.Unlock()
+			if rs == nil {
+				rs = []forgejo.Repository{}
+			}
+			write(200, rs)
+		case c.Method == "GET" && strings.HasPrefix(p, "/repos/") && strings.Count(p, "/") == 3 && f.repo(strings.TrimPrefix(p, "/repos/")) != nil:
+			write(200, f.repo(strings.TrimPrefix(p, "/repos/")))
 		case c.Method == "GET" && strings.HasSuffix(p, "/actions/runners/jobs"):
 			f.mu.Lock()
 			jobs := f.Jobs

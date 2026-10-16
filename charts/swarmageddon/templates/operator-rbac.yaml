@@ -77,6 +77,10 @@ rules:
   - apiGroups: [""]
     resources: [nodes, endpoints]
     verbs: [get, list, watch]
+  # Kubelet's stats summary (free node disk for RunnerPools' minFreeDiskGB).
+  - apiGroups: [""]
+    resources: [nodes/proxy]
+    verbs: [get]
   - apiGroups: ["discovery.k8s.io"]
     resources: [endpointslices]
     verbs: [get, list, watch]

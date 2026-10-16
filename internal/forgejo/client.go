@@ -539,6 +539,21 @@ func (c *Client) RemoveTeamMember(ctx context.Context, teamID int64, user string
 	return err
 }
 
+// ListTeamRepos lists the repositories a team has access to (all pages).
+func (c *Client) ListTeamRepos(ctx context.Context, teamID int64) ([]Repository, error) {
+	var all []Repository
+	for page := 1; ; page++ {
+		var rs []Repository
+		if err := c.do(ctx, http.MethodGet, fmt.Sprintf("/teams/%d/repos?limit=50&page=%d", teamID, page), nil, &rs); err != nil {
+			return nil, err
+		}
+		all = append(all, rs...)
+		if len(rs) < 50 {
+			return all, nil
+		}
+	}
+}
+
 // AddTeamRepo gives a team access to an org repo.
 func (c *Client) AddTeamRepo(ctx context.Context, teamID int64, org, repo string) error {
 	return c.do(ctx, http.MethodPut, fmt.Sprintf("/teams/%d/repos/%s/%s", teamID, esc(org), esc(repo)), nil, nil)
@@ -789,6 +804,23 @@ func (c *Client) RegisterOrgRunner(ctx context.Context, org, name, description s
 	var r RegisteredRunner
 	return &r, c.do(ctx, http.MethodPost, "/orgs/"+esc(org)+"/actions/runners",
 		map[string]any{"name": name, "description": description, "ephemeral": ephemeral}, &r)
+}
+
+// RegisterRepoRunner registers a runner on one repository (Forgejo >= 15):
+// it only ever gets that repository's jobs.
+func (c *Client) RegisterRepoRunner(ctx context.Context, owner, repo, name, description string, ephemeral bool) (*RegisteredRunner, error) {
+	var r RegisteredRunner
+	return &r, c.do(ctx, http.MethodPost, "/repos/"+esc(owner)+"/"+esc(repo)+"/actions/runners",
+		map[string]any{"name": name, "description": description, "ephemeral": ephemeral}, &r)
+}
+
+// DeleteRepoRunner removes a repository's runner.
+func (c *Client) DeleteRepoRunner(ctx context.Context, owner, repo string, id int64) error {
+	err := c.do(ctx, http.MethodDelete, fmt.Sprintf("/repos/%s/%s/actions/runners/%d", esc(owner), esc(repo), id), nil, nil)
+	if IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // DeleteOrgRunner removes a runner.
