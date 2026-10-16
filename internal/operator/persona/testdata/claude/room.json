@@ -26,5 +26,12 @@
   "approvalTimeoutSeconds": 86400,
   "env": {
     "FOO": "bar"
+  },
+  "network": {
+    "mode": "full"
+  },
+  "warden": {
+    "mode": "monitor",
+    "interruptOnHigh": true
   }
 }

@@ -11,6 +11,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -30,6 +32,7 @@ const (
 	KeyOreRequirements       = "ore-requirements.toml"
 	KeyOreConfig             = "ore-config.toml"
 	KeyOreRules              = "ore-persona.rules"
+	KeyClaudeAgentAdvisor    = "claude-agent-advisor.md"
 	DefaultApprovalTimeout   = 24 * time.Hour
 	GatewayKeyEnv            = "SWARM_GATEWAY_KEY"
 	defaultWorkDir           = "work"
@@ -51,6 +54,31 @@ type Input struct {
 	Role      *v1.RoleTemplate
 	Workspace *v1.Workspace
 	Endpoints Endpoints
+	// Settings are the merged layered settings (§6.6). Nil: the room's own
+	// env only, as before layering.
+	Settings *Settings
+}
+
+// AdvisorJSON is the room's advisor (ADR 0010). Its gateway key is
+// /run/swarm/identity/advisor_key.
+type AdvisorJSON struct {
+	Model           string `json:"model"`
+	Effort          string `json:"effort"`
+	MaxCallsPerHour int32  `json:"maxCallsPerHour"`
+	// Native: Claude rooms also run Claude Code's own advisor tool (the
+	// supervisor adds --advisor <model>).
+	Native bool `json:"native,omitempty"`
+}
+
+// WardenJSON is the in-room warden's configuration (ADR 0011, layers 1-3).
+// Its gateway key is /run/swarm/identity/warden_key. Rules are the role's;
+// the supervisor runs them after rules.Builtin (internal/warden/rules).
+type WardenJSON struct {
+	Mode             string          `json:"mode"`
+	Model            string          `json:"model,omitempty"`
+	InterruptOnHigh  bool            `json:"interruptOnHigh"`
+	QuarantineOnHigh bool            `json:"quarantineOnHigh,omitempty"`
+	Rules            []v1.WardenRule `json:"rules,omitempty"`
 }
 
 // RoomJSON is /etc/swarm/room.json.
@@ -79,6 +107,63 @@ type RoomJSON struct {
 	PermissionMode         string            `json:"permissionMode,omitempty"`
 	ApprovalTimeoutSeconds int64             `json:"approvalTimeoutSeconds"`
 	Env                    map[string]string `json:"env,omitempty"`
+	// SecretEnv names variables whose values are in the identity Secret,
+	// at env_<NAME>.
+	SecretEnv []string `json:"secretEnv,omitempty"`
+	// MCPServers names the layered MCP servers, rendered into the CLI's files.
+	MCPServers []string     `json:"mcpServers,omitempty"`
+	Network    Network      `json:"network"`
+	Advisor    *AdvisorJSON `json:"advisor,omitempty"`
+	Warden     WardenJSON   `json:"warden"`
+}
+
+// Advisor is the room's advisor with defaults applied (the room's spec
+// overrides the role's), or nil when there is none.
+func Advisor(r *v1.Room, role *v1.RoleTemplate) *AdvisorJSON {
+	a := role.Spec.Advisor
+	if r.Spec.Advisor != nil {
+		a = r.Spec.Advisor
+	}
+	if a == nil || a.Model == "" {
+		return nil
+	}
+	out := &AdvisorJSON{Model: a.Model, Effort: a.Effort, MaxCallsPerHour: a.MaxCallsPerHour, Native: a.Native}
+	if out.Effort == "" {
+		out.Effort = "high"
+	}
+	if out.MaxCallsPerHour <= 0 {
+		out.MaxCallsPerHour = 10
+	}
+	return out
+}
+
+// WardenMode is the room's effective warden mode.
+func WardenMode(r *v1.Room, ws *v1.Workspace) v1.WardenMode {
+	switch {
+	case r.Spec.WardenMode != "":
+		return r.Spec.WardenMode
+	case ws.Spec.Warden.Mode != "":
+		return ws.Spec.Warden.Mode
+	}
+	return v1.WardenMonitor
+}
+
+// Warden is the room's warden configuration.
+func Warden(r *v1.Room, role *v1.RoleTemplate, ws *v1.Workspace) WardenJSON {
+	w := ws.Spec.Warden
+	return WardenJSON{
+		Mode: string(WardenMode(r, ws)), Model: w.Model,
+		InterruptOnHigh:  w.InterruptOnHigh == nil || *w.InterruptOnHigh,
+		QuarantineOnHigh: w.QuarantineOnHigh,
+		Rules:            role.Spec.WardenRules,
+	}
+}
+
+func (in Input) settings() Settings {
+	if in.Settings != nil {
+		return *in.Settings
+	}
+	return Settings{Env: in.Room.Spec.Env, Network: Network{Mode: string(v1.NetworkFull)}}
 }
 
 // Email is the agent's address: <room>@agents.<workspace>.invalid (§9.1).
@@ -130,7 +215,14 @@ func Render(in Input) (map[string]string, error) {
 			return nil, err
 		}
 		out[KeyClaudeManagedSettings] = s
-		out[KeyClaudeManagedMCP] = claudeMCP
+		mcp, err := claudeMCP(in.settings())
+		if err != nil {
+			return nil, err
+		}
+		out[KeyClaudeManagedMCP] = mcp
+		if rj.Advisor != nil {
+			out[KeyClaudeAgentAdvisor] = claudeAdvisorAgent(rj.Advisor)
+		}
 		md, err := claudeMD(rj, role)
 		if err != nil {
 			return nil, err
@@ -158,6 +250,7 @@ func roomJSON(in Input) RoomJSON {
 	if cli == "" {
 		cli = string(v1.CLIClaude)
 	}
+	set := in.settings()
 	return RoomJSON{
 		Room: r.Name, Workspace: ws.Name, Address: r.Name + "@" + ws.Name,
 		DisplayName: r.Spec.DisplayName, Email: Email(r.Name, ws.Name), Group: r.Spec.Group,
@@ -169,24 +262,51 @@ func roomJSON(in Input) RoomJSON {
 		Sudo:                   r.Spec.Sudo == nil || *r.Spec.Sudo,
 		PermissionMode:         string(role.Spec.ClaudeCode.PermissionMode),
 		ApprovalTimeoutSeconds: int64(approvalTimeout(ws) / time.Second),
-		Env:                    r.Spec.Env,
+		Env:                    set.Env,
+		SecretEnv:              set.SecretEnv,
+		MCPServers:             slices.Sorted(maps.Keys(set.MCPServers)),
+		Network:                set.Network,
+		Advisor:                Advisor(r, role),
+		Warden:                 Warden(r, role, ws),
 	}
 }
 
 // ---- Claude Code (ADR 0006) ----
 
-// claudeMCP registers the in-room swarm MCP server. managed-mcp.json is
-// exclusive: agents can't add other MCP servers.
-const claudeMCP = `{
-  "mcpServers": {
-    "swarm": {
-      "type": "stdio",
-      "command": "swarm",
-      "args": ["mcp"]
-    }
-  }
+// claudeMCP renders managed-mcp.json: the in-room swarm server plus the
+// layered servers. It is exclusive: agents can't add other MCP servers.
+// Claude Code has no per-server tool allowlist here; enabledTools applies to
+// ore only.
+func claudeMCP(s Settings) (string, error) {
+	servers := map[string]MCPServer{"swarm": {Type: "stdio", Command: "swarm", Args: []string{"mcp"}}}
+	for name, m := range s.MCPServers {
+		if name == "swarm" {
+			continue
+		}
+		servers[name] = m
+	}
+	b, err := json.MarshalIndent(map[string]any{"mcpServers": servers}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b) + "\n", nil
 }
-`
+
+// claudeAdvisorAgent is the managed, read-only advisor subagent (ADR 0010).
+func claudeAdvisorAgent(a *AdvisorJSON) string {
+	return fmt.Sprintf(`---
+name: advisor
+description: A stronger second opinion. Consult it before committing to an approach, when an error recurs, and before declaring a task done. Give it the goal, your plan, the relevant paths and the exact question.
+tools: Read, Grep, Glob
+model: %s
+effort: %s
+---
+You are an advisor to an autonomous coding agent. You can read files but
+change nothing. Read what the agent points you to, then answer with the
+risks you see, a recommended plan, and what to verify. Never suggest
+bypassing reviews, branch protection, hooks or the warden.
+`, a.Model, a.Effort)
+}
 
 type hookCmd struct {
 	Type    string `json:"type"`
@@ -249,12 +369,18 @@ func claudeSettings(in Input) (string, error) {
 		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
 		"DISABLE_AUTOUPDATER":                      "1",
 	}
+	if a := Advisor(in.Room, in.Role); a != nil && a.Native {
+		env["CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL"] = "1"
+	}
 	s := map[string]any{
 		"permissions":           perms,
 		"hooks":                 hooks,
 		"crossSessionInbound":   "accept",
 		"allowManagedHooksOnly": true,
 		"env":                   env,
+	}
+	if a := Advisor(in.Room, in.Role); a != nil && a.Native {
+		s["advisorModel"] = a.Model
 	}
 	if cc.ManagedRulesOnly {
 		s["allowManagedPermissionRulesOnly"] = true
@@ -333,7 +459,8 @@ type oreProvider struct {
 }
 
 type oreMCPIdentity struct {
-	Command string `toml:"command"`
+	Command string `toml:"command,omitempty"`
+	URL     string `toml:"url,omitempty"`
 }
 
 type oreMCPRequirement struct {
@@ -351,9 +478,12 @@ type oreRequirements struct {
 }
 
 type oreMCPServer struct {
-	Command       string   `toml:"command"`
-	Args          []string `toml:"args"`
-	Required      bool     `toml:"required"`
+	Command       string            `toml:"command,omitempty"`
+	Args          []string          `toml:"args,omitempty"`
+	Env           map[string]string `toml:"env,omitempty"`
+	URL           string            `toml:"url,omitempty"`
+	HTTPHeaders   map[string]string `toml:"http_headers,omitempty"`
+	Required      bool              `toml:"required"`
 	EnabledTools  []string `toml:"enabled_tools,omitempty"`
 	DisabledTools []string `toml:"disabled_tools,omitempty"`
 }
@@ -413,6 +543,21 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 		Model: rj.Model, ModelProvider: "gateway", ModelReasoningEffort: rj.Effort,
 		ApprovalPolicy: policy, ApprovalsReviewer: reviewer, SandboxMode: sandbox,
 		MCPServers: map[string]oreMCPServer{"swarm": swarm},
+	}
+	// Layered MCP servers, with values written in: ore doesn't expand ${VAR}.
+	for name, m := range in.settings().MCPServers {
+		if name == "swarm" {
+			continue
+		}
+		srv := oreMCPServer{EnabledTools: m.EnabledTools}
+		if m.Type == "http" {
+			srv.URL, srv.HTTPHeaders = m.URL, m.Headers
+			req.MCPServers[name] = oreMCPRequirement{Identity: oreMCPIdentity{URL: m.URL}}
+		} else {
+			srv.Command, srv.Args, srv.Env = m.Command, m.Args, m.Env
+			req.MCPServers[name] = oreMCPRequirement{Identity: oreMCPIdentity{Command: m.Command}}
+		}
+		cfg.MCPServers[name] = srv
 	}
 	rb, err := encodeTOML(req)
 	if err != nil {
