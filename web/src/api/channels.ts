@@ -91,6 +91,8 @@ export interface AdvisorDraft {
   model: string;
   effort: string;
   maxCallsPerHour: number;
+  /** The advisor key's monthly budget; 0: the workspace's per-room budget. */
+  monthlyUSD: number;
   /** Claude's built-in advisor tool; its advice can't be audited. */
   native: boolean;
 }

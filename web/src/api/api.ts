@@ -103,7 +103,7 @@ export interface Api {
   watchLogs(workspace: string, room: string, component: LogComponent | "", signal: AbortSignal): AsyncIterable<LogLine>;
   getResources(workspace: string, room: string): Promise<Resources>;
   getStorage(workspace: string, room: string): Promise<Storage>;
-  prune(workspace: string, room: string, kind: PruneKind): Promise<{ reclaimedBytes: number }>;
+  prune(workspace: string, room: string, kind: PruneKind): Promise<{ reclaimedBytes: number; output?: string }>;
   roomAction(workspace: string, room: string, action: RoomAction): Promise<void>;
   getRoomSettings(workspace: string, room: string): Promise<RoomSettingsView>;
   /** Replaces the room's own level. */

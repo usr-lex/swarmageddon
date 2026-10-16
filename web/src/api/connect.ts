@@ -10,7 +10,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import * as pb from "@/gen/swarm/controlcenter/v1/controlcenter_pb";
 import { ApiError, type Api } from "./api";
 import { defaultStorm, defaultWarden } from "@/lib/workspace";
-import type { ChannelAccess, ChatChannelDraft, DeliveryMode, InboxItem, ReadScope, Severity, StormDraft, Verdict, WardenMode } from "./channels";
+import type { AdvisorDraft, ChannelAccess, ChatChannelDraft, DeliveryMode, InboxItem, MentionCandidate, ReadScope, Severity, StormDraft, Verdict, WardenDraft, WardenMode } from "./channels";
 import { emptySettings, type EffectiveSettings, type McpServer, type McpValue, type RoomSettings, type SettingSource, type SharedVolumeDraft } from "./settings";
 import type { ActivityEvent, ActivityKind, AgentAxes, Edges, HandoffKind, MessageEdge, ObservatoryApi, ObsWindow, ThroughputDay } from "./observatory";
 import type {
@@ -32,6 +32,7 @@ import type {
   RoomPhase,
   RoomProgress,
   RoomSummary,
+  TranscriptEntry,
   User,
   WizardStep,
   WorkspaceDraft,
@@ -272,9 +273,8 @@ function platformFrom(p: pb.Platform): Platform {
     tlsMode: hn?.tlsMode === "certManager" ? "certManager" : "selfSigned",
     issuerName: hn?.issuerName ?? "",
     issuerKind: hn?.issuerKind ?? "",
-    // The proto has no isolation tier setting; preflight's choice is in status.
-    isolationTier: "auto",
-    privilegedAccepted: false,
+    isolationTier: (["userns", "sysbox", "privileged"].includes(p.isolationTier) ? p.isolationTier : "auto") as PlatformSpec["isolationTier"],
+    privilegedAccepted: p.privilegedAccepted,
     localDisabled: si ? !si.localEnabled : false,
     oidc: (si?.oidc ?? []).map((o) => ({
       name: o.name,
@@ -329,6 +329,7 @@ function platformFrom(p: pb.Platform): Platform {
       roomEstimate: st?.roomEstimate ?? 0,
       clusterCIDRs: [],
       completed: st?.preflightDone ?? false,
+      rerunPending: !!st?.preflightRerunRequested && st.preflightRerunRequested !== st.preflightRerun,
     },
     conditions: (st?.conditions ?? []).map(conditionFrom),
     versions: st?.versions ?? {},
@@ -354,6 +355,26 @@ export function parseSMTP(target: string) {
   }
 }
 
+const wardenMode = (m: string): WardenMode | undefined => (m === "off" || m === "monitor" || m === "gate" ? m : undefined);
+
+const advisorFrom = (a: pb.AdvisorPlan): AdvisorDraft => ({
+  model: a.model,
+  effort: a.effort || "high",
+  maxCallsPerHour: a.maxCallsPerHour || 10,
+  monthlyUSD: a.monthlyUsd,
+  native: a.native,
+});
+
+const advisorTo = (a: AdvisorDraft) =>
+  create(pb.AdvisorPlanSchema, { model: a.model, effort: a.model ? a.effort : "", maxCallsPerHour: a.maxCallsPerHour, monthlyUsd: a.monthlyUSD, native: a.native });
+
+/** The full warden plan when the server sends one, else the mode and model over the defaults. */
+function wardenFrom(p: pb.WorkspacePlan): WardenDraft {
+  const w = p.warden;
+  if (w) return { mode: wardenMode(w.mode) ?? "monitor", model: w.model, interruptOnHigh: w.interruptOnHigh, quarantineOnHigh: w.quarantineOnHigh, monthlyUSD: w.monthlyUsd || 20 };
+  return { ...defaultWarden(), mode: wardenMode(p.wardenMode) ?? defaultWarden().mode, model: p.wardenModel };
+}
+
 function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
   return {
     name: p.name,
@@ -374,6 +395,8 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
       engineGi: parseGi(a.engineVolume),
       repos: a.repos,
       settings: settingsFrom(a.settings),
+      advisor: a.advisor ? (a.advisor.model ? advisorFrom(a.advisor) : null) : undefined,
+      wardenMode: wardenMode(a.wardenMode) ?? "",
     })),
     groups: p.groups.map((g) => g.name),
     defaultLinks: p.defaultLinks === "none" ? "none" : "withinGroup",
@@ -391,10 +414,8 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     events: p.notificationEvents as NotificationEvent[],
     chatChannels: p.channels.map(chatChannelFrom),
     storm: stormFrom(p.storm),
-    // WorkspacePlan carries the warden's mode and model only; the rest stays at the defaults.
-    warden: { ...defaultWarden(), mode: (["off", "monitor", "gate"].includes(p.wardenMode) ? p.wardenMode : defaultWarden().mode) as WardenMode, model: p.wardenModel },
-    // Advisors are not in WorkspacePlan; edited in the wizard but not sent.
-    advisors: {},
+    warden: wardenFrom(p),
+    advisors: mapValues(p.roleAdvisors, advisorFrom),
     roomDefaults: settingsFrom(p.roomDefaults),
     roleDefaults: mapValues(p.roleDefaults, settingsFrom),
     sharedVolumes: p.sharedVolumes.map(sharedVolumeFrom),
@@ -440,6 +461,9 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
         engineVolume: gi(r.engineGi),
         repos: r.repos,
         settings: settingsTo(r.settings),
+        // undefined inherits the role's advisor; null turns it off (an empty model).
+        advisor: r.advisor === undefined ? undefined : advisorTo(r.advisor ?? { model: "", effort: "", maxCallsPerHour: 0, monthlyUSD: 0, native: false }),
+        wardenMode: r.wardenMode ?? "",
       }),
     ),
     groups: d.groups.map((g) => from(pb.GroupPlanSchema, srcGroup.get(g), { name: g })),
@@ -452,10 +476,26 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     storm: create(pb.StormPlanSchema, { pushPerMinute: d.storm.pushPerMinute, coalesceBytes: d.storm.coalesceBytes, digestInterval: `${d.storm.digestMinutes}m`, fanoutPerMinute: d.storm.fanoutPerMinute }),
     wardenMode: d.warden.mode,
     wardenModel: d.warden.model,
+    warden: create(pb.WardenPlanSchema, {
+      mode: d.warden.mode,
+      model: d.warden.model,
+      interruptOnHigh: d.warden.interruptOnHigh,
+      quarantineOnHigh: d.warden.quarantineOnHigh,
+      monthlyUsd: d.warden.monthlyUSD,
+    }),
+    // Roles the draft names replace the template's advisor; an empty model removes it.
+    roleAdvisors: mapValues(d.advisors, advisorTo),
     roomDefaults: settingsTo(d.roomDefaults),
     roleDefaults: mapValues(d.roleDefaults, settingsTo),
     sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
   });
+}
+
+/** One transcript item as the Agent tab shows it. */
+export function transcriptFrom(i: pb.TranscriptItem): TranscriptEntry {
+  const kind = i.role === "tool_result" ? "toolResult" : i.role === "tool" || i.role === "user" || i.role === "assistant" ? i.role : "system";
+  const text = kind === "tool" ? `${i.toolName}: ${i.toolInput}` : kind === "toolResult" ? i.toolResult : i.text;
+  return { id: i.id, at: iso(i.at), kind, text, toolName: i.toolName || undefined };
 }
 
 const changeOp = (a: pb.ChangeAction) =>
@@ -478,7 +518,6 @@ function toApiError(e: unknown): unknown {
   return e;
 }
 
-const unimplemented = (what: string) => new ApiError("unimplemented", `${what} isn't available from the control center yet.`);
 
 /** Wraps every method so Connect errors surface as ApiError, for promises and streams alike. */
 function withErrors<T extends object>(o: T): T {
@@ -718,13 +757,8 @@ export function createConnectApi(transport: Transport = createConnectTransport({
       for await (const r of platform.watchPlatform({}, { signal })) if (r.platform) yield platformFrom(r.platform);
     },
     async updateIsolation(tier, privilegedAccepted) {
-      // The proto has no isolation-tier setting yet; "auto" needs none.
-      if (tier !== "auto" || privilegedAccepted)
-        throw new ApiError(
-          "unimplemented",
-          `The control center can't set the isolation tier yet. Run: kubectl patch platform default --type merge -p '{"spec":{"isolationTier":"${tier}","privilegedAccepted":${privilegedAccepted}}}'`,
-        );
-      return api.getPlatform();
+      const r = await platform.setIsolation({ tier, privilegedAccepted });
+      return platformFrom(r.platform!);
     },
     async updateSignIn(spec, secrets) {
       const r = await platform.updateSignIn({
@@ -776,7 +810,7 @@ export function createConnectApi(transport: Transport = createConnectTransport({
       await platform.setWizardStep({ step });
     },
     async rerunPreflight() {
-      throw unimplemented("Re-running preflight");
+      await platform.rerunPreflight({});
     },
 
     async listWorkspaces() {
@@ -867,9 +901,8 @@ export function createConnectApi(transport: Transport = createConnectTransport({
         contextTokens: Number(r.contextTokens),
       };
     },
-    // eslint-disable-next-line require-yield
-    async *watchTranscript() {
-      throw unimplemented("The read-only transcript");
+    async *watchTranscript(workspace, name, signal) {
+      for await (const r of rooms.watchTranscript({ ...ref(workspace, name), tailLines: 200 }, { signal })) if (r.item) yield transcriptFrom(r.item);
     },
     async *watchLogs(workspace, name, component, signal) {
       for await (const r of rooms.streamRoomLogs({ ...ref(workspace, name), follow: true, tailLines: 500n, component }, { signal })) yield { text: r.line };
@@ -891,8 +924,9 @@ export function createConnectApi(transport: Transport = createConnectTransport({
         sharedDirs: r.sharedDirs.map((d) => ({ name: d, readOnly: false })),
       };
     },
-    async prune() {
-      throw unimplemented("Pruning the room's engine");
+    async prune(workspace, name, kind) {
+      const r = await rooms.pruneEngine({ ...ref(workspace, name), kind });
+      return { reclaimedBytes: Number(r.reclaimedBytes), output: r.output };
     },
     async roomAction(workspace, name, a) {
       const r = ref(workspace, name);
@@ -1112,33 +1146,22 @@ export function createConnectApi(transport: Transport = createConnectTransport({
     async markRead(workspace, scope, upTo) {
       await channels.markChannelRead({ workspace, scope: scopeTo(scope), upTo: upTo ?? "" });
     },
-    // The proto has no channel stream: poll each workspace's unread items and yield the new ones.
+    // The server reads messaging for the person every ~2 s and streams new items.
     async *watchItems(signal) {
-      const seen = new Set<string>();
-      let first = true;
-      while (!signal.aborted) {
-        const wss = await myWorkspaces();
-        for (const workspace of wss) {
-          const r = await channels.readChannelMessages({ workspace, scope: "all", unreadOnly: true, limit: 50, full: true, markRead: false }, { signal }).catch(() => null);
-          for (const i of r?.items ?? []) {
-            if (seen.has(i.id)) continue;
-            seen.add(i.id);
-            if (!first) yield itemFrom(workspace, i);
-          }
-        }
-        first = false;
-        await new Promise((res) => {
-          const t = setTimeout(res, 5000);
-          signal.addEventListener("abort", () => (clearTimeout(t), res(undefined)), { once: true });
-        });
-      }
+      for await (const r of channels.watchChannelItems({}, { signal })) if (r.item) yield itemFrom(r.workspace, r.item);
     },
     async mentionCandidates(workspace) {
-      const rs = await listRooms(workspace);
+      const [ms, rs] = await Promise.all([channels.listMentionables({ workspace }), listRooms(workspace).catch(() => [] as pb.RoomSummary[])]);
       const roles = [...new Set(rs.map((r) => r.role).filter(Boolean))];
       const groups = [...new Set(rs.map((r) => r.group).filter(Boolean))];
       return [
-        ...rs.map((r) => ({ handle: r.name, kind: "agent" as const, detail: r.role })),
+        ...ms.mentionables.map(
+          (m): MentionCandidate => ({
+            handle: m.handle,
+            kind: m.kind === "person" ? "person" : "agent",
+            detail: [m.kind === "person" ? m.displayName : m.role, m.reachable ? "" : "not reachable from you"].filter(Boolean).join(" · "),
+          }),
+        ),
         ...roles.map((r) => ({ handle: `role:${r}`, kind: "group" as const, detail: `every ${r}` })),
         ...groups.map((g) => ({ handle: `group:${g}`, kind: "group" as const, detail: `group ${g}` })),
       ];

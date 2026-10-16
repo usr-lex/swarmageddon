@@ -21,14 +21,14 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
   const [tier, setTier] = useState<IsolationTier>(platform.spec.isolationTier || "auto");
   const [accepted, setAccepted] = useState(platform.spec.privilegedAccepted);
   const rerun = useMutation({ mutationFn: () => api().rerunPreflight() });
-  // Set when the control center can't store the tier itself and shows a kubectl command instead.
-  const [manual, setManual] = useState<string>();
+  // Set when storing the tier failed; the hint shows how to set it by hand.
+  const [saveError, setSaveError] = useState<unknown>();
   const next = async () => {
+    setSaveError(undefined);
     try {
       await save({ ...platform.spec, isolationTier: tier, privilegedAccepted: needsAccept && accepted }, "signin");
     } catch (e) {
-      if (e instanceof ApiError && e.code === "unimplemented") setManual(e.message);
-      else throw e;
+      setSaveError(e);
     }
   };
   const failed = pf.checks.filter((c) => c.result === "fail");
@@ -40,7 +40,7 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
       <Card
         title="Cluster checks"
         actions={
-          <Button onClick={() => rerun.mutate()} busy={rerun.isPending || !pf.completed}>
+          <Button onClick={() => rerun.mutate()} busy={rerun.isPending || !pf.completed || !!pf.rerunPending}>
             Run again
           </Button>
         }
@@ -107,13 +107,17 @@ export function PreflightStep({ platform, save, saving }: StepProps) {
       </Card>
 
       {failed.length > 0 && <p className="text-sm text-bad">Fix the failed checks, then run them again.</p>}
-      {manual && (
-        <div role="status" className="space-y-2 border border-border bg-surface-2 p-3 text-sm">
-          <p>{manual.split("Run:")[0]}</p>
-          {manual.includes("Run:") && <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap">{manual.split("Run:")[1].trim()}</pre>}
-          <Button onClick={() => save({ ...platform.spec, isolationTier: "auto", privilegedAccepted: false }, "signin")} busy={saving}>
-            I ran it; continue
-          </Button>
+      {saveError !== undefined && (
+        <div role="alert" className="space-y-2 border border-border bg-surface-2 p-3 text-sm">
+          <ErrorText error={saveError} />
+          {!(saveError instanceof ApiError && saveError.code === "permission_denied") && (
+            <>
+              <p className="text-muted">If the control center can't store it, an admin can set the tier with kubectl:</p>
+              <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap">
+                {`kubectl patch platform default --type merge -p '{"spec":{"isolationTier":"${tier}","privilegedAccepted":${needsAccept && accepted}}}'`}
+              </pre>
+            </>
+          )}
         </div>
       )}
       <div className="flex justify-end">
