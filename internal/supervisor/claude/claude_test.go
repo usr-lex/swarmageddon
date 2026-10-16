@@ -258,7 +258,10 @@ func TestHooksAndDelivery(t *testing.T) {
 	}
 
 	// Answered in the TUI: the PostToolUse hook for the same call ends the wait.
-	ev.approve = func(ctx context.Context, _ agent.Approval) (agent.Decision, error) { <-ctx.Done(); return agent.Decision{}, ctx.Err() }
+	ev.approve = func(ctx context.Context, _ agent.Approval) (agent.Decision, error) {
+		<-ctx.Done()
+		return agent.Decision{}, ctx.Err()
+	}
 	res := make(chan []byte, 1)
 	go func() {
 		out, _ := d.Hook(context.Background(), "PermissionRequest", []byte(`{"tool_name":"Bash","tool_input":{"command":"ls","description":"d"}}`), nil)

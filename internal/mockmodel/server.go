@@ -192,6 +192,9 @@ type call struct {
 	input  map[string]any // function arguments
 	custom string         // freeform input (Responses custom tools)
 	isCust bool
+	// namespace is set for Responses namespaced tools (ore exposes MCP
+	// servers as namespace "mcp__<server>" with the tool names inside).
+	namespace string
 }
 
 func (r reply) String() string {
@@ -239,7 +242,11 @@ func buildReply(api string, c *conversation, st *Step, def string, n int) reply 
 			r.call = commandCall(c, false, "cat > "+shellQuote(st.Write.Path)+" <<'EOF'\n"+st.Write.Content+"\nEOF")
 		}
 	case st.MCP != nil:
-		r.call = &call{name: mcpName(c, st.MCP.Server, st.MCP.Tool), input: st.MCP.Input}
+		if ns := "mcp__" + st.MCP.Server; has(c, ns) && api == "responses" {
+			r.call = &call{name: st.MCP.Tool, namespace: ns, input: st.MCP.Input}
+		} else {
+			r.call = &call{name: mcpName(c, st.MCP.Server, st.MCP.Tool), input: st.MCP.Input}
+		}
 	}
 	if r.call != nil && r.call.input == nil && !r.call.isCust {
 		r.call.input = map[string]any{}

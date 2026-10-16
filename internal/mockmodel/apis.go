@@ -167,7 +167,11 @@ func responsesOutput(r reply) []any {
 		if r.call.isCust {
 			out = append(out, map[string]any{"type": "custom_tool_call", "id": id, "call_id": callID, "name": r.call.name, "input": r.call.custom, "status": "completed"})
 		} else {
-			out = append(out, map[string]any{"type": "function_call", "id": id, "call_id": callID, "name": r.call.name, "arguments": r.args(), "status": "completed"})
+			fc := map[string]any{"type": "function_call", "id": id, "call_id": callID, "name": r.call.name, "arguments": r.args(), "status": "completed"}
+			if r.call.namespace != "" {
+				fc["namespace"] = r.call.namespace
+			}
+			out = append(out, fc)
 		}
 	}
 	return out

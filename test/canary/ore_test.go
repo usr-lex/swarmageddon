@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,6 +141,31 @@ func TestOre(t *testing.T) {
 	t.Run("swarm MCP send_message", func(t *testing.T) {
 		waitFor(t, "idle", 60*time.Second, func() bool { return r.core.CurrentPresence() == messagingv1.Presence_PRESENCE_IDLE })
 		r.fake.PushMessage("01MCP", "alice@acme", "MARK-MCP")
+		defer func() {
+			if !t.Failed() {
+				return
+			}
+			for _, q := range m.Requests() {
+				if q.Turn != "MARK-MCP" {
+					continue
+				}
+				var body struct {
+					Tools []map[string]any `json:"tools"`
+					Input []map[string]any `json:"input"`
+				}
+				json.Unmarshal([]byte(q.Body), &body)
+				var names []string
+				for _, tl := range body.Tools {
+					names = append(names, fmt.Sprint(tl["type"], ":", tl["name"]))
+				}
+				last := ""
+				if n := len(body.Input); n > 0 {
+					b, _ := json.Marshal(body.Input[n-1])
+					last = string(b)
+				}
+				t.Logf("step %d reply %s tools %v last input %.600s", q.Step, q.Reply, names, last)
+			}
+		}()
 		waitFor(t, "message sent through swarm mcp", 90*time.Second, func() bool {
 			sent, _, _, _, _, _ := r.fake.Snapshot()
 			for _, s := range sent {

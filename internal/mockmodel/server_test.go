@@ -94,6 +94,8 @@ func TestResponsesGolden(t *testing.T) {
 		`{"model":"m","stream":true,`+tools+`,"input":[{"type":"message","role":"developer","content":[{"type":"input_text","text":"sys"}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"MARK-CMD"}]}]}`))
 	golden(t, "responses_write_stream", post(t, hs, "/v1/responses",
 		`{"model":"m","stream":true,`+tools+`,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"MARK-WRITE"}]}]}`))
+	golden(t, "responses_mcp_namespace", post(t, hs, "/v1/responses",
+		`{"model":"m","tools":[{"type":"function","name":"exec_command"},{"type":"namespace","name":"mcp__swarm","tools":[{"type":"function","name":"send_message"}]}],"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"MARK-MCP"}]}]}`))
 	golden(t, "responses_steer_stream", post(t, hs, "/v1/responses",
 		`{"model":"m","stream":true,`+tools+`,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"MARK-CMD"}]},{"type":"function_call"},{"type":"function_call_output"},{"type":"message","role":"user","content":[{"type":"input_text","text":"steered in"}]}]}`))
 }

@@ -106,7 +106,7 @@ func Requirements(p Policy) ([]byte, error) {
 	r := map[string]any{
 		"allowed_approval_policies":   []string{p.approval()},
 		"allowed_approvals_reviewers": []string{p.reviewer()},
-		"allowed_sandbox_modes":       []string{p.sandbox()},
+		"allowed_sandbox_modes":       sandboxModes(p.sandbox()),
 		"model_provider":              "gateway",
 		"model_providers":             map[string]any{"gateway": p.Provider()},
 		"mcp_servers":                 servers,
@@ -155,6 +155,15 @@ func Config(p Policy) ([]byte, error) {
 		servers[n] = map[string]any{"enabled_tools": p.MCPTools[n]}
 	}
 	return encode(c)
+}
+
+// sandboxModes is the allowed set: ore 1.161 refuses a set without
+// read-only ("must include 'read-only' to allow any PermissionProfile").
+func sandboxModes(mode string) []string {
+	if mode == "read-only" {
+		return []string{mode}
+	}
+	return []string{"read-only", mode}
 }
 
 func encode(v any) ([]byte, error) {
