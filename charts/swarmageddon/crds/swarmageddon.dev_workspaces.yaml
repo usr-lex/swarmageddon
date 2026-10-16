@@ -109,6 +109,22 @@ spec:
                 required:
                 - org
                 type: object
+              forgeNotifications:
+                description: |-
+                  ForgeNotifications lists the forge events delivered to agents as messages
+                  (docs/design.md §9.7). Empty: all of them.
+                items:
+                  description: ForgeEvent is a kind of forge activity delivered to
+                    agents.
+                  enum:
+                  - assigned
+                  - reviewRequested
+                  - mentioned
+                  - reviewSubmitted
+                  - commented
+                  - ciFailed
+                  type: string
+                type: array
               groups:
                 items:
                   properties:
@@ -123,14 +139,83 @@ spec:
                 type: array
               internet:
                 default: true
-                description: 'Room egress: false cuts rooms off from the internet;
-                  platform services stay reachable.'
+                description: 'Deprecated: use roomDefaults.network. false is the same
+                  as network mode none.'
                 type: boolean
               isolationTier:
                 default: inherit
                 type: string
               messaging:
                 properties:
+                  channels:
+                    description: Channels are the workspace's one-to-many conversations
+                      (docs/design.md §7.8).
+                    items:
+                      description: ChannelSpec is a named conversation and who may
+                        read and post in it.
+                      properties:
+                        allowedDelivery:
+                          description: 'AllowedDelivery lists the modes readers may
+                            switch to. Empty: all.'
+                          items:
+                            description: DeliveryMode is how a channel's posts reach
+                              a reader's session.
+                            enum:
+                            - push
+                            - digest
+                            - pull
+                            type: string
+                          type: array
+                        defaultDelivery:
+                          default: digest
+                          description: DeliveryMode is how a channel's posts reach
+                            a reader's session.
+                          enum:
+                          - push
+                          - digest
+                          - pull
+                          type: string
+                        description:
+                          type: string
+                        members:
+                          items:
+                            description: ChannelMember selects members and gives them
+                              access.
+                            properties:
+                              access:
+                                description: ChannelAccess is what a channel member
+                                  may do.
+                                enum:
+                                - read
+                                - write
+                                - readWrite
+                                type: string
+                              select:
+                                description: |-
+                                  Selector: everyone, people, role:<template>, team:<forge team>,
+                                  group:<group>, room:<name> or person:<handle>.
+                                pattern: ^(everyone|people|(role|team|group|room|person):[a-z0-9][a-z0-9_-]{0,62})$
+                                type: string
+                            required:
+                            - access
+                            - select
+                            type: object
+                          minItems: 1
+                          type: array
+                        name:
+                          description: 'Name without the leading #.'
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,62}$
+                          type: string
+                        postsPerMinute:
+                          description: PostsPerMinute across all posters. Default
+                            20.
+                          format: int32
+                          type: integer
+                      required:
+                      - members
+                      - name
+                      type: object
+                    type: array
                   defaultLinks:
                     default: withinGroup
                     description: DefaultLinks is how rooms in the same group reach
@@ -210,6 +295,30 @@ spec:
                       transcripts:
                         type: string
                     type: object
+                  storm:
+                    description: Storm keeps agents' sessions from being flooded (docs/design.md
+                      §7.8).
+                    properties:
+                      coalesceBytes:
+                        description: CoalesceBytes caps one coalesced injection. Default
+                          4096.
+                        format: int32
+                        type: integer
+                      digestInterval:
+                        description: DigestInterval between digest notices per channel.
+                          Default 15m.
+                        type: string
+                      fanoutPerMinute:
+                        description: FanoutPerMinute caps recipients a sender reaches
+                          per minute. Default 60.
+                        format: int32
+                        type: integer
+                      pushPerMinute:
+                        description: PushPerMinute is how many items may be pushed
+                          into a session per minute. Default 6.
+                        format: int32
+                        type: integer
+                    type: object
                 type: object
               models:
                 properties:
@@ -259,6 +368,7 @@ spec:
                       - budget
                       - diskLow
                       - roomCrashed
+                      - wardenFlag
                       type: string
                     type: array
                 type: object
@@ -296,6 +406,183 @@ spec:
                   - name
                   type: object
                 type: array
+              roomDefaults:
+                description: RoomDefaults apply to every room of the workspace (docs/design.md
+                  §6.6).
+                properties:
+                  env:
+                    additionalProperties:
+                      type: string
+                    description: Env adds non-secret environment variables.
+                    type: object
+                  mcpServers:
+                    additionalProperties:
+                      description: MCPServer is one MCP server, as in .mcp.json.
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        command:
+                          type: string
+                        disabled:
+                          description: Disabled removes a server inherited from an
+                            earlier level.
+                          type: boolean
+                        enabledTools:
+                          description: 'EnabledTools limits the server''s tools; empty:
+                            all.'
+                          items:
+                            type: string
+                          type: array
+                        env:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        headers:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        type:
+                          description: stdio (default when command is set) or http.
+                          enum:
+                          - stdio
+                          - http
+                          type: string
+                        url:
+                          type: string
+                      type: object
+                    description: MCPServers for both CLIs, by name, in the .mcp.json
+                      format.
+                    type: object
+                  network:
+                    description: Network is the room's network access (docs/design.md
+                      §11.2).
+                    properties:
+                      domains:
+                        description: |-
+                          Domains reachable in limited mode: exact hosts or *.suffix, with an
+                          optional :port (default 443 and 80). Merged across levels.
+                        items:
+                          type: string
+                        type: array
+                      mode:
+                        default: full
+                        description: NetworkMode is how much network a room gets.
+                        enum:
+                        - none
+                        - limited
+                        - full
+                        type: string
+                      packageManagers:
+                        description: PackageManagers adds the package registries'
+                          domains in limited mode.
+                        type: boolean
+                    type: object
+                  secretEnv:
+                    description: |-
+                      SecretEnv adds environment variables whose values come from Secrets in
+                      the workspace namespace.
+                    items:
+                      description: SecretEnvVar is an environment variable whose value
+                        comes from a Secret.
+                      properties:
+                        name:
+                          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                          type: string
+                        secretRef:
+                          description: SecretKeyRef names a key of a Secret in the
+                            workspace namespace.
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - name
+                      - secretRef
+                      type: object
+                    type: array
+                type: object
+              sharedVolumes:
+                description: SharedVolumes are ReadWriteMany volumes shared between
+                  rooms.
+                items:
+                  description: |-
+                    SharedVolume is a ReadWriteMany volume mounted into the rooms its mounts
+                    select, at /srv/shared/<name> (docs/design.md §6.6).
+                  properties:
+                    mounts:
+                      items:
+                        description: VolumeMount selects rooms for a shared volume.
+                        properties:
+                          readOnly:
+                            type: boolean
+                          select:
+                            description: 'Selector: everyone, role:<template>, group:<group>
+                              or room:<name>.'
+                            pattern: ^(everyone|(role|group|room):[a-z0-9][a-z0-9_-]{0,62})$
+                            type: string
+                        required:
+                        - select
+                        type: object
+                      minItems: 1
+                      type: array
+                    name:
+                      pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+                      type: string
+                    size:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    storageClassName:
+                      type: string
+                  required:
+                  - mounts
+                  - name
+                  - size
+                  type: object
+                type: array
               updatePolicy:
                 properties:
                   mode:
@@ -309,6 +596,37 @@ spec:
                   window:
                     description: Window, for mode window, e.g. "Sat 02:00-06:00" (UTC).
                     type: string
+                type: object
+              warden:
+                description: Warden watches agents for drift and risky actions (ADR
+                  0011).
+                properties:
+                  interruptOnHigh:
+                    default: true
+                    description: InterruptOnHigh interrupts the agent's turn on a
+                      high-severity verdict.
+                    type: boolean
+                  mode:
+                    default: monitor
+                    description: WardenMode is how closely the warden watches.
+                    enum:
+                    - "off"
+                    - monitor
+                    - gate
+                    type: string
+                  model:
+                    description: 'Model the warden judges with: a small, fast model
+                      on the gateway. Empty: rules only.'
+                    type: string
+                  monthlyUSD:
+                    description: Monthly budget of each room's warden key in USD.
+                      Default 20.
+                    format: int32
+                    type: integer
+                  quarantineOnHigh:
+                    description: QuarantineOnHigh quarantines on high verdicts from
+                      the gateway guard, not only critical ones.
+                    type: boolean
                 type: object
             required:
             - forge

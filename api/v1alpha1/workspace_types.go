@@ -28,7 +28,13 @@ type WorkspaceSpec struct {
 	// Owners are control center users (by email or handle) who operate this workspace.
 	// +optional
 	Owners []string `json:"owners,omitempty"`
-	// Room egress: false cuts rooms off from the internet; platform services stay reachable.
+	// RoomDefaults apply to every room of the workspace (docs/design.md §6.6).
+	// +optional
+	RoomDefaults RoomDefaults `json:"roomDefaults,omitempty"`
+	// SharedVolumes are ReadWriteMany volumes shared between rooms.
+	// +optional
+	SharedVolumes []SharedVolume `json:"sharedVolumes,omitempty"`
+	// Deprecated: use roomDefaults.network. false is the same as network mode none.
 	// +kubebuilder:default=true
 	// +optional
 	Internet *bool `json:"internet,omitempty"`

@@ -45,6 +45,31 @@ spec:
               RoleTemplateSpec is a persona: role text plus CLI policy. Personas are
               guardrails, not security (docs/design.md §6.4).
             properties:
+              advisor:
+                description: 'Advisor the agent can consult with `swarm advise` (ADR
+                  0010). No model: no advisor.'
+                properties:
+                  effort:
+                    type: string
+                  maxCallsPerHour:
+                    default: 10
+                    format: int32
+                    type: integer
+                  model:
+                    description: Model, as the gateway names it.
+                    type: string
+                  monthlyUSD:
+                    description: 'Monthly budget of the advisor''s own gateway key
+                      in USD; 0: the workspace''s per-room budget.'
+                    format: int32
+                    type: integer
+                  native:
+                    description: Native also turns on Claude Code's built-in advisor
+                      tool (Claude rooms only; unauditable).
+                    type: boolean
+                required:
+                - model
+                type: object
               autoApprove:
                 description: AutoApprove rules the control center applies to approval
                   requests.
@@ -145,11 +170,182 @@ spec:
               roleText:
                 description: RoleText is written to the agent.
                 type: string
+              roomDefaults:
+                description: RoomDefaults apply to rooms of this role, over the workspace's
+                  (docs/design.md §6.6).
+                properties:
+                  env:
+                    additionalProperties:
+                      type: string
+                    description: Env adds non-secret environment variables.
+                    type: object
+                  mcpServers:
+                    additionalProperties:
+                      description: MCPServer is one MCP server, as in .mcp.json.
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        command:
+                          type: string
+                        disabled:
+                          description: Disabled removes a server inherited from an
+                            earlier level.
+                          type: boolean
+                        enabledTools:
+                          description: 'EnabledTools limits the server''s tools; empty:
+                            all.'
+                          items:
+                            type: string
+                          type: array
+                        env:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        headers:
+                          additionalProperties:
+                            description: MCPValue is a literal value, or one taken
+                              from a Secret.
+                            properties:
+                              value:
+                                type: string
+                              valueFrom:
+                                description: SecretKeyRef names a key of a Secret
+                                  in the workspace namespace.
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            type: object
+                          type: object
+                        type:
+                          description: stdio (default when command is set) or http.
+                          enum:
+                          - stdio
+                          - http
+                          type: string
+                        url:
+                          type: string
+                      type: object
+                    description: MCPServers for both CLIs, by name, in the .mcp.json
+                      format.
+                    type: object
+                  network:
+                    description: Network is the room's network access (docs/design.md
+                      §11.2).
+                    properties:
+                      domains:
+                        description: |-
+                          Domains reachable in limited mode: exact hosts or *.suffix, with an
+                          optional :port (default 443 and 80). Merged across levels.
+                        items:
+                          type: string
+                        type: array
+                      mode:
+                        default: full
+                        description: NetworkMode is how much network a room gets.
+                        enum:
+                        - none
+                        - limited
+                        - full
+                        type: string
+                      packageManagers:
+                        description: PackageManagers adds the package registries'
+                          domains in limited mode.
+                        type: boolean
+                    type: object
+                  secretEnv:
+                    description: |-
+                      SecretEnv adds environment variables whose values come from Secrets in
+                      the workspace namespace.
+                    items:
+                      description: SecretEnvVar is an environment variable whose value
+                        comes from a Secret.
+                      properties:
+                        name:
+                          pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                          type: string
+                        secretRef:
+                          description: SecretKeyRef names a key of a Secret in the
+                            workspace namespace.
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - name
+                      - secretRef
+                      type: object
+                    type: array
+                type: object
               summary:
                 description: One line, shown in teammates' team lists.
                 type: string
               title:
                 type: string
+              wardenRules:
+                description: WardenRules adds rules to the warden's rule table for
+                  rooms of this role (ADR 0011).
+                items:
+                  description: |-
+                    WardenRule matches a tool call by tool name and a regular expression over
+                    its command or path.
+                  properties:
+                    action:
+                      description: WardenAction is what a warden rule does with a
+                        matching tool call.
+                      enum:
+                      - allow
+                      - deny
+                      - escalate
+                      type: string
+                    match:
+                      description: Match is a regular expression against the command
+                        or file path.
+                      type: string
+                    name:
+                      type: string
+                    reason:
+                      type: string
+                    tool:
+                      description: 'Tool name (Claude: Bash, Edit, ...; ore: exec,
+                        patch); "*" for any.'
+                      type: string
+                  required:
+                  - action
+                  - match
+                  - name
+                  - tool
+                  type: object
+                type: array
             required:
             - roleText
             - title

@@ -38,6 +38,7 @@ type RoomSpec struct {
 	Resources RoomResources `json:"resources,omitempty"`
 	// +optional
 	Volumes RoomVolumes `json:"volumes,omitempty"`
+	// Deprecated: use Workspace.spec.sharedVolumes.
 	// +optional
 	SharedDirs []SharedDir `json:"sharedDirs,omitempty"`
 	// Repos (owner/name in the forge) cloned into ~/work on first start.
@@ -46,9 +47,18 @@ type RoomSpec struct {
 	// WorkDir the agent starts in, relative to its home. Default "work".
 	// +optional
 	WorkDir string `json:"workDir,omitempty"`
-	// Env adds non-secret environment variables.
+	// Env adds non-secret environment variables, over the role's and workspace's.
 	// +optional
 	Env map[string]string `json:"env,omitempty"`
+	// SecretEnv adds variables from Secrets in the workspace namespace.
+	// +optional
+	SecretEnv []SecretEnvVar `json:"secretEnv,omitempty"`
+	// MCPServers for this room, over the role's and workspace's.
+	// +optional
+	MCPServers map[string]MCPServer `json:"mcpServers,omitempty"`
+	// Network access for this room, over the role's and workspace's.
+	// +optional
+	Network *NetworkAccess `json:"network,omitempty"`
 	// Sudo gives the agent passwordless sudo inside the room.
 	// +kubebuilder:default=true
 	// +optional
