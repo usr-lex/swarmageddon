@@ -1293,6 +1293,20 @@ binary. The detail is in the ADRs.
   - push mirrors
 - forgejo-runner 13.2: `one-job` is required for ephemeral runners, and there
   are no job hooks.
+- Forgejo 17.0.0, run against a real server (2026-10-16):
+  - `POST /admin/users/{u}/tokens` issues an agent's token with the scopes in
+    §9.1 (`write:repository`, `write:issue`, `read:organization`,
+    `read:user`, `write:package`, `read:notification`)
+  - admin-created users' emails are verified
+  - a GPG key added through `Sudo` with a signed `gpg_key_token` is
+    verified, and commits signed with it verify. git must be told
+    `gpg.format=openpgp`: an inherited `gpg.format=ssh` produces SSH
+    signatures that protection rejects
+  - a team with `can_create_org_repo: false` stops agents creating org
+    repositories (403)
+  - a protected default branch refuses direct pushes, force pushes,
+    deletion and unverified commits, and refuses merging a PR without the
+    required approvals
 - `tea` 0.16: PR review and approval. `fj` 0.7 can't approve.
 - Sysbox v0.7.1: its supported versions, no k3s, the containerd 2 issue.
 - User namespaces and `procMount` are GA in Kubernetes 1.36. k3s ships
@@ -1309,10 +1323,7 @@ binary. The detail is in the ADRs.
 |---|---|
 | Podman as root in a user-namespaced pod on containerd 2 runs builds, compose and Testcontainers. `/dev/fuse` and `/dev/net/tun` through a device plugin are enough | M1 spike |
 | Claude Code's inbox frame format (undocumented) stays stable within a pinned version. A canary guards it | M1 / M2 |
-| A protected branch blocks force-push and deletion in Forgejo, as in Gitea | M1 test |
-| Admin-created Forgejo users' emails count as activated for GPG verification | M1 |
 | Forgejo's OCI registry works with token auth (`write:package`) | M5 |
-| Forgejo's exact token scope names in 17 | M1 |
 | LiteLLM keeps serving known keys while PostgreSQL is briefly down | M3 |
 | `tea` arm64 builds, or that we can build them | M1 |
 | Thousands of R3 JetStream consumers aren't needed at our scale | Measured in M2 |
