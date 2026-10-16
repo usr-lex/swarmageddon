@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/oklog/ulid/v2"
+	"google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -189,7 +191,6 @@ func TestChannels(t *testing.T) {
 		}
 	})
 
-	var firstDigest time.Time
 	t.Run("post with a mention pushes", func(t *testing.T) {
 		res := post(t, atlas, "reviewers", "@athena please review #4; @metis can't see this")
 		if strings.Join(res.Mentioned, ",") != "athena@chat" {
@@ -206,7 +207,6 @@ func TestChannels(t *testing.T) {
 		}
 		// apollo reads #reviewers as a digest.
 		d = apollo.waitFor(t, "the first digest", func(d *messagingv1.Delivery) bool { return d.GetDigest() != nil })
-		firstDigest = time.Now()
 		if g := d.GetDigest(); g.Channel != "reviewers" || g.NewPosts != 1 || g.Posters[0] != "atlas@chat" {
 			t.Fatalf("digest %v", g)
 		}
@@ -228,17 +228,24 @@ func TestChannels(t *testing.T) {
 	})
 
 	t.Run("digest at most once per interval", func(t *testing.T) {
-		// The digest tick is 300ms and the interval 2s: without the
-		// interval, "second" would get a digest of its own.
+		// The digest tick is 300ms and the interval 2s. Start from a fresh
+		// digest, so the interval is measured from a known point whatever
+		// the earlier subtests cost; then two posts well inside the
+		// interval must share the next digest.
+		post(t, atlas, "reviewers", "anchor")
+		apollo.waitFor(t, "a fresh digest", func(d *messagingv1.Delivery) bool {
+			return slices.Contains(d.GetDigest().GetPreviews(), "anchor")
+		})
+		anchor := time.Now()
 		post(t, atlas, "reviewers", "second")
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 		post(t, atlas, "reviewers", "third")
-		d := apollo.waitFor(t, "the second digest", func(d *messagingv1.Delivery) bool { return d.GetDigest() != nil })
+		d := apollo.waitFor(t, "the next digest", func(d *messagingv1.Delivery) bool { return d.GetDigest() != nil })
 		if g := d.GetDigest(); g.NewPosts != 2 || strings.Join(g.Previews, ",") != "second,third" {
 			t.Fatalf("digest %v", g)
 		}
-		if since := time.Since(firstDigest); since < 1500*time.Millisecond {
-			t.Fatalf("second digest %s after the first; the interval is 2s", since)
+		if since := time.Since(anchor); since < 1500*time.Millisecond {
+			t.Fatalf("next digest %s after the last; the interval is 2s", since)
 		}
 	})
 
@@ -373,9 +380,20 @@ func TestChannels(t *testing.T) {
 		reps[li] = nil
 		time.Sleep(2 * time.Second) // past the digest interval
 		post(t, poster, "reviewers", "after failover")
-		d := apollo.waitFor(t, "a digest from the new leader", func(d *messagingv1.Delivery) bool { return d.GetDigest() != nil })
-		if g := d.GetDigest(); g.NewPosts != 1 || g.Previews[0] != "after failover" {
+		// The new leader sends the digest. By now apollo may have used its
+		// push budget for the minute, in which case storm control holds the
+		// digest and pushes the "messages are waiting" notice instead (§7.8).
+		// Either proves the new leader is digesting.
+		d := apollo.waitFor(t, "a digest or a budget notice from the new leader", func(d *messagingv1.Delivery) bool {
+			return d.GetDigest() != nil || strings.Contains(d.GetNotice().GetText(), "waiting")
+		})
+		if g := d.GetDigest(); g != nil && (g.NewPosts != 1 || g.Previews[0] != "after failover") {
 			t.Fatalf("digest %v", g)
+		}
+		// And the post itself survived the failover.
+		r := read(t, client((li+2)%3, "apollo"), &messagingv1.ReadMessagesRequest{Scope: "reviewers", UnreadOnly: proto.Bool(false), Limit: 50})
+		if !strings.Contains(bodies(r.Items), "after failover") {
+			t.Fatalf("apollo's #reviewers after the failover: %v", r.Items)
 		}
 	})
 }
