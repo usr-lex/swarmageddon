@@ -31,9 +31,9 @@ func must(t *testing.T, err error) {
 }
 
 func setup(t *testing.T) (client.Client, *Reconciler, *roomtest.Forge) {
-	c, _ := roomtest.Client(t)
+	c, op, _ := roomtest.Client(t)
 	f := roomtest.NewForge(t)
-	r := &Reconciler{Client: c, Deps: deps.Deps{
+	r := &Reconciler{Client: op, Deps: deps.Deps{
 		Images: &roomtest.Images{RunnerImage: "runner:1"}, Forge: f.Client,
 		PlatformTier: func(context.Context) (string, error) { return "userns", nil },
 	}}
