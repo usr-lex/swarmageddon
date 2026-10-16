@@ -650,8 +650,9 @@ The operator creates the claim in the workspace namespace and mounts it at
 `/srv/shared/<name>` in each matching room.
 
 - **Walls:** a volume may not be mounted read-write on both sides of a
-  wall. The workspace controller refuses that, so a wall can't be crossed
-  through a disk.
+  wall. If a workspace asks for that, the operator mounts it read-only in
+  every room and sets the rooms' `SettingsReady` condition to say why, so a
+  wall can't be crossed through a disk and no room loses its other settings.
 - **No ReadWriteMany:** preflight reports whether the cluster offers RWX
   (§3.4). Without it, the wizard hides shared volumes.
 - **Identity mapping:** under the `userns` tier, a shared volume needs a
@@ -1344,7 +1345,9 @@ written in Go):
   - RubyGems
   - Maven Central
   - the Ubuntu archive and security mirrors
-  - GitHub release downloads
+  - GitHub release downloads (`objects.githubusercontent.com`,
+    `release-assets.githubusercontent.com`; not `github.com` itself, which
+    a person adds when a room should clone from GitHub)
 
   Docker Hub is already covered by the registry cache.
 - **Refusals:** a 403 with a plain-text body naming the room's mode and how

@@ -5,6 +5,7 @@
 package directory
 
 import (
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -29,6 +30,8 @@ type Room struct {
 	Group       string
 	Title       string // from the room's RoleTemplate
 	Summary     string
+	Role        string   // RoleTemplate name
+	Teams       []string // forge teams: the template's and spec.forge.teams
 }
 
 // Workspace is a snapshot of one workspace: its policy and its rooms.
@@ -38,6 +41,10 @@ type Workspace struct {
 	Messaging       v1alpha1.MessagingPolicy
 	ApprovalTimeout time.Duration
 	Rooms           map[string]Room
+	// Roles and Teams are the role templates and forge teams that exist,
+	// for validating channel selectors.
+	Roles map[string]bool
+	Teams map[string]bool
 }
 
 // MaxBytes is the largest message body allowed.
@@ -132,6 +139,8 @@ func FromObjects(ws *v1alpha1.Workspace, rooms []v1alpha1.Room, roles []v1alpha1
 		Messaging:       ws.Spec.Messaging,
 		ApprovalTimeout: DefaultApprovalTimeout,
 		Rooms:           map[string]Room{},
+		Roles:           map[string]bool{},
+		Teams:           map[string]bool{},
 	}
 	if ws.Spec.ApprovalTimeout != nil {
 		out.ApprovalTimeout = ws.Spec.ApprovalTimeout.Duration
@@ -142,14 +151,27 @@ func FromObjects(ws *v1alpha1.Workspace, rooms []v1alpha1.Room, roles []v1alpha1
 	byName := map[string]*v1alpha1.RoleTemplate{}
 	for i := range roles {
 		byName[roles[i].Name] = &roles[i]
+		out.Roles[roles[i].Name] = true
+		for _, t := range roles[i].Spec.ForgeTeams {
+			out.Teams[t] = true
+		}
+	}
+	for _, t := range ws.Spec.Forge.Teams {
+		out.Teams[t.Name] = true
 	}
 	for _, r := range rooms {
 		if r.DeletionTimestamp != nil {
 			continue
 		}
-		room := Room{Name: r.Name, DisplayName: r.Spec.DisplayName, Group: r.Spec.Group}
+		room := Room{Name: r.Name, DisplayName: r.Spec.DisplayName, Group: r.Spec.Group, Role: r.Spec.Role}
 		if rt := byName[r.Spec.Role]; rt != nil {
 			room.Title, room.Summary = rt.Spec.Title, rt.Spec.Summary
+			room.Teams = append(room.Teams, rt.Spec.ForgeTeams...)
+		}
+		for _, t := range ws.Spec.Forge.Teams {
+			if slices.Contains(t.Members, r.Name) && !slices.Contains(room.Teams, t.Name) {
+				room.Teams = append(room.Teams, t.Name)
+			}
 		}
 		out.Rooms[r.Name] = room
 	}

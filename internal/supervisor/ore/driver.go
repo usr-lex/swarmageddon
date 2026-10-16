@@ -194,7 +194,7 @@ func (d *Driver) runOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	c.OnNotification = d.onNotification
 	c.OnRequest = func(id json.RawMessage, method string, params json.RawMessage) {
 		d.onRequest(runCtx, c, id, method, params)

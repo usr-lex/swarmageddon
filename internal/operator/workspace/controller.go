@@ -125,6 +125,11 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 	}
 	setCond(w, ConditionRoleTemplatesReady, true, "Ready", "built-in role templates present")
 
+	if err := r.reconcileChannels(ctx, w, ns); err != nil {
+		setCond(w, ConditionChannelsValid, false, "Error", err.Error())
+		return ctrl.Result{}, err
+	}
+
 	retry := false
 	if err := r.reconcileForge(ctx, w); err != nil {
 		if !errors.Is(err, deps.ErrNotReady) {

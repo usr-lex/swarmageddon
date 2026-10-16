@@ -16,7 +16,7 @@ import (
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "version") {
-		os.Stdout.WriteString(version.Version + "\n")
+		_, _ = os.Stdout.WriteString(version.Version + "\n")
 		return
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)

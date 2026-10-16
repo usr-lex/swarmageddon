@@ -82,7 +82,7 @@ func (s *Server) AnswerApproval(ctx context.Context, req *connect.Request[messag
 	if a.AnsweredAt == nil {
 		a.AnsweredAt = timestamppb.Now()
 	}
-	d := &messagingv1.Delivery{Item: &messagingv1.Delivery_ApprovalAnswer{ApprovalAnswer: a}}
+	d := &messagingv1.Delivery{Urgent: true, Item: &messagingv1.Delivery_ApprovalAnswer{ApprovalAnswer: a}}
 	dup, err := s.st.Deliver(ctx, ws.Name, room, "answer/"+a.ApprovalId, d)
 	if err != nil {
 		return nil, unavailable(err)

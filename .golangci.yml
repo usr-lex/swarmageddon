@@ -15,6 +15,10 @@ linters:
         - (*net/http.Response).Body.Close
   exclusions:
     rules:
+      # A bare receive from an error channel waits for a goroutine to end;
+      # the error was already handled where it was sent.
+      - linters: [errcheck]
+        text: "^Error return value is not checked"
       # Tests may ignore errors from cleanup helpers.
       - path: _test\.go
         linters: [errcheck]

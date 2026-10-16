@@ -74,7 +74,7 @@ func subscribeOnce(ctx context.Context, c messagingv1connect.MessagingServiceCli
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	log.Info("subscribed to messaging")
 	items := make(chan *messagingv1.Delivery, 256)
 	ended := make(chan error, 1)
