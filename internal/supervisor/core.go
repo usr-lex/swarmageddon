@@ -17,6 +17,7 @@ import (
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	"github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1/messagingv1connect"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/advisor"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/janitor"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/msgclient"
@@ -46,6 +47,8 @@ type Core struct {
 	StatusDebounce time.Duration
 	// CoalesceBytes caps one injected message (default 4096).
 	CoalesceBytes int
+	// Advisor serves `swarm advise`; nil when the room has none.
+	Advisor *advisor.Advisor
 
 	mu        sync.Mutex
 	presence  messagingv1.Presence
@@ -129,6 +132,13 @@ func (c *Core) Task(text string) {
 	c.status.CurrentTask = text
 	c.mu.Unlock()
 	kick(c.statusC)
+}
+
+// CurrentTask returns the agent's current task.
+func (c *Core) CurrentTask() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.status.CurrentTask
 }
 
 // Tokens implements agent.Events.

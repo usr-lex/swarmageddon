@@ -17,12 +17,14 @@ import (
 	"connectrpc.com/connect"
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/advisor"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/claude"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/display"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/engine"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/identity"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/janitor"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/llm"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/msgclient"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/ore"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
@@ -61,6 +63,18 @@ func installPersona(dir string) error {
 	}
 	return errors.Join(errs...)
 }
+
+// Identity Secret keys the supervisor reads besides the identity files
+// (docs/conventions.md).
+const (
+	KeyGateway     = "gateway_key"
+	KeyAdvisor     = "advisor_key"
+	KeyWarden      = "warden_key"
+	KeyEgressAuth  = "egress_auth"
+	KeyVNCPassword = "vnc_password"
+	// SecretEnvPrefix: each key env.<NAME> is the value of variable NAME.
+	SecretEnvPrefix = "env."
+)
 
 func readSecret(name string) string {
 	b, _ := os.ReadFile(filepath.Join(roomcfg.IdentityDir, name))
@@ -136,7 +150,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	start(engine.Spec())
 	start(display.Xvfb(user, ""))
 	start(display.Openbox(user))
-	if pw := readSecret("vnc_password"); pw != "" {
+	if pw := readSecret(KeyVNCPassword); pw != "" {
 		file := "/run/swarm/vnc/passwd"
 		if err := display.WriteVNCPassword(user, pw, file); err != nil {
 			log.Warn("vnc password", "err", err)
@@ -166,6 +180,16 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}
 	core.Dedup = dedup
 	core.Agent = newAgent(room, user, work, roleText, core, log)
+	if room.Advisor.Model != "" {
+		core.Advisor = &advisor.Advisor{
+			LLM:        &llm.Client{BaseURL: room.GatewayURL, Key: readSecret(KeyAdvisor), Model: room.Advisor.Model, Effort: room.Advisor.Effort},
+			MaxPerHour: room.Advisor.MaxCallsPerHour, WorkDir: work, User: user, RoleText: roleText,
+			Task: core.CurrentTask, Log: log.With("component", "advisor"),
+		}
+		if t, ok := core.Agent.(agent.Transcriber); ok {
+			core.Advisor.Transcript = t.Transcript
+		}
+	}
 
 	api := &API{Core: core}
 	wg.Add(3)
@@ -266,7 +290,7 @@ func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog
 
 // newAgent builds the CLI driver for the room.
 func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, ev agent.Events, log *slog.Logger) agent.Agent {
-	key := readSecret("gateway_key")
+	key := readSecret(KeyGateway)
 	var roomEnv []string
 	for k, v := range room.Env {
 		roomEnv = append(roomEnv, k+"="+v)

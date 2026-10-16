@@ -3,11 +3,14 @@ package supervisor
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"connectrpc.com/connect"
 	"github.com/oklog/ulid/v2"
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
+	roomv1 "github.com/usr-lex/swarmageddon/gen/swarm/room/v1"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/advisor"
 )
 
 // Channels and reading (design §7.8): the room API forwards to messaging,
@@ -68,4 +71,20 @@ func (a *API) ListChannels(ctx context.Context, r *connect.Request[messagingv1.L
 // SetDelivery changes this agent's delivery mode for a channel.
 func (a *API) SetDelivery(ctx context.Context, r *connect.Request[messagingv1.SetDeliveryRequest]) (*connect.Response[messagingv1.SetDeliveryResponse], error) {
 	return forward(ctx, a.Core.Messaging.SetDelivery, r)
+}
+
+// Advise answers `swarm advise` (ADR 0010) with the room's advisor.
+func (a *API) Advise(ctx context.Context, r *connect.Request[roomv1.AdviseRequest]) (*connect.Response[roomv1.AdviseResponse], error) {
+	adv := a.Core.Advisor
+	if adv == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("this room has no advisor"))
+	}
+	answer, left, err := adv.Advise(ctx, r.Msg.GetQuestion(), r.Msg.GetFiles(), r.Msg.IncludeContext == nil || r.Msg.GetIncludeContext())
+	switch {
+	case errors.Is(err, advisor.ErrRateLimited):
+		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+	case err != nil:
+		return nil, connect.NewError(connect.CodeUnavailable, fmt.Errorf("advisor: %w", err))
+	}
+	return connect.NewResponse(&roomv1.AdviseResponse{Answer: answer, Model: adv.LLM.Model, Remaining: int32(left)}), nil
 }
