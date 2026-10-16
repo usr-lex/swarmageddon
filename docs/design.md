@@ -578,6 +578,32 @@ tools, and the branch rules. Personas are guardrails, not security. The hard
 limits are forge permissions, branch protection, NetworkPolicy and what is
 mounted (§11).
 
+### 6.5 Advisors and the warden
+
+Each room can have an **advisor**: a stronger model, or the same model at a
+higher effort, that the agent consults through the `swarm advise` tool.
+
+- **Inputs:** the question, the tail of the transcript, and files from the
+  work folder.
+- **Limits:** at most a read-only file reader; answers return only to the
+  calling session.
+- **Spend:** a separate budget-capped gateway key.
+- **Claude rooms** also get a managed read-only `advisor` subagent, and
+  Claude's native advisor tool as an opt-in. ADR 0010 has the details.
+
+The **warden** is a small model that keeps agents from going rogue. It works
+in four layers:
+
+1. rules in the room
+2. a synchronous judge for risky calls, in `gate` mode
+3. trajectory review after each turn
+4. a gateway guard outside the room, which a root agent can't tamper with
+
+It can deny, escalate to a person, interrupt, or quarantine a room: refuse
+its model requests and shrink its network and forge access until a person
+releases it. Its verdicts land in the audit log, the room's Activity tab and
+the observatory. ADR 0011 has the details.
+
 ## 7. The messaging service
 
 ADR 0002 covers storage, ADR 0003 the wire protocol.
