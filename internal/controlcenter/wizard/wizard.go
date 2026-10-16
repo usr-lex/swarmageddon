@@ -158,7 +158,7 @@ func Validate(p *ccv1.WorkspacePlan, reserved map[string]bool) []string {
 			probs = append(probs, fmt.Sprintf("unknown forge notification %q", e))
 		}
 	}
-	return probs
+	return append(probs, validateChannels(p)...)
 }
 
 // Desired is what a plan asks for.
@@ -257,6 +257,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	for _, e := range p.GetForgeNotifications() {
 		s.ForgeNotifications = append(s.ForgeNotifications, v1alpha1.ForgeEvent(e))
 	}
+	applyChannels(p, s)
 
 	existing := map[string]v1alpha1.Room{}
 	for _, r := range cur.Rooms {
@@ -327,6 +328,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 	for _, e := range s.ForgeNotifications {
 		p.ForgeNotifications = append(p.ForgeNotifications, string(e))
 	}
+	channelsToPlan(s, p)
 	for _, r := range s.Repositories {
 		p.Repositories = append(p.Repositories, &ccv1.RepositoryPlan{Name: r.Name, ImportUrl: r.ImportURL, Group: r.Group,
 			PushMirror: r.PushMirror, MirrorSecretName: r.MirrorSecretName, StatusChecks: r.StatusChecks})

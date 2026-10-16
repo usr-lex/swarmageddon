@@ -15,7 +15,11 @@ import (
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/approvals"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/k8s"
+	"github.com/usr-lex/swarmageddon/internal/controlcenter/store"
 )
+
+// VerdictBadge is a room's undecided warden verdicts.
+type VerdictBadge = store.VerdictBadge
 
 // presenceInfo is what messaging last said about a room.
 type presenceInfo struct {
@@ -33,6 +37,8 @@ type Fleet struct {
 	Spend func() map[string]float64
 	// OnPodRestarts is told each room's container restart count; optional.
 	OnPodRestarts func(ctx context.Context, ws, room string, restarts int32)
+	// Badges returns undecided warden verdict badges per ws/room; optional.
+	Badges func(ctx context.Context) map[string]VerdictBadge
 	// OnPresence is told each presence event; optional.
 	OnPresence func(ctx context.Context, ws, room string, p messagingv1.Presence, at time.Time, st *messagingv1.RoomStatusReport)
 	Interval   time.Duration
@@ -101,7 +107,11 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 		for _, r := range rooms {
 			s := &ccv1.RoomSummary{Workspace: w.Name, Name: r.Name, DisplayName: r.Spec.DisplayName, Role: r.Spec.Role, Cli: string(r.Spec.CLI),
 				Model: r.Spec.Model, Group: r.Spec.Group, Phase: string(r.Status.Phase), UpdateAvailable: r.Status.UpdateAvailable,
-				Paused: r.Spec.Paused, Conditions: conditions(r.Status.Conditions), Address: r.Status.Address}
+				Paused: r.Spec.Paused, Conditions: conditions(r.Status.Conditions), Address: r.Status.Address,
+				Quarantined: r.Spec.Quarantined}
+			if r.Spec.Quarantined {
+				s.QuarantineReason = quarantineReason(&r)
+			}
 			if s.Model == "" {
 				s.Model = w.Spec.Models.Default
 			}
@@ -115,6 +125,14 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 				restarts = append(restarts, restart{w.Name, r.Name, s.PodRestarts})
 			}
 			next[w.Name+"/"+r.Name] = s
+		}
+	}
+	if f.Badges != nil {
+		for key, b := range f.Badges(ctx) {
+			if s, ok := next[key]; ok {
+				s.WardenSeverity = ccv1.Severity(b.MaxSeverity)
+				s.UndecidedVerdicts = int32(b.Undecided)
+			}
 		}
 	}
 	if f.OnPodRestarts != nil {
@@ -262,6 +280,8 @@ func rank(s *ccv1.RoomSummary) int {
 	switch {
 	case s.Presence == ccv1.Presence_PRESENCE_WAITING_ON_HUMAN || s.PendingApprovals > 0:
 		return 0
+	case s.Quarantined || s.WardenSeverity >= ccv1.Severity_SEVERITY_HIGH:
+		return 1
 	case s.Phase == string(v1alpha1.RoomFailed) || s.CrashCount >= 3:
 		return 1
 	case s.Presence == ccv1.Presence_PRESENCE_WORKING:

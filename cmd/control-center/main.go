@@ -119,6 +119,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 		Setup:    auth.NewLimiter(),
 		Logins:   auth.NewLimiter(),
 		Inbox:    &api.InboxHub{},
+		Verdicts: &api.VerdictHub{},
 		Exec:     &terminal.Kube{Config: cfg, Client: kc.Kube},
 		Log:      log,
 	}
@@ -203,6 +204,14 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 		return out
 	}
 	srv.Fleet.OnPodRestarts = srv.Tracker.PodRestarts
+	srv.Fleet.Badges = func(ctx context.Context) map[string]api.VerdictBadge {
+		db := srv.DB()
+		if db == nil {
+			return nil
+		}
+		b, _ := db.VerdictBadges(ctx, time.Now().Add(-24*time.Hour))
+		return b
+	}
 	srv.Fleet.OnPresence = func(ctx context.Context, ws, room string, p messagingv1.Presence, at time.Time, st *messagingv1.RoomStatusReport) {
 		srv.Tracker.Presence(ctx, ws, room, p, st)
 		srv.Presence.Event(ctx, ws, room, p, at, st)
@@ -229,7 +238,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 	if srv.Msg != nil {
 		go msgclient.Loop(ctx, "approvals", srv.Approvals.Watch)
 		go msgclient.Loop(ctx, "presence", func(ctx context.Context) error { return srv.Fleet.WatchPresence(ctx, srv.Msg) })
-		follower := &observatory.AuditFollower{Msg: srv.Msg, R: srv.Rec, Workspaces: srv.WorkspaceNames, IsRoom: srv.IsRoom}
+		follower := &observatory.AuditFollower{Msg: srv.Msg, R: srv.Rec, Workspaces: srv.WorkspaceNames, IsRoom: srv.IsRoom, OnVerdict: srv.OnVerdict}
 		go follower.Run(ctx)
 		reports := &observatory.Reports{Msg: srv.Msg, DB: srv.DB}
 		go srv.SubscriptionLoop(ctx, reports.Follow)

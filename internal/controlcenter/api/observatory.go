@@ -35,6 +35,8 @@ func edgeKind(k string) (ccv1.EdgeKind, string) {
 		return ccv1.EdgeKind_EDGE_KIND_CROSSING, ""
 	case store.KindHuman:
 		return ccv1.EdgeKind_EDGE_KIND_HUMAN, ""
+	case store.KindPost:
+		return ccv1.EdgeKind_EDGE_KIND_CHANNEL_POST, ""
 	}
 	return ccv1.EdgeKind_EDGE_KIND_FORGE_HANDOFF, k
 }

@@ -319,6 +319,9 @@ service WorkspaceService {
   rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
   // PreviewWorkspace returns what ApplyWorkspace would change.
   rpc PreviewWorkspace(PreviewWorkspaceRequest) returns (PreviewWorkspaceResponse);
+  // DefaultChannels returns the channels the operator creates for a plan
+  // whose channels are empty, for the wizard to show and edit.
+  rpc DefaultChannels(DefaultChannelsRequest) returns (DefaultChannelsResponse);
   // ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
   rpc ApplyWorkspace(ApplyWorkspaceRequest) returns (ApplyWorkspaceResponse);
 }
@@ -416,6 +419,40 @@ message WorkspacePlan {
   // Forge events delivered to agents (assigned, reviewRequested, mentioned,
   // reviewSubmitted, commented, ciFailed); empty: all.
   repeated string forge_notifications = 21;
+  // Channels (docs/design.md §7.8). Empty: the operator creates the defaults
+  // (see DefaultChannels).
+  repeated ChannelPlan channels = 22;
+  StormPlan storm = 23;
+  // Warden (ADR 0011): off, monitor or gate; empty keeps the default.
+  string warden_mode = 24;
+  string warden_model = 25;
+}
+
+message ChannelMemberPlan {
+  // everyone, people, role:<template>, team:<team>, group:<group>,
+  // room:<name> or person:<handle>.
+  string select = 1;
+  // read, write or readWrite.
+  string access = 2;
+}
+
+message ChannelPlan {
+  // Without the leading #.
+  string name = 1;
+  string description = 2;
+  repeated ChannelMemberPlan members = 3;
+  // push, digest or pull.
+  string default_delivery = 4;
+  repeated string allowed_delivery = 5;
+  int32 posts_per_minute = 6;
+}
+
+message StormPlan {
+  int32 push_per_minute = 1;
+  int32 coalesce_bytes = 2;
+  // Go duration, e.g. "15m".
+  string digest_interval = 3;
+  int32 fanout_per_minute = 4;
 }
 
 message WorkspaceSummary {
@@ -426,6 +463,13 @@ message WorkspaceSummary {
   repeated string owners = 5;
   repeated Condition conditions = 6;
   string namespace = 7;
+}
+
+message DefaultChannelsRequest {
+  WorkspacePlan plan = 1;
+}
+message DefaultChannelsResponse {
+  repeated ChannelPlan channels = 1;
 }
 
 message ListWorkspacesRequest {}
@@ -557,6 +601,12 @@ message RoomSummary {
   int32 pending_approvals = 18;
   google.protobuf.Timestamp presence_since = 19;
   string address = 20;
+  bool quarantined = 21;
+  // Why, from the room's Quarantined condition.
+  string quarantine_reason = 22;
+  // Highest severity among undecided warden verdicts of the last 24 h.
+  Severity warden_severity = 23;
+  int32 undecided_verdicts = 24;
 }
 
 service RoomService {
@@ -572,6 +622,10 @@ service RoomService {
   rpc RemoveRoom(RemoveRoomRequest) returns (RemoveRoomResponse);
   rpc RotateRoomCredentials(RotateRoomCredentialsRequest) returns (RotateRoomCredentialsResponse);
   rpc UpdateRoomNow(UpdateRoomNowRequest) returns (UpdateRoomNowResponse);
+  // QuarantineRoom cuts a room off (Room.spec.quarantined); operators.
+  rpc QuarantineRoom(QuarantineRoomRequest) returns (QuarantineRoomResponse);
+  // ReleaseRoom lifts a quarantine; operators, audited.
+  rpc ReleaseRoom(ReleaseRoomRequest) returns (ReleaseRoomResponse);
   rpc StreamRoomLogs(StreamRoomLogsRequest) returns (stream StreamRoomLogsResponse);
   rpc GetRoomResources(GetRoomResourcesRequest) returns (GetRoomResourcesResponse);
   rpc GetRoomStorage(GetRoomStorageRequest) returns (GetRoomStorageResponse);
@@ -641,6 +695,19 @@ message UpdateRoomNowRequest {
   RoomRef room = 1;
 }
 message UpdateRoomNowResponse {}
+
+message QuarantineRoomRequest {
+  RoomRef room = 1;
+  string reason = 2;
+}
+message QuarantineRoomResponse {}
+
+message ReleaseRoomRequest {
+  RoomRef room = 1;
+  // Why it is safe to release; kept in the audit log.
+  string note = 2;
+}
+message ReleaseRoomResponse {}
 
 message StreamRoomLogsRequest {
   RoomRef room = 1;
@@ -1055,6 +1122,8 @@ enum EdgeKind {
   EDGE_KIND_HUMAN = 3;
   // Review requested, assigned or mentioned in the forge.
   EDGE_KIND_FORGE_HANDOFF = 4;
+  // A post to a channel; the target is the channel node, "#<name>".
+  EDGE_KIND_CHANNEL_POST = 5;
 }
 
 message Edge {
@@ -1144,7 +1213,8 @@ message ActivityEvent {
   // message, human, crossing, refusal, commit, pr_opened, pr_merged,
   // pr_closed, review_approved, review_changes, review_comment,
   // issue_opened, issue_closed, comment, ci_failed, ci_passed,
-  // review_requested, assigned, mentioned, presence, task, tokens.
+  // review_requested, assigned, mentioned, presence, task, tokens, post
+  // (target #channel), verdict (summary: severity, layer and reason).
   string kind = 4;
   string target = 5;
   string repo = 6;
@@ -1226,4 +1296,185 @@ message RequestReportRequest {
 message RequestReportResponse {
   // Chronicler rooms the request was sent to.
   repeated string sent_to = 1;
+}
+
+// ---------------------------------------------------------------- Channels
+
+// ChannelService is the signed-in person's view of channels and reading
+// (docs/design.md §7.8), through messaging as <handle>@<workspace>.
+// Operators may post to any channel of their workspaces; others as the
+// channel's access allows (messaging enforces it).
+service ChannelService {
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse);
+  rpc PostToChannel(PostToChannelRequest) returns (PostToChannelResponse);
+  rpc ReadChannelMessages(ReadChannelMessagesRequest) returns (ReadChannelMessagesResponse);
+  rpc GetChannelMessage(GetChannelMessageRequest) returns (GetChannelMessageResponse);
+  rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
+  rpc GetUnreadSummary(GetUnreadSummaryRequest) returns (GetUnreadSummaryResponse);
+  rpc SetChannelDelivery(SetChannelDeliveryRequest) returns (SetChannelDeliveryResponse);
+}
+
+message ChannelInfo {
+  string name = 1;
+  string description = 2;
+  // read, write or readWrite.
+  string access = 3;
+  // push, digest or pull.
+  string delivery = 4;
+  repeated string allowed_delivery = 5;
+  int32 unread = 6;
+  int32 members = 7;
+}
+
+message ChannelItem {
+  string id = 1;
+  // Empty for direct messages.
+  string channel = 2;
+  string from = 3;
+  string from_kind = 4;
+  string body = 5;
+  google.protobuf.Timestamp sent_at = 6;
+  bool truncated = 7;
+  bool read = 8;
+  bool mentions_me = 9;
+}
+
+message ListChannelsRequest {
+  string workspace = 1;
+}
+message ListChannelsResponse {
+  repeated ChannelInfo channels = 1;
+}
+
+message PostToChannelRequest {
+  string workspace = 1;
+  // Without the leading #.
+  string channel = 2;
+  string body = 3;
+}
+message PostToChannelResponse {
+  string id = 1;
+  repeated string mentioned = 2;
+}
+
+message ReadChannelMessagesRequest {
+  string workspace = 1;
+  // all, direct, mentions, or a channel name.
+  string scope = 2;
+  optional bool unread_only = 3;
+  int32 limit = 4;
+  string cursor = 5;
+  bool full = 6;
+  optional bool mark_read = 7;
+}
+message ReadChannelMessagesResponse {
+  repeated ChannelItem items = 1;
+  string next_cursor = 2;
+  int32 unread_remaining = 3;
+}
+
+message GetChannelMessageRequest {
+  string workspace = 1;
+  string id = 2;
+}
+message GetChannelMessageResponse {
+  ChannelItem item = 1;
+}
+
+message MarkChannelReadRequest {
+  string workspace = 1;
+  string scope = 2;
+  string up_to = 3;
+}
+message MarkChannelReadResponse {}
+
+message GetUnreadSummaryRequest {
+  string workspace = 1;
+}
+message UnreadScope {
+  // direct, mentions, or a channel name.
+  string scope = 1;
+  int32 unread = 2;
+}
+message GetUnreadSummaryResponse {
+  repeated UnreadScope counts = 1;
+}
+
+message SetChannelDeliveryRequest {
+  string workspace = 1;
+  string channel = 2;
+  // push, digest or pull.
+  string mode = 3;
+}
+message SetChannelDeliveryResponse {}
+
+// ---------------------------------------------------------------- Warden
+
+// WardenService shows warden verdicts (ADR 0011) and records people's
+// decisions next to them. Viewers of a workspace may list; deciding needs
+// the operator role.
+service WardenService {
+  rpc ListVerdicts(ListVerdictsRequest) returns (ListVerdictsResponse);
+  rpc DecideVerdict(DecideVerdictRequest) returns (DecideVerdictResponse);
+  rpc WatchVerdicts(WatchVerdictsRequest) returns (stream WatchVerdictsResponse);
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
+}
+
+message Verdict {
+  string id = 1;
+  string workspace = 2;
+  string room = 3;
+  // rules, judge, trajectory or gateway.
+  string layer = 4;
+  Severity severity = 5;
+  string rule = 6;
+  string reason = 7;
+  string evidence = 8;
+  // allowed, denied, escalated, gated, interrupted, quarantined.
+  string action = 9;
+  // room (self-report) or gateway.
+  string source = 10;
+  google.protobuf.Timestamp at = 11;
+  // Empty until a person decides: dismiss or confirm.
+  string decision = 12;
+  string decided_by = 13;
+  google.protobuf.Timestamp decided_at = 14;
+  string note = 15;
+}
+
+message ListVerdictsRequest {
+  string workspace = 1;
+  // Empty: every room.
+  string room = 2;
+  bool undecided_only = 3;
+  Severity min_severity = 4;
+  google.protobuf.Timestamp before = 5;
+  int32 limit = 6;
+}
+message ListVerdictsResponse {
+  repeated Verdict verdicts = 1;
+}
+
+message DecideVerdictRequest {
+  string id = 1;
+  // dismiss or confirm.
+  string decision = 2;
+  string note = 3;
+}
+message DecideVerdictResponse {
+  Verdict verdict = 1;
+}
+
+message WatchVerdictsRequest {
+  repeated string workspaces = 1;
+}
+message WatchVerdictsResponse {
+  Verdict verdict = 1;
 }

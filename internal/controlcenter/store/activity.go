@@ -14,6 +14,8 @@ const (
 	KindHuman    = "human"    // to or from a person
 	KindCrossing = "crossing" // over a mediated link
 	KindRefusal  = "refusal"
+	KindPost     = "post"    // to a channel; target "#<channel>"
+	KindVerdict  = "verdict" // a warden verdict about the actor (a room)
 
 	KindCommit          = "commit"
 	KindPROpened        = "pr_opened"
@@ -37,7 +39,7 @@ const (
 )
 
 // EdgeKinds are the kinds drawn as edges between actors.
-var EdgeKinds = []string{KindMessage, KindHuman, KindCrossing, KindReviewRequested, KindAssigned, KindMentioned}
+var EdgeKinds = []string{KindMessage, KindHuman, KindCrossing, KindPost, KindReviewRequested, KindAssigned, KindMentioned}
 
 // statusKinds are not activity in the heatmap's sense.
 var statusKinds = []string{KindPresence, KindTask, KindTokens}
@@ -225,7 +227,7 @@ func (s *Store) Axes(ctx context.Context, ws string, since time.Time) ([]AxesRow
 			count(*) FILTER (WHERE kind = 'pr_opened'),
 			count(*) FILTER (WHERE kind IN ('review_approved','review_changes','review_comment')),
 			count(*) FILTER (WHERE kind IN ('issue_opened','issue_closed')),
-			count(*) FILTER (WHERE kind IN ('message','human','crossing'))
+			count(*) FILTER (WHERE kind IN ('message','human','crossing','post'))
 		FROM activity_events WHERE workspace=$1 AND ts >= $2 AND NOT (kind = ANY($3))
 		GROUP BY actor ORDER BY actor`, ws, since, statusKinds)
 	if err != nil {

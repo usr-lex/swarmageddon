@@ -67,6 +67,10 @@ const (
 	UserServiceName = "swarm.controlcenter.v1.UserService"
 	// ObservatoryServiceName is the fully-qualified name of the ObservatoryService service.
 	ObservatoryServiceName = "swarm.controlcenter.v1.ObservatoryService"
+	// ChannelServiceName is the fully-qualified name of the ChannelService service.
+	ChannelServiceName = "swarm.controlcenter.v1.ChannelService"
+	// WardenServiceName is the fully-qualified name of the WardenService service.
+	WardenServiceName = "swarm.controlcenter.v1.WardenService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -127,6 +131,9 @@ const (
 	// WorkspaceServicePreviewWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// PreviewWorkspace RPC.
 	WorkspaceServicePreviewWorkspaceProcedure = "/swarm.controlcenter.v1.WorkspaceService/PreviewWorkspace"
+	// WorkspaceServiceDefaultChannelsProcedure is the fully-qualified name of the WorkspaceService's
+	// DefaultChannels RPC.
+	WorkspaceServiceDefaultChannelsProcedure = "/swarm.controlcenter.v1.WorkspaceService/DefaultChannels"
 	// WorkspaceServiceApplyWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// ApplyWorkspace RPC.
 	WorkspaceServiceApplyWorkspaceProcedure = "/swarm.controlcenter.v1.WorkspaceService/ApplyWorkspace"
@@ -149,6 +156,11 @@ const (
 	// RoomServiceUpdateRoomNowProcedure is the fully-qualified name of the RoomService's UpdateRoomNow
 	// RPC.
 	RoomServiceUpdateRoomNowProcedure = "/swarm.controlcenter.v1.RoomService/UpdateRoomNow"
+	// RoomServiceQuarantineRoomProcedure is the fully-qualified name of the RoomService's
+	// QuarantineRoom RPC.
+	RoomServiceQuarantineRoomProcedure = "/swarm.controlcenter.v1.RoomService/QuarantineRoom"
+	// RoomServiceReleaseRoomProcedure is the fully-qualified name of the RoomService's ReleaseRoom RPC.
+	RoomServiceReleaseRoomProcedure = "/swarm.controlcenter.v1.RoomService/ReleaseRoom"
 	// RoomServiceStreamRoomLogsProcedure is the fully-qualified name of the RoomService's
 	// StreamRoomLogs RPC.
 	RoomServiceStreamRoomLogsProcedure = "/swarm.controlcenter.v1.RoomService/StreamRoomLogs"
@@ -238,6 +250,36 @@ const (
 	// ObservatoryServiceRequestReportProcedure is the fully-qualified name of the ObservatoryService's
 	// RequestReport RPC.
 	ObservatoryServiceRequestReportProcedure = "/swarm.controlcenter.v1.ObservatoryService/RequestReport"
+	// ChannelServiceListChannelsProcedure is the fully-qualified name of the ChannelService's
+	// ListChannels RPC.
+	ChannelServiceListChannelsProcedure = "/swarm.controlcenter.v1.ChannelService/ListChannels"
+	// ChannelServicePostToChannelProcedure is the fully-qualified name of the ChannelService's
+	// PostToChannel RPC.
+	ChannelServicePostToChannelProcedure = "/swarm.controlcenter.v1.ChannelService/PostToChannel"
+	// ChannelServiceReadChannelMessagesProcedure is the fully-qualified name of the ChannelService's
+	// ReadChannelMessages RPC.
+	ChannelServiceReadChannelMessagesProcedure = "/swarm.controlcenter.v1.ChannelService/ReadChannelMessages"
+	// ChannelServiceGetChannelMessageProcedure is the fully-qualified name of the ChannelService's
+	// GetChannelMessage RPC.
+	ChannelServiceGetChannelMessageProcedure = "/swarm.controlcenter.v1.ChannelService/GetChannelMessage"
+	// ChannelServiceMarkChannelReadProcedure is the fully-qualified name of the ChannelService's
+	// MarkChannelRead RPC.
+	ChannelServiceMarkChannelReadProcedure = "/swarm.controlcenter.v1.ChannelService/MarkChannelRead"
+	// ChannelServiceGetUnreadSummaryProcedure is the fully-qualified name of the ChannelService's
+	// GetUnreadSummary RPC.
+	ChannelServiceGetUnreadSummaryProcedure = "/swarm.controlcenter.v1.ChannelService/GetUnreadSummary"
+	// ChannelServiceSetChannelDeliveryProcedure is the fully-qualified name of the ChannelService's
+	// SetChannelDelivery RPC.
+	ChannelServiceSetChannelDeliveryProcedure = "/swarm.controlcenter.v1.ChannelService/SetChannelDelivery"
+	// WardenServiceListVerdictsProcedure is the fully-qualified name of the WardenService's
+	// ListVerdicts RPC.
+	WardenServiceListVerdictsProcedure = "/swarm.controlcenter.v1.WardenService/ListVerdicts"
+	// WardenServiceDecideVerdictProcedure is the fully-qualified name of the WardenService's
+	// DecideVerdict RPC.
+	WardenServiceDecideVerdictProcedure = "/swarm.controlcenter.v1.WardenService/DecideVerdict"
+	// WardenServiceWatchVerdictsProcedure is the fully-qualified name of the WardenService's
+	// WatchVerdicts RPC.
+	WardenServiceWatchVerdictsProcedure = "/swarm.controlcenter.v1.WardenService/WatchVerdicts"
 )
 
 // SetupServiceClient is a client for the swarm.controlcenter.v1.SetupService service.
@@ -711,6 +753,9 @@ type WorkspaceServiceClient interface {
 	ListModels(context.Context, *connect.Request[v1.ListModelsRequest]) (*connect.Response[v1.ListModelsResponse], error)
 	// PreviewWorkspace returns what ApplyWorkspace would change.
 	PreviewWorkspace(context.Context, *connect.Request[v1.PreviewWorkspaceRequest]) (*connect.Response[v1.PreviewWorkspaceResponse], error)
+	// DefaultChannels returns the channels the operator creates for a plan
+	// whose channels are empty, for the wizard to show and edit.
+	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
 }
@@ -762,6 +807,12 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("PreviewWorkspace")),
 			connect.WithClientOptions(opts...),
 		),
+		defaultChannels: connect.NewClient[v1.DefaultChannelsRequest, v1.DefaultChannelsResponse](
+			httpClient,
+			baseURL+WorkspaceServiceDefaultChannelsProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("DefaultChannels")),
+			connect.WithClientOptions(opts...),
+		),
 		applyWorkspace: connect.NewClient[v1.ApplyWorkspaceRequest, v1.ApplyWorkspaceResponse](
 			httpClient,
 			baseURL+WorkspaceServiceApplyWorkspaceProcedure,
@@ -779,6 +830,7 @@ type workspaceServiceClient struct {
 	listRoleTemplates *connect.Client[v1.ListRoleTemplatesRequest, v1.ListRoleTemplatesResponse]
 	listModels        *connect.Client[v1.ListModelsRequest, v1.ListModelsResponse]
 	previewWorkspace  *connect.Client[v1.PreviewWorkspaceRequest, v1.PreviewWorkspaceResponse]
+	defaultChannels   *connect.Client[v1.DefaultChannelsRequest, v1.DefaultChannelsResponse]
 	applyWorkspace    *connect.Client[v1.ApplyWorkspaceRequest, v1.ApplyWorkspaceResponse]
 }
 
@@ -812,6 +864,11 @@ func (c *workspaceServiceClient) PreviewWorkspace(ctx context.Context, req *conn
 	return c.previewWorkspace.CallUnary(ctx, req)
 }
 
+// DefaultChannels calls swarm.controlcenter.v1.WorkspaceService.DefaultChannels.
+func (c *workspaceServiceClient) DefaultChannels(ctx context.Context, req *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error) {
+	return c.defaultChannels.CallUnary(ctx, req)
+}
+
 // ApplyWorkspace calls swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace.
 func (c *workspaceServiceClient) ApplyWorkspace(ctx context.Context, req *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error) {
 	return c.applyWorkspace.CallUnary(ctx, req)
@@ -830,6 +887,9 @@ type WorkspaceServiceHandler interface {
 	ListModels(context.Context, *connect.Request[v1.ListModelsRequest]) (*connect.Response[v1.ListModelsResponse], error)
 	// PreviewWorkspace returns what ApplyWorkspace would change.
 	PreviewWorkspace(context.Context, *connect.Request[v1.PreviewWorkspaceRequest]) (*connect.Response[v1.PreviewWorkspaceResponse], error)
+	// DefaultChannels returns the channels the operator creates for a plan
+	// whose channels are empty, for the wizard to show and edit.
+	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
 }
@@ -877,6 +937,12 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("PreviewWorkspace")),
 		connect.WithHandlerOptions(opts...),
 	)
+	workspaceServiceDefaultChannelsHandler := connect.NewUnaryHandler(
+		WorkspaceServiceDefaultChannelsProcedure,
+		svc.DefaultChannels,
+		connect.WithSchema(workspaceServiceMethods.ByName("DefaultChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
 	workspaceServiceApplyWorkspaceHandler := connect.NewUnaryHandler(
 		WorkspaceServiceApplyWorkspaceProcedure,
 		svc.ApplyWorkspace,
@@ -897,6 +963,8 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceListModelsHandler.ServeHTTP(w, r)
 		case WorkspaceServicePreviewWorkspaceProcedure:
 			workspaceServicePreviewWorkspaceHandler.ServeHTTP(w, r)
+		case WorkspaceServiceDefaultChannelsProcedure:
+			workspaceServiceDefaultChannelsHandler.ServeHTTP(w, r)
 		case WorkspaceServiceApplyWorkspaceProcedure:
 			workspaceServiceApplyWorkspaceHandler.ServeHTTP(w, r)
 		default:
@@ -932,6 +1000,10 @@ func (UnimplementedWorkspaceServiceHandler) PreviewWorkspace(context.Context, *c
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.PreviewWorkspace is not implemented"))
 }
 
+func (UnimplementedWorkspaceServiceHandler) DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.DefaultChannels is not implemented"))
+}
+
 func (UnimplementedWorkspaceServiceHandler) ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace is not implemented"))
 }
@@ -950,6 +1022,10 @@ type RoomServiceClient interface {
 	RemoveRoom(context.Context, *connect.Request[v1.RemoveRoomRequest]) (*connect.Response[v1.RemoveRoomResponse], error)
 	RotateRoomCredentials(context.Context, *connect.Request[v1.RotateRoomCredentialsRequest]) (*connect.Response[v1.RotateRoomCredentialsResponse], error)
 	UpdateRoomNow(context.Context, *connect.Request[v1.UpdateRoomNowRequest]) (*connect.Response[v1.UpdateRoomNowResponse], error)
+	// QuarantineRoom cuts a room off (Room.spec.quarantined); operators.
+	QuarantineRoom(context.Context, *connect.Request[v1.QuarantineRoomRequest]) (*connect.Response[v1.QuarantineRoomResponse], error)
+	// ReleaseRoom lifts a quarantine; operators, audited.
+	ReleaseRoom(context.Context, *connect.Request[v1.ReleaseRoomRequest]) (*connect.Response[v1.ReleaseRoomResponse], error)
 	StreamRoomLogs(context.Context, *connect.Request[v1.StreamRoomLogsRequest]) (*connect.ServerStreamForClient[v1.StreamRoomLogsResponse], error)
 	GetRoomResources(context.Context, *connect.Request[v1.GetRoomResourcesRequest]) (*connect.Response[v1.GetRoomResourcesResponse], error)
 	GetRoomStorage(context.Context, *connect.Request[v1.GetRoomStorageRequest]) (*connect.Response[v1.GetRoomStorageResponse], error)
@@ -1014,6 +1090,18 @@ func NewRoomServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(roomServiceMethods.ByName("UpdateRoomNow")),
 			connect.WithClientOptions(opts...),
 		),
+		quarantineRoom: connect.NewClient[v1.QuarantineRoomRequest, v1.QuarantineRoomResponse](
+			httpClient,
+			baseURL+RoomServiceQuarantineRoomProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("QuarantineRoom")),
+			connect.WithClientOptions(opts...),
+		),
+		releaseRoom: connect.NewClient[v1.ReleaseRoomRequest, v1.ReleaseRoomResponse](
+			httpClient,
+			baseURL+RoomServiceReleaseRoomProcedure,
+			connect.WithSchema(roomServiceMethods.ByName("ReleaseRoom")),
+			connect.WithClientOptions(opts...),
+		),
 		streamRoomLogs: connect.NewClient[v1.StreamRoomLogsRequest, v1.StreamRoomLogsResponse](
 			httpClient,
 			baseURL+RoomServiceStreamRoomLogsProcedure,
@@ -1045,6 +1133,8 @@ type roomServiceClient struct {
 	removeRoom            *connect.Client[v1.RemoveRoomRequest, v1.RemoveRoomResponse]
 	rotateRoomCredentials *connect.Client[v1.RotateRoomCredentialsRequest, v1.RotateRoomCredentialsResponse]
 	updateRoomNow         *connect.Client[v1.UpdateRoomNowRequest, v1.UpdateRoomNowResponse]
+	quarantineRoom        *connect.Client[v1.QuarantineRoomRequest, v1.QuarantineRoomResponse]
+	releaseRoom           *connect.Client[v1.ReleaseRoomRequest, v1.ReleaseRoomResponse]
 	streamRoomLogs        *connect.Client[v1.StreamRoomLogsRequest, v1.StreamRoomLogsResponse]
 	getRoomResources      *connect.Client[v1.GetRoomResourcesRequest, v1.GetRoomResourcesResponse]
 	getRoomStorage        *connect.Client[v1.GetRoomStorageRequest, v1.GetRoomStorageResponse]
@@ -1090,6 +1180,16 @@ func (c *roomServiceClient) UpdateRoomNow(ctx context.Context, req *connect.Requ
 	return c.updateRoomNow.CallUnary(ctx, req)
 }
 
+// QuarantineRoom calls swarm.controlcenter.v1.RoomService.QuarantineRoom.
+func (c *roomServiceClient) QuarantineRoom(ctx context.Context, req *connect.Request[v1.QuarantineRoomRequest]) (*connect.Response[v1.QuarantineRoomResponse], error) {
+	return c.quarantineRoom.CallUnary(ctx, req)
+}
+
+// ReleaseRoom calls swarm.controlcenter.v1.RoomService.ReleaseRoom.
+func (c *roomServiceClient) ReleaseRoom(ctx context.Context, req *connect.Request[v1.ReleaseRoomRequest]) (*connect.Response[v1.ReleaseRoomResponse], error) {
+	return c.releaseRoom.CallUnary(ctx, req)
+}
+
 // StreamRoomLogs calls swarm.controlcenter.v1.RoomService.StreamRoomLogs.
 func (c *roomServiceClient) StreamRoomLogs(ctx context.Context, req *connect.Request[v1.StreamRoomLogsRequest]) (*connect.ServerStreamForClient[v1.StreamRoomLogsResponse], error) {
 	return c.streamRoomLogs.CallServerStream(ctx, req)
@@ -1119,6 +1219,10 @@ type RoomServiceHandler interface {
 	RemoveRoom(context.Context, *connect.Request[v1.RemoveRoomRequest]) (*connect.Response[v1.RemoveRoomResponse], error)
 	RotateRoomCredentials(context.Context, *connect.Request[v1.RotateRoomCredentialsRequest]) (*connect.Response[v1.RotateRoomCredentialsResponse], error)
 	UpdateRoomNow(context.Context, *connect.Request[v1.UpdateRoomNowRequest]) (*connect.Response[v1.UpdateRoomNowResponse], error)
+	// QuarantineRoom cuts a room off (Room.spec.quarantined); operators.
+	QuarantineRoom(context.Context, *connect.Request[v1.QuarantineRoomRequest]) (*connect.Response[v1.QuarantineRoomResponse], error)
+	// ReleaseRoom lifts a quarantine; operators, audited.
+	ReleaseRoom(context.Context, *connect.Request[v1.ReleaseRoomRequest]) (*connect.Response[v1.ReleaseRoomResponse], error)
 	StreamRoomLogs(context.Context, *connect.Request[v1.StreamRoomLogsRequest], *connect.ServerStream[v1.StreamRoomLogsResponse]) error
 	GetRoomResources(context.Context, *connect.Request[v1.GetRoomResourcesRequest]) (*connect.Response[v1.GetRoomResourcesResponse], error)
 	GetRoomStorage(context.Context, *connect.Request[v1.GetRoomStorageRequest]) (*connect.Response[v1.GetRoomStorageResponse], error)
@@ -1179,6 +1283,18 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(roomServiceMethods.ByName("UpdateRoomNow")),
 		connect.WithHandlerOptions(opts...),
 	)
+	roomServiceQuarantineRoomHandler := connect.NewUnaryHandler(
+		RoomServiceQuarantineRoomProcedure,
+		svc.QuarantineRoom,
+		connect.WithSchema(roomServiceMethods.ByName("QuarantineRoom")),
+		connect.WithHandlerOptions(opts...),
+	)
+	roomServiceReleaseRoomHandler := connect.NewUnaryHandler(
+		RoomServiceReleaseRoomProcedure,
+		svc.ReleaseRoom,
+		connect.WithSchema(roomServiceMethods.ByName("ReleaseRoom")),
+		connect.WithHandlerOptions(opts...),
+	)
 	roomServiceStreamRoomLogsHandler := connect.NewServerStreamHandler(
 		RoomServiceStreamRoomLogsProcedure,
 		svc.StreamRoomLogs,
@@ -1215,6 +1331,10 @@ func NewRoomServiceHandler(svc RoomServiceHandler, opts ...connect.HandlerOption
 			roomServiceRotateRoomCredentialsHandler.ServeHTTP(w, r)
 		case RoomServiceUpdateRoomNowProcedure:
 			roomServiceUpdateRoomNowHandler.ServeHTTP(w, r)
+		case RoomServiceQuarantineRoomProcedure:
+			roomServiceQuarantineRoomHandler.ServeHTTP(w, r)
+		case RoomServiceReleaseRoomProcedure:
+			roomServiceReleaseRoomHandler.ServeHTTP(w, r)
 		case RoomServiceStreamRoomLogsProcedure:
 			roomServiceStreamRoomLogsHandler.ServeHTTP(w, r)
 		case RoomServiceGetRoomResourcesProcedure:
@@ -1260,6 +1380,14 @@ func (UnimplementedRoomServiceHandler) RotateRoomCredentials(context.Context, *c
 
 func (UnimplementedRoomServiceHandler) UpdateRoomNow(context.Context, *connect.Request[v1.UpdateRoomNowRequest]) (*connect.Response[v1.UpdateRoomNowResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.UpdateRoomNow is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) QuarantineRoom(context.Context, *connect.Request[v1.QuarantineRoomRequest]) (*connect.Response[v1.QuarantineRoomResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.QuarantineRoom is not implemented"))
+}
+
+func (UnimplementedRoomServiceHandler) ReleaseRoom(context.Context, *connect.Request[v1.ReleaseRoomRequest]) (*connect.Response[v1.ReleaseRoomResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.RoomService.ReleaseRoom is not implemented"))
 }
 
 func (UnimplementedRoomServiceHandler) StreamRoomLogs(context.Context, *connect.Request[v1.StreamRoomLogsRequest], *connect.ServerStream[v1.StreamRoomLogsResponse]) error {
@@ -2425,4 +2553,352 @@ func (UnimplementedObservatoryServiceHandler) Reports(context.Context, *connect.
 
 func (UnimplementedObservatoryServiceHandler) RequestReport(context.Context, *connect.Request[v1.RequestReportRequest]) (*connect.Response[v1.RequestReportResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ObservatoryService.RequestReport is not implemented"))
+}
+
+// ChannelServiceClient is a client for the swarm.controlcenter.v1.ChannelService service.
+type ChannelServiceClient interface {
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	PostToChannel(context.Context, *connect.Request[v1.PostToChannelRequest]) (*connect.Response[v1.PostToChannelResponse], error)
+	ReadChannelMessages(context.Context, *connect.Request[v1.ReadChannelMessagesRequest]) (*connect.Response[v1.ReadChannelMessagesResponse], error)
+	GetChannelMessage(context.Context, *connect.Request[v1.GetChannelMessageRequest]) (*connect.Response[v1.GetChannelMessageResponse], error)
+	MarkChannelRead(context.Context, *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error)
+	GetUnreadSummary(context.Context, *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error)
+	SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error)
+}
+
+// NewChannelServiceClient constructs a client for the swarm.controlcenter.v1.ChannelService
+// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
+// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
+// the connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewChannelServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ChannelServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	channelServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("ChannelService").Methods()
+	return &channelServiceClient{
+		listChannels: connect.NewClient[v1.ListChannelsRequest, v1.ListChannelsResponse](
+			httpClient,
+			baseURL+ChannelServiceListChannelsProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("ListChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		postToChannel: connect.NewClient[v1.PostToChannelRequest, v1.PostToChannelResponse](
+			httpClient,
+			baseURL+ChannelServicePostToChannelProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("PostToChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		readChannelMessages: connect.NewClient[v1.ReadChannelMessagesRequest, v1.ReadChannelMessagesResponse](
+			httpClient,
+			baseURL+ChannelServiceReadChannelMessagesProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("ReadChannelMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		getChannelMessage: connect.NewClient[v1.GetChannelMessageRequest, v1.GetChannelMessageResponse](
+			httpClient,
+			baseURL+ChannelServiceGetChannelMessageProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("GetChannelMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		markChannelRead: connect.NewClient[v1.MarkChannelReadRequest, v1.MarkChannelReadResponse](
+			httpClient,
+			baseURL+ChannelServiceMarkChannelReadProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("MarkChannelRead")),
+			connect.WithClientOptions(opts...),
+		),
+		getUnreadSummary: connect.NewClient[v1.GetUnreadSummaryRequest, v1.GetUnreadSummaryResponse](
+			httpClient,
+			baseURL+ChannelServiceGetUnreadSummaryProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("GetUnreadSummary")),
+			connect.WithClientOptions(opts...),
+		),
+		setChannelDelivery: connect.NewClient[v1.SetChannelDeliveryRequest, v1.SetChannelDeliveryResponse](
+			httpClient,
+			baseURL+ChannelServiceSetChannelDeliveryProcedure,
+			connect.WithSchema(channelServiceMethods.ByName("SetChannelDelivery")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// channelServiceClient implements ChannelServiceClient.
+type channelServiceClient struct {
+	listChannels        *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
+	postToChannel       *connect.Client[v1.PostToChannelRequest, v1.PostToChannelResponse]
+	readChannelMessages *connect.Client[v1.ReadChannelMessagesRequest, v1.ReadChannelMessagesResponse]
+	getChannelMessage   *connect.Client[v1.GetChannelMessageRequest, v1.GetChannelMessageResponse]
+	markChannelRead     *connect.Client[v1.MarkChannelReadRequest, v1.MarkChannelReadResponse]
+	getUnreadSummary    *connect.Client[v1.GetUnreadSummaryRequest, v1.GetUnreadSummaryResponse]
+	setChannelDelivery  *connect.Client[v1.SetChannelDeliveryRequest, v1.SetChannelDeliveryResponse]
+}
+
+// ListChannels calls swarm.controlcenter.v1.ChannelService.ListChannels.
+func (c *channelServiceClient) ListChannels(ctx context.Context, req *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return c.listChannels.CallUnary(ctx, req)
+}
+
+// PostToChannel calls swarm.controlcenter.v1.ChannelService.PostToChannel.
+func (c *channelServiceClient) PostToChannel(ctx context.Context, req *connect.Request[v1.PostToChannelRequest]) (*connect.Response[v1.PostToChannelResponse], error) {
+	return c.postToChannel.CallUnary(ctx, req)
+}
+
+// ReadChannelMessages calls swarm.controlcenter.v1.ChannelService.ReadChannelMessages.
+func (c *channelServiceClient) ReadChannelMessages(ctx context.Context, req *connect.Request[v1.ReadChannelMessagesRequest]) (*connect.Response[v1.ReadChannelMessagesResponse], error) {
+	return c.readChannelMessages.CallUnary(ctx, req)
+}
+
+// GetChannelMessage calls swarm.controlcenter.v1.ChannelService.GetChannelMessage.
+func (c *channelServiceClient) GetChannelMessage(ctx context.Context, req *connect.Request[v1.GetChannelMessageRequest]) (*connect.Response[v1.GetChannelMessageResponse], error) {
+	return c.getChannelMessage.CallUnary(ctx, req)
+}
+
+// MarkChannelRead calls swarm.controlcenter.v1.ChannelService.MarkChannelRead.
+func (c *channelServiceClient) MarkChannelRead(ctx context.Context, req *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error) {
+	return c.markChannelRead.CallUnary(ctx, req)
+}
+
+// GetUnreadSummary calls swarm.controlcenter.v1.ChannelService.GetUnreadSummary.
+func (c *channelServiceClient) GetUnreadSummary(ctx context.Context, req *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error) {
+	return c.getUnreadSummary.CallUnary(ctx, req)
+}
+
+// SetChannelDelivery calls swarm.controlcenter.v1.ChannelService.SetChannelDelivery.
+func (c *channelServiceClient) SetChannelDelivery(ctx context.Context, req *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error) {
+	return c.setChannelDelivery.CallUnary(ctx, req)
+}
+
+// ChannelServiceHandler is an implementation of the swarm.controlcenter.v1.ChannelService service.
+type ChannelServiceHandler interface {
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	PostToChannel(context.Context, *connect.Request[v1.PostToChannelRequest]) (*connect.Response[v1.PostToChannelResponse], error)
+	ReadChannelMessages(context.Context, *connect.Request[v1.ReadChannelMessagesRequest]) (*connect.Response[v1.ReadChannelMessagesResponse], error)
+	GetChannelMessage(context.Context, *connect.Request[v1.GetChannelMessageRequest]) (*connect.Response[v1.GetChannelMessageResponse], error)
+	MarkChannelRead(context.Context, *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error)
+	GetUnreadSummary(context.Context, *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error)
+	SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error)
+}
+
+// NewChannelServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewChannelServiceHandler(svc ChannelServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	channelServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("ChannelService").Methods()
+	channelServiceListChannelsHandler := connect.NewUnaryHandler(
+		ChannelServiceListChannelsProcedure,
+		svc.ListChannels,
+		connect.WithSchema(channelServiceMethods.ByName("ListChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServicePostToChannelHandler := connect.NewUnaryHandler(
+		ChannelServicePostToChannelProcedure,
+		svc.PostToChannel,
+		connect.WithSchema(channelServiceMethods.ByName("PostToChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceReadChannelMessagesHandler := connect.NewUnaryHandler(
+		ChannelServiceReadChannelMessagesProcedure,
+		svc.ReadChannelMessages,
+		connect.WithSchema(channelServiceMethods.ByName("ReadChannelMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceGetChannelMessageHandler := connect.NewUnaryHandler(
+		ChannelServiceGetChannelMessageProcedure,
+		svc.GetChannelMessage,
+		connect.WithSchema(channelServiceMethods.ByName("GetChannelMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceMarkChannelReadHandler := connect.NewUnaryHandler(
+		ChannelServiceMarkChannelReadProcedure,
+		svc.MarkChannelRead,
+		connect.WithSchema(channelServiceMethods.ByName("MarkChannelRead")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceGetUnreadSummaryHandler := connect.NewUnaryHandler(
+		ChannelServiceGetUnreadSummaryProcedure,
+		svc.GetUnreadSummary,
+		connect.WithSchema(channelServiceMethods.ByName("GetUnreadSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	channelServiceSetChannelDeliveryHandler := connect.NewUnaryHandler(
+		ChannelServiceSetChannelDeliveryProcedure,
+		svc.SetChannelDelivery,
+		connect.WithSchema(channelServiceMethods.ByName("SetChannelDelivery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/swarm.controlcenter.v1.ChannelService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case ChannelServiceListChannelsProcedure:
+			channelServiceListChannelsHandler.ServeHTTP(w, r)
+		case ChannelServicePostToChannelProcedure:
+			channelServicePostToChannelHandler.ServeHTTP(w, r)
+		case ChannelServiceReadChannelMessagesProcedure:
+			channelServiceReadChannelMessagesHandler.ServeHTTP(w, r)
+		case ChannelServiceGetChannelMessageProcedure:
+			channelServiceGetChannelMessageHandler.ServeHTTP(w, r)
+		case ChannelServiceMarkChannelReadProcedure:
+			channelServiceMarkChannelReadHandler.ServeHTTP(w, r)
+		case ChannelServiceGetUnreadSummaryProcedure:
+			channelServiceGetUnreadSummaryHandler.ServeHTTP(w, r)
+		case ChannelServiceSetChannelDeliveryProcedure:
+			channelServiceSetChannelDeliveryHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedChannelServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedChannelServiceHandler struct{}
+
+func (UnimplementedChannelServiceHandler) ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.ListChannels is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) PostToChannel(context.Context, *connect.Request[v1.PostToChannelRequest]) (*connect.Response[v1.PostToChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.PostToChannel is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) ReadChannelMessages(context.Context, *connect.Request[v1.ReadChannelMessagesRequest]) (*connect.Response[v1.ReadChannelMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.ReadChannelMessages is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) GetChannelMessage(context.Context, *connect.Request[v1.GetChannelMessageRequest]) (*connect.Response[v1.GetChannelMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.GetChannelMessage is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) MarkChannelRead(context.Context, *connect.Request[v1.MarkChannelReadRequest]) (*connect.Response[v1.MarkChannelReadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.MarkChannelRead is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) GetUnreadSummary(context.Context, *connect.Request[v1.GetUnreadSummaryRequest]) (*connect.Response[v1.GetUnreadSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.GetUnreadSummary is not implemented"))
+}
+
+func (UnimplementedChannelServiceHandler) SetChannelDelivery(context.Context, *connect.Request[v1.SetChannelDeliveryRequest]) (*connect.Response[v1.SetChannelDeliveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.ChannelService.SetChannelDelivery is not implemented"))
+}
+
+// WardenServiceClient is a client for the swarm.controlcenter.v1.WardenService service.
+type WardenServiceClient interface {
+	ListVerdicts(context.Context, *connect.Request[v1.ListVerdictsRequest]) (*connect.Response[v1.ListVerdictsResponse], error)
+	DecideVerdict(context.Context, *connect.Request[v1.DecideVerdictRequest]) (*connect.Response[v1.DecideVerdictResponse], error)
+	WatchVerdicts(context.Context, *connect.Request[v1.WatchVerdictsRequest]) (*connect.ServerStreamForClient[v1.WatchVerdictsResponse], error)
+}
+
+// NewWardenServiceClient constructs a client for the swarm.controlcenter.v1.WardenService service.
+// By default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped
+// responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewWardenServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) WardenServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	wardenServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("WardenService").Methods()
+	return &wardenServiceClient{
+		listVerdicts: connect.NewClient[v1.ListVerdictsRequest, v1.ListVerdictsResponse](
+			httpClient,
+			baseURL+WardenServiceListVerdictsProcedure,
+			connect.WithSchema(wardenServiceMethods.ByName("ListVerdicts")),
+			connect.WithClientOptions(opts...),
+		),
+		decideVerdict: connect.NewClient[v1.DecideVerdictRequest, v1.DecideVerdictResponse](
+			httpClient,
+			baseURL+WardenServiceDecideVerdictProcedure,
+			connect.WithSchema(wardenServiceMethods.ByName("DecideVerdict")),
+			connect.WithClientOptions(opts...),
+		),
+		watchVerdicts: connect.NewClient[v1.WatchVerdictsRequest, v1.WatchVerdictsResponse](
+			httpClient,
+			baseURL+WardenServiceWatchVerdictsProcedure,
+			connect.WithSchema(wardenServiceMethods.ByName("WatchVerdicts")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// wardenServiceClient implements WardenServiceClient.
+type wardenServiceClient struct {
+	listVerdicts  *connect.Client[v1.ListVerdictsRequest, v1.ListVerdictsResponse]
+	decideVerdict *connect.Client[v1.DecideVerdictRequest, v1.DecideVerdictResponse]
+	watchVerdicts *connect.Client[v1.WatchVerdictsRequest, v1.WatchVerdictsResponse]
+}
+
+// ListVerdicts calls swarm.controlcenter.v1.WardenService.ListVerdicts.
+func (c *wardenServiceClient) ListVerdicts(ctx context.Context, req *connect.Request[v1.ListVerdictsRequest]) (*connect.Response[v1.ListVerdictsResponse], error) {
+	return c.listVerdicts.CallUnary(ctx, req)
+}
+
+// DecideVerdict calls swarm.controlcenter.v1.WardenService.DecideVerdict.
+func (c *wardenServiceClient) DecideVerdict(ctx context.Context, req *connect.Request[v1.DecideVerdictRequest]) (*connect.Response[v1.DecideVerdictResponse], error) {
+	return c.decideVerdict.CallUnary(ctx, req)
+}
+
+// WatchVerdicts calls swarm.controlcenter.v1.WardenService.WatchVerdicts.
+func (c *wardenServiceClient) WatchVerdicts(ctx context.Context, req *connect.Request[v1.WatchVerdictsRequest]) (*connect.ServerStreamForClient[v1.WatchVerdictsResponse], error) {
+	return c.watchVerdicts.CallServerStream(ctx, req)
+}
+
+// WardenServiceHandler is an implementation of the swarm.controlcenter.v1.WardenService service.
+type WardenServiceHandler interface {
+	ListVerdicts(context.Context, *connect.Request[v1.ListVerdictsRequest]) (*connect.Response[v1.ListVerdictsResponse], error)
+	DecideVerdict(context.Context, *connect.Request[v1.DecideVerdictRequest]) (*connect.Response[v1.DecideVerdictResponse], error)
+	WatchVerdicts(context.Context, *connect.Request[v1.WatchVerdictsRequest], *connect.ServerStream[v1.WatchVerdictsResponse]) error
+}
+
+// NewWardenServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewWardenServiceHandler(svc WardenServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	wardenServiceMethods := v1.File_swarm_controlcenter_v1_controlcenter_proto.Services().ByName("WardenService").Methods()
+	wardenServiceListVerdictsHandler := connect.NewUnaryHandler(
+		WardenServiceListVerdictsProcedure,
+		svc.ListVerdicts,
+		connect.WithSchema(wardenServiceMethods.ByName("ListVerdicts")),
+		connect.WithHandlerOptions(opts...),
+	)
+	wardenServiceDecideVerdictHandler := connect.NewUnaryHandler(
+		WardenServiceDecideVerdictProcedure,
+		svc.DecideVerdict,
+		connect.WithSchema(wardenServiceMethods.ByName("DecideVerdict")),
+		connect.WithHandlerOptions(opts...),
+	)
+	wardenServiceWatchVerdictsHandler := connect.NewServerStreamHandler(
+		WardenServiceWatchVerdictsProcedure,
+		svc.WatchVerdicts,
+		connect.WithSchema(wardenServiceMethods.ByName("WatchVerdicts")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/swarm.controlcenter.v1.WardenService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case WardenServiceListVerdictsProcedure:
+			wardenServiceListVerdictsHandler.ServeHTTP(w, r)
+		case WardenServiceDecideVerdictProcedure:
+			wardenServiceDecideVerdictHandler.ServeHTTP(w, r)
+		case WardenServiceWatchVerdictsProcedure:
+			wardenServiceWatchVerdictsHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedWardenServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedWardenServiceHandler struct{}
+
+func (UnimplementedWardenServiceHandler) ListVerdicts(context.Context, *connect.Request[v1.ListVerdictsRequest]) (*connect.Response[v1.ListVerdictsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WardenService.ListVerdicts is not implemented"))
+}
+
+func (UnimplementedWardenServiceHandler) DecideVerdict(context.Context, *connect.Request[v1.DecideVerdictRequest]) (*connect.Response[v1.DecideVerdictResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WardenService.DecideVerdict is not implemented"))
+}
+
+func (UnimplementedWardenServiceHandler) WatchVerdicts(context.Context, *connect.Request[v1.WatchVerdictsRequest], *connect.ServerStream[v1.WatchVerdictsResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WardenService.WatchVerdicts is not implemented"))
 }

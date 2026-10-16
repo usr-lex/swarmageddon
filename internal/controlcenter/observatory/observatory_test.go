@@ -121,9 +121,13 @@ func TestObservatory(t *testing.T) {
 		{Kind: "message", At: timestamppb.New(day(11, 12)), From: "hermes@acme", To: "metis@acme", MessageId: "m3", Body: "secret"},
 		{Kind: "crossing", At: timestamppb.New(day(11, 12)), From: "hermes@acme", To: "metis@acme", MessageId: "m3", Link: "clean->dirty"},
 		{Kind: "refusal", At: timestamppb.New(day(11, 12)), From: "metis@acme", To: "athena@acme", MessageId: "m4", Reason: "only hermes may message"},
+		{Kind: "message", At: timestamppb.New(day(11, 12)), From: "athena@acme", To: "#general", MessageId: "p1", Body: "secret"},
+		{Kind: "verdict", At: timestamppb.New(day(11, 12)), From: "metis@acme", MessageId: "v1",
+			Body: `{"id":"v1","room":"metis@acme","layer":"trajectory","severity":"SEVERITY_HIGH","reason":"looping","action":"gated"}`},
 	}}
 	rooms := map[string]bool{"athena": true, "hermes": true, "metis": true}
-	f := &AuditFollower{Msg: client(t, fm), R: rec, Backfill: 365 * 24 * time.Hour, IsRoom: func(_ context.Context, _, n string) bool { return rooms[n] }}
+	var verdicts []*messagingv1.Verdict
+	f := &AuditFollower{OnVerdict: func(_ context.Context, ws string, v *messagingv1.Verdict) { verdicts = append(verdicts, v) }, Msg: client(t, fm), R: rec, Backfill: 365 * 24 * time.Hour, IsRoom: func(_ context.Context, _, n string) bool { return rooms[n] }}
 	if err := f.Poll(ctx, "acme"); err != nil {
 		t.Fatal(err)
 	}
@@ -131,12 +135,18 @@ func TestObservatory(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if len(verdicts) != 1 || verdicts[0].Severity != messagingv1.Severity_SEVERITY_HIGH {
+		t.Fatalf("verdicts %+v", verdicts)
+	}
+	if vt, _ := db.Timeline(ctx, "acme", store.TimelineFilter{Kinds: []string{store.KindVerdict}}); len(vt) != 1 || vt[0].Summary != "high trajectory: looping" {
+		t.Fatalf("verdict on timeline %+v", vt)
+	}
 	edges, err := db.Edges(ctx, "acme", day(1, 0), day(30, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]int64{
-		"athena>hermes/message": 1, "alice>athena/human": 1, "hermes>metis/crossing": 1, "athena>hermes/review_requested": 1,
+		"athena>hermes/message": 1, "alice>athena/human": 1, "athena>#general/post": 1, "hermes>metis/crossing": 1, "athena>hermes/review_requested": 1,
 	}
 	if len(edges) != len(want) {
 		t.Fatalf("edges %+v", edges)
@@ -163,7 +173,7 @@ func TestObservatory(t *testing.T) {
 	}
 
 	heat, _ := db.Heatmap(ctx, "acme", "athena", day(1, 0))
-	if len(heat) != 2 || heat[0].Count != 2 || heat[1].Count != 4 {
+	if len(heat) != 2 || heat[0].Count != 2 || heat[1].Count != 5 {
 		t.Fatalf("heatmap %+v", heat)
 	}
 
@@ -172,7 +182,7 @@ func TestObservatory(t *testing.T) {
 	for _, a := range axes {
 		ax[a.Actor] = a
 	}
-	if a := ax["athena"]; a.Commits != 1 || a.PullRequests != 1 || a.Reviews != 1 || a.Messages != 1 {
+	if a := ax["athena"]; a.Commits != 1 || a.PullRequests != 1 || a.Reviews != 1 || a.Messages != 2 {
 		t.Fatalf("axes athena %+v", a)
 	}
 	if a := ax["hermes"]; a.Reviews != 2 || a.Messages != 1 {

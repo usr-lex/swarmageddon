@@ -15,6 +15,7 @@ import (
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
+	"github.com/usr-lex/swarmageddon/internal/controlcenter/auth"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/k8s"
 )
 
@@ -185,6 +186,56 @@ func (s roomSvc) UpdateRoomNow(ctx context.Context, req *connect.Request[ccv1.Up
 		return nil, err
 	}
 	return connect.NewResponse(&ccv1.UpdateRoomNowResponse{}), nil
+}
+
+// AnnotationQuarantineReason carries why a room was quarantined.
+const AnnotationQuarantineReason = "swarmageddon.dev/quarantine-reason"
+
+func (s roomSvc) QuarantineRoom(ctx context.Context, req *connect.Request[ccv1.QuarantineRoomRequest]) (*connect.Response[ccv1.QuarantineRoomResponse], error) {
+	err := s.lifecycle(ctx, req, req.Msg.GetRoom(), "quarantine", func(r *v1alpha1.Room) error {
+		r.Spec.Quarantined = true
+		reason := req.Msg.GetReason()
+		if reason == "" {
+			reason = "quarantined by " + displayName(authName(ctx), "a person")
+		}
+		annotate(r, AnnotationQuarantineReason, reason)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&ccv1.QuarantineRoomResponse{}), nil
+}
+
+// ReleaseRoom lifts a quarantine. Only people with the operator role on the
+// workspace may; the warden never releases.
+func (s roomSvc) ReleaseRoom(ctx context.Context, req *connect.Request[ccv1.ReleaseRoomRequest]) (*connect.Response[ccv1.ReleaseRoomResponse], error) {
+	err := s.lifecycle(ctx, req, req.Msg.GetRoom(), "release", func(r *v1alpha1.Room) error {
+		if !r.Spec.Quarantined {
+			return connect.NewError(connect.CodeFailedPrecondition, errors.New("the room is not quarantined"))
+		}
+		r.Spec.Quarantined = false
+		annotate(r, "swarmageddon.dev/released-by", authName(ctx), "swarmageddon.dev/release-note", req.Msg.GetNote())
+		delete(r.Annotations, AnnotationQuarantineReason)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&ccv1.ReleaseRoomResponse{}), nil
+}
+
+func authName(ctx context.Context) string { return auth.FromContext(ctx).Name() }
+
+// quarantineReason reads why a room is quarantined: its Quarantined
+// condition, else the annotation.
+func quarantineReason(r *v1alpha1.Room) string {
+	for _, c := range r.Status.Conditions {
+		if c.Type == v1alpha1.ConditionQuarantined && c.Status == "True" && c.Message != "" {
+			return c.Message
+		}
+	}
+	return r.Annotations[AnnotationQuarantineReason]
 }
 
 func (s roomSvc) StreamRoomLogs(ctx context.Context, req *connect.Request[ccv1.StreamRoomLogsRequest], stream *connect.ServerStream[ccv1.StreamRoomLogsResponse]) error {

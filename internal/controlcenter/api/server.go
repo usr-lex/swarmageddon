@@ -60,6 +60,7 @@ type Server struct {
 	Presence  *observatory.Presence
 	Fleet     *Fleet
 	Inbox     *InboxHub
+	Verdicts  *VerdictHub
 	Exec      terminal.Execer
 	Fwd       terminal.Forwarder
 	Log       *slog.Logger
@@ -93,6 +94,8 @@ func (s *Server) Handler() http.Handler {
 	add(controlcenterv1connect.NewSpendServiceHandler(spendSvc{s}, opts...))
 	add(controlcenterv1connect.NewUserServiceHandler(userSvc{s}, opts...))
 	add(controlcenterv1connect.NewObservatoryServiceHandler(observatorySvc{s}, opts...))
+	add(controlcenterv1connect.NewChannelServiceHandler(channelSvc{s}, opts...))
+	add(controlcenterv1connect.NewWardenServiceHandler(wardenSvc{s}, opts...))
 
 	mux.HandleFunc("/auth/oidc/", s.handleOIDC)
 	mux.HandleFunc("/auth/saml/", s.handleSAML)

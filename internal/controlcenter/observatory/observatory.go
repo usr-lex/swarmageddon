@@ -7,12 +7,14 @@ package observatory
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
@@ -29,11 +31,12 @@ type Recorder struct {
 	subs map[chan store.Activity]string // channel -> workspace
 }
 
-// Record stores events; duplicates (by dedup key) are dropped silently.
-func (r *Recorder) Record(ctx context.Context, evs ...store.Activity) {
+// Record stores events and returns the new ones; duplicates (by dedup key)
+// are dropped silently.
+func (r *Recorder) Record(ctx context.Context, evs ...store.Activity) []store.Activity {
 	db := r.DB()
 	if db == nil || len(evs) == 0 {
-		return
+		return nil
 	}
 	stored, err := db.InsertActivity(ctx, evs...)
 	if err != nil {
@@ -51,6 +54,7 @@ func (r *Recorder) Record(ctx context.Context, evs ...store.Activity) {
 			}
 		}
 	}
+	return stored
 }
 
 func (r *Recorder) log() *slog.Logger {
@@ -161,6 +165,8 @@ type AuditFollower struct {
 	// IsRoom tells agents from people (and system addresses) apart.
 	IsRoom   func(ctx context.Context, ws, name string) bool
 	Interval time.Duration
+	// OnVerdict is called once per new warden verdict (ADR 0011); optional.
+	OnVerdict func(ctx context.Context, ws string, v *messagingv1.Verdict)
 	// Backfill is how far back a workspace's first poll reaches; default 24h.
 	Backfill time.Duration
 }
@@ -207,7 +213,7 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 		since = time.Now().Add(-bf)
 	}
 	stream, err := f.Msg.QueryAudit(ctx, connect.NewRequest(&messagingv1.QueryAuditRequest{
-		Workspace: ws, Kinds: []string{"message", "crossing", "refusal"}, Since: timestamppb.New(since), Limit: 1000,
+		Workspace: ws, Kinds: []string{"message", "crossing", "refusal", "verdict"}, Since: timestamppb.New(since), Limit: 1000,
 	}))
 	if err != nil {
 		return err
@@ -216,6 +222,7 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 	latest := since
 	var evs []store.Activity
 	var crossings []store.Activity
+	verdicts := map[string]*messagingv1.Verdict{}
 	for stream.Receive() {
 		rec := stream.Msg()
 		at := rec.GetAt().AsTime()
@@ -226,12 +233,28 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 		to, _ := split(rec.GetTo())
 		key := "audit/msg/" + rec.GetMessageId()
 		switch rec.GetKind() {
-		case "message":
+		case "message", "post":
 			kind := store.KindMessage
-			if !f.IsRoom(ctx, ws, from) || !f.IsRoom(ctx, ws, to) {
+			switch {
+			case strings.HasPrefix(rec.GetTo(), "#"):
+				kind, to = store.KindPost, strings.SplitN(rec.GetTo(), "@", 2)[0]
+			case !f.IsRoom(ctx, ws, from) || !f.IsRoom(ctx, ws, to):
 				kind = store.KindHuman
 			}
 			evs = append(evs, store.Activity{TS: at, Workspace: ws, Actor: from, Kind: kind, Target: to, Dedup: key})
+		case "verdict":
+			var v messagingv1.Verdict
+			if err := protojson.Unmarshal([]byte(rec.GetBody()), &v); err != nil || v.GetId() == "" {
+				continue
+			}
+			room, _ := split(v.GetRoom())
+			if room == "" {
+				room = from
+			}
+			evs = append(evs, store.Activity{TS: at, Workspace: ws, Actor: room, Kind: store.KindVerdict,
+				Summary: fmt.Sprintf("%s %s: %s", severityName(v.GetSeverity()), v.GetLayer(), firstNonEmpty(v.GetReason(), v.GetRule())),
+				Value:   int64(v.GetSeverity()), Dedup: "verdict/" + v.GetId()})
+			verdicts["verdict/"+v.GetId()] = &v
 		case "crossing":
 			crossings = append(crossings, store.Activity{TS: at, Workspace: ws, Actor: from, Kind: store.KindCrossing, Target: to,
 				Summary: rec.GetLink(), Dedup: key})
@@ -243,7 +266,11 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 	if err := stream.Err(); err != nil {
 		return err
 	}
-	f.R.Record(ctx, evs...)
+	for _, e := range f.R.Record(ctx, evs...) {
+		if v := verdicts[e.Dedup]; v != nil && f.OnVerdict != nil {
+			f.OnVerdict(ctx, ws, v)
+		}
+	}
 	// A crossing is also a message: it replaces the plain message event.
 	for _, c := range crossings {
 		if err := db.MarkCrossing(ctx, c); err != nil {
@@ -254,6 +281,27 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 		return db.SetActivityCursor(ctx, ws, latest)
 	}
 	return nil
+}
+
+func severityName(s messagingv1.Severity) string {
+	switch s {
+	case messagingv1.Severity_SEVERITY_LOW:
+		return "low"
+	case messagingv1.Severity_SEVERITY_MEDIUM:
+		return "medium"
+	case messagingv1.Severity_SEVERITY_HIGH:
+		return "high"
+	case messagingv1.Severity_SEVERITY_CRITICAL:
+		return "critical"
+	}
+	return "unknown"
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func split(addr string) (string, string) {

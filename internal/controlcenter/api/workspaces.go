@@ -177,6 +177,16 @@ func (s workspaceSvc) plan(ctx context.Context, p *ccv1.WorkspacePlan, prune boo
 	return pr, cur, d, wizard.Diff(cur, d, prune), problems, nil
 }
 
+func (s workspaceSvc) DefaultChannels(ctx context.Context, req *connect.Request[ccv1.DefaultChannelsRequest]) (*connect.Response[ccv1.DefaultChannelsResponse], error) {
+	if _, err := signedIn(ctx); err != nil {
+		return nil, err
+	}
+	if req.Msg.GetPlan() == nil {
+		return nil, errInvalid("plan is required")
+	}
+	return connect.NewResponse(&ccv1.DefaultChannelsResponse{Channels: wizard.DefaultChannels(req.Msg.GetPlan())}), nil
+}
+
 func (s workspaceSvc) PreviewWorkspace(ctx context.Context, req *connect.Request[ccv1.PreviewWorkspaceRequest]) (*connect.Response[ccv1.PreviewWorkspaceResponse], error) {
 	_, _, d, changes, problems, err := s.plan(ctx, req.Msg.GetPlan(), req.Msg.GetPruneRooms())
 	if err != nil {
