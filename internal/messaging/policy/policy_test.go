@@ -111,6 +111,13 @@ func TestCheck(t *testing.T) {
 		{name: "agents can't reply to forge", from: agent("hermes"), to: "forge", body: "thanks", code: Invalid, rule: "forge",
 			reason: "forge notices are one-way; reply on the issue or PR"},
 		{name: "people can't reply to forge", from: alice, to: "forge@acme", body: "thanks", code: Invalid, rule: "forge"},
+		// status reports (§8.7)
+		{name: "any agent reports to status", from: agent("metis"), to: "status", body: "shipped #42", want: []string{"status"}},
+		{name: "ungrouped agent reports to status", from: agent("loner"), to: "status@acme", body: "x", want: []string{"status"}},
+		{name: "status report size limit", from: agent("metis"), to: "status", body: strings.Repeat("x", 101), code: Invalid, rule: "size"},
+		{name: "people don't report to status", from: alice, to: "status", body: "x", code: Denied, rule: "status"},
+		{name: "status can't send", from: Party{Name: "status", Kind: System}, to: "metis", body: "x", code: Denied, rule: "system"},
+		{name: "forge can't send to status", from: Party{Name: "forge", Kind: System}, to: "status", body: "x", code: Invalid, rule: "forge"},
 		// addressing and limits
 		{name: "unknown recipient", from: agent("hermes"), to: "zeus", body: "hi", code: NotFound, rule: "unknown-recipient"},
 		{name: "unknown group", from: agent("hermes"), to: "@olympus", body: "hi", code: NotFound, rule: "unknown-group"},

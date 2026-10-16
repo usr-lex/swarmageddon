@@ -58,8 +58,8 @@ type Store struct {
 
 	ensureMu sync.Mutex // serializes EnsureWorkspace
 	mu       sync.Mutex
-	applied map[string]WorkspaceConfig
-	known   map[string]bool // people known to exist, "<ws>.<handle>"
+	applied  map[string]WorkspaceConfig
+	known    map[string]bool // people known to exist, "<ws>.<handle>"
 }
 
 // Options tune a Store; zero values take the defaults.
@@ -221,6 +221,19 @@ func (s *Store) isLeader(ctx context.Context, stream string) bool {
 		return false
 	}
 	return info.Cluster == nil || info.Cluster.Leader == "" || info.Cluster.Leader == s.node.name
+}
+
+// InboxLeader names the replica leading a workspace's inbox stream.
+func (s *Store) InboxLeader(ctx context.Context, ws string) string {
+	st, err := s.js.Stream(ctx, InboxStream(ws))
+	if err != nil {
+		return ""
+	}
+	info, err := st.Info(ctx)
+	if err != nil || info.Cluster == nil {
+		return ""
+	}
+	return info.Cluster.Leader
 }
 
 // RegisterPerson records that a person exists in a workspace.

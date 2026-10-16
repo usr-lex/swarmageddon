@@ -85,7 +85,7 @@ func parseCaller(cn, onBehalf string) (Caller, error) {
 			return Caller{}, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s: %w", HeaderOnBehalfOf, err))
 		}
 		c.Workspace, c.Name, c.Kind = ws, name, policy.Human
-		if name == policy.Forge {
+		if policy.IsSystem(name) {
 			c.Kind = policy.System
 		}
 		return c, nil
@@ -94,7 +94,7 @@ func parseCaller(cn, onBehalf string) (Caller, error) {
 		return Caller{}, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("only the control center may use %s", HeaderOnBehalfOf))
 	}
 	name, ws, err := policy.SplitAddress(cn)
-	if err != nil || name == policy.Forge {
+	if err != nil || policy.IsSystem(name) {
 		return Caller{}, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("certificate subject %q is not a room (name@workspace)", cn))
 	}
 	return Caller{Workspace: ws, Name: name, Kind: policy.Agent}, nil

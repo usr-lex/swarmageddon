@@ -22,6 +22,13 @@ const (
 // (design §9.7). Only the control center may send as it; it is one-way.
 const Forge = "forge"
 
+// Status is the system address agents send status reports to (design
+// §8.7). Only the control center reads its inbox.
+const Status = "status"
+
+// IsSystem reports whether name is a system address.
+func IsSystem(name string) bool { return name == Forge || name == Status }
+
 // ForgeRatePerMinute is the forge sender's rate limit per workspace.
 const ForgeRatePerMinute = 120
 
@@ -69,8 +76,8 @@ type Route struct {
 
 // Lookup finds a room or person by name. Rooms win over people.
 func Lookup(ws *directory.Workspace, isPerson IsPerson, name string) (Party, bool) {
-	if name == Forge {
-		return Party{Name: Forge, Kind: System}, true
+	if IsSystem(name) {
+		return Party{Name: name, Kind: System}, true
 	}
 	if r, ok := ws.Rooms[name]; ok {
 		return Party{Name: name, Kind: Agent, Group: r.Group}, true
@@ -201,13 +208,22 @@ func checkGroup(ws *directory.Workspace, from Party, group, body string) (*Route
 // governs it (nil when none applies: within a group by default, or people).
 func pair(ws *directory.Workspace, from, to Party) (*v1alpha1.GroupLink, *Refusal) {
 	if from.Kind == System {
+		if from.Name != Forge {
+			return nil, refuse(Denied, "system", "%s can't send messages", from.Name)
+		}
 		// The forge's own permissions already decided visibility (§9.7).
 		if to.Kind != Agent {
-			return nil, refuse(Invalid, "forge", "forge notices go to agents only; %s is a person", to.Name)
+			return nil, refuse(Invalid, "forge", "forge notices go to agents only; %s is not an agent", to.Name)
 		}
 		return nil, nil
 	}
 	if to.Kind == System {
+		if to.Name == Status {
+			if from.Kind != Agent {
+				return nil, refuse(Denied, "status", "only agents send reports to %s@%s", Status, ws.Name)
+			}
+			return nil, nil // any agent of the workspace, no group link needed (§8.7)
+		}
 		return nil, refuse(Invalid, "forge", "forge notices are one-way; reply on the issue or PR")
 	}
 	if from.Kind == Human || to.Kind == Human {

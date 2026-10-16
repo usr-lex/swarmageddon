@@ -85,15 +85,17 @@ type party struct {
 }
 
 // sender resolves a caller that sends or owns an inbox: a room, or the
-// control center acting for a person (or, if allowSystem, the forge).
-func (s *Server) sender(ctx context.Context, allowSystem bool) (*party, error) {
+// control center acting for a person, or for the system address named by
+// system: forge@<ws> only sends, status@<ws> only has an inbox.
+func (s *Server) sender(ctx context.Context, system string) (*party, error) {
 	c, _ := CallerFrom(ctx)
 	if c.ControlCenter && c.Name == "" {
 		return nil, connect.NewError(connect.CodePermissionDenied,
 			fmt.Errorf("the control center must name the person it acts for in %s", HeaderOnBehalfOf))
 	}
-	if c.Kind == policy.System && !allowSystem {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("forge@<workspace> can only send"))
+	if c.Kind == policy.System && c.Name != system {
+		return nil, connect.NewError(connect.CodePermissionDenied,
+			fmt.Errorf("%s can't do this: forge@<workspace> only sends, status@<workspace> only receives", c.Address()))
 	}
 	ws, ok := s.dir.Workspace(c.Workspace)
 	if !ok {
@@ -130,7 +132,7 @@ func (s *Server) room(ctx context.Context) (*party, error) {
 	if c.Kind != policy.Agent {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only rooms may call this"))
 	}
-	return s.sender(ctx, false)
+	return s.sender(ctx, "")
 }
 
 // controlCenter checks that the caller is the control center.
@@ -175,7 +177,7 @@ func (s *Server) refused(ctx context.Context, from *party, to, id, body string, 
 
 // Send implements MessagingService.
 func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.SendRequest]) (*connect.Response[messagingv1.SendResponse], error) {
-	from, err := s.sender(ctx, true)
+	from, err := s.sender(ctx, policy.Forge)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +248,7 @@ func (s *Server) isPerson(ctx context.Context, ws string) policy.IsPerson {
 
 // Subscribe implements MessagingService.
 func (s *Server) Subscribe(ctx context.Context, req *connect.Request[messagingv1.SubscribeRequest], stream *connect.ServerStream[messagingv1.Delivery]) error {
-	me, err := s.sender(ctx, false)
+	me, err := s.sender(ctx, policy.Status)
 	if err != nil {
 		return err
 	}
@@ -264,7 +266,7 @@ func (s *Server) Subscribe(ctx context.Context, req *connect.Request[messagingv1
 
 // Ack implements MessagingService.
 func (s *Server) Ack(ctx context.Context, req *connect.Request[messagingv1.AckRequest]) (*connect.Response[messagingv1.AckResponse], error) {
-	me, err := s.sender(ctx, false)
+	me, err := s.sender(ctx, policy.Status)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +321,7 @@ func (s *Server) ReportStatus(ctx context.Context, req *connect.Request[messagin
 
 // ListPeers implements MessagingService.
 func (s *Server) ListPeers(ctx context.Context, req *connect.Request[messagingv1.ListPeersRequest]) (*connect.Response[messagingv1.ListPeersResponse], error) {
-	me, err := s.sender(ctx, false)
+	me, err := s.sender(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -334,8 +336,14 @@ func (s *Server) ListPeers(ctx context.Context, req *connect.Request[messagingv1
 		out.Peers = append(out.Peers, &messagingv1.Peer{
 			Address: policy.Address(name, me.ws.Name), Kind: string(policy.Agent), DisplayName: r.DisplayName,
 			Title: r.Title, Summary: r.Summary, Group: r.Group, Note: note,
-			Presence: s.st.Presence(ctx, me.ws.Name, name),
+			Presence:    s.st.Presence(ctx, me.ws.Name, name),
+			CurrentTask: s.st.Status(ctx, me.ws.Name, name).GetCurrentTask(),
 		})
+	}
+	if ok, _ := policy.Allowed(me.ws, me.p, policy.Party{Name: policy.Status, Kind: policy.System}); ok {
+		out.Peers = append(out.Peers, &messagingv1.Peer{Address: policy.Address(policy.Status, me.ws.Name),
+			Kind: string(policy.System), DisplayName: "Swarm status",
+			Note: "status reports for the control center; one-way"})
 	}
 	people, err := s.st.People(ctx, me.ws.Name)
 	if err != nil {

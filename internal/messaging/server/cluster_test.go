@@ -319,6 +319,19 @@ func TestCluster(t *testing.T) {
 		if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "forge notices are one-way; reply on the issue or PR") {
 			t.Fatalf("reply to forge: %v", err)
 		}
+		// status@: any agent reports, only the control center reads.
+		send(t, clientFor(reps[2], "hecate@acme", ""), ulid.Make().String(), "status", "shipped #161")
+		sin := subscribe(t, clientFor(reps[0], ControlCenterCN, "status@acme"))
+		if m := sin.next(t, true).GetMessage(); m.GetFrom() != "hecate@acme" || m.GetTo() != "status@acme" {
+			t.Fatalf("status inbox got %v", m)
+		}
+		if _, err := forge.ListPeers(ctx, connect.NewRequest(&messagingv1.ListPeersRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Fatalf("forge listing peers: %v", err)
+		}
+		_, err = clientFor(reps[0], ControlCenterCN, "status@acme").Send(ctx, connect.NewRequest(&messagingv1.SendRequest{Id: ulid.Make().String(), To: "metis", Body: "x"}))
+		if connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Fatalf("status sending: %v", err)
+		}
 		// ListPeers: hecate sees the two contacts with the prefix note, and alice.
 		res, err := clientFor(reps[2], "hecate@acme", "").ListPeers(ctx, connect.NewRequest(&messagingv1.ListPeersRequest{}))
 		if err != nil {
@@ -330,7 +343,7 @@ func TestCluster(t *testing.T) {
 		}
 		joined := strings.Join(got, "\n")
 		if !strings.Contains(joined, `proteus@acme|mediated link dirty->clean: one named recipient per message, no group addresses; messages must start with "to proteus:"`) ||
-			!strings.Contains(joined, "metis@acme|") || !strings.Contains(joined, "alice@acme|") || strings.Contains(joined, "themis") {
+			!strings.Contains(joined, "metis@acme|") || !strings.Contains(joined, "status@acme|") || !strings.Contains(joined, "alice@acme|") || strings.Contains(joined, "themis") {
 			t.Fatalf("peers:\n%s", joined)
 		}
 	})
@@ -426,6 +439,13 @@ func TestCluster(t *testing.T) {
 			t.Fatal(err)
 		}
 		wait("a@fast", messagingv1.Presence_PRESENCE_WORKING, true)
+		peers, err := clientFor(reps[2], "b@fast", "").ListPeers(ctx, connect.NewRequest(&messagingv1.ListPeersRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p := peers.Msg.Peers[0]; p.Address != "a@fast" || p.CurrentTask != "#42" || p.Presence != messagingv1.Presence_PRESENCE_WORKING {
+			t.Fatalf("peer %v", p)
+		}
 		wait("a@fast", messagingv1.Presence_PRESENCE_OFFLINE, true) // the 2 s TTL lapses
 	})
 
@@ -442,8 +462,12 @@ func TestCluster(t *testing.T) {
 	})
 
 	t.Run("replica stopped mid-stream", func(t *testing.T) {
-		in := subscribe(t, clientFor(reps[0], "hermes@acme", ""))
-		themis := clientFor(reps[1], "themis@acme", "")
+		// Stop the inbox stream's leader; the clients use the other two.
+		var leader int
+		fmt.Sscanf(reps[0].st.InboxLeader(ctx, "acme"), "messaging-%d", &leader)
+		others := []int{(leader + 1) % 3, (leader + 2) % 3}
+		in := subscribe(t, clientFor(reps[others[0]], "hermes@acme", ""))
+		themis := clientFor(reps[others[1]], "themis@acme", "")
 		var ids []string
 		for i := range 10 {
 			id := ulid.Make().String()
@@ -455,8 +479,8 @@ func TestCluster(t *testing.T) {
 				t.Fatalf("got %s want %s", got, id)
 			}
 		}
-		reps[2].close()
-		reps[2] = nil
+		reps[leader].close()
+		reps[leader] = nil
 		for i := range 5 {
 			id := ulid.Make().String()
 			ids = append(ids, id)

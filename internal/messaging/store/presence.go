@@ -37,6 +37,19 @@ func (s *Store) Presence(ctx context.Context, ws, name string) messagingv1.Prese
 	return ev.Presence
 }
 
+// Status returns a room's latest status report, or nil.
+func (s *Store) Status(ctx context.Context, ws, name string) *messagingv1.RoomStatusReport {
+	e, err := s.status.Get(ctx, ws+"."+name)
+	if err != nil {
+		return nil
+	}
+	var st messagingv1.RoomStatusReport
+	if proto.Unmarshal(e.Value(), &st) != nil {
+		return nil
+	}
+	return &st
+}
+
 // PutStatus stores a room's latest status report.
 func (s *Store) PutStatus(ctx context.Context, ws, name string, st *messagingv1.RoomStatusReport) error {
 	data, err := proto.Marshal(st)
