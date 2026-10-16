@@ -30,6 +30,9 @@ type RoleTemplateSpec struct {
 	// WardenRules adds rules to the warden's rule table for rooms of this role (ADR 0011).
 	// +optional
 	WardenRules []WardenRule `json:"wardenRules,omitempty"`
+	// RoomDefaults apply to rooms of this role, over the workspace's (docs/design.md §6.6).
+	// +optional
+	RoomDefaults RoomDefaults `json:"roomDefaults,omitempty"`
 	// FirstTurn is the prompt a room gets when it starts. Empty: the built-in one.
 	// +optional
 	FirstTurn string `json:"firstTurn,omitempty"`

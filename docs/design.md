@@ -578,6 +578,86 @@ tools, and the branch rules. Personas are guardrails, not security. The hard
 limits are forge permissions, branch protection, NetworkPolicy and what is
 mounted (§11).
 
+### 6.5 Advisors and the warden
+
+Each room can have an **advisor**: a stronger model, or the same model at a
+higher effort, that the agent consults through the `swarm advise` tool.
+
+- **Inputs:** the question, the tail of the transcript, and files from the
+  work folder.
+- **Limits:** at most a read-only file reader; answers return only to the
+  calling session.
+- **Spend:** a separate budget-capped gateway key.
+- **Claude rooms** also get a managed read-only `advisor` subagent, and
+  Claude's native advisor tool as an opt-in. ADR 0010 has the details.
+
+The **warden** is a small model that keeps agents from going rogue. It works
+in four layers:
+
+1. rules in the room
+2. a synchronous judge for risky calls, in `gate` mode
+3. trajectory review after each turn
+4. a gateway guard outside the room, which a root agent can't tamper with
+
+It can deny, escalate to a person, interrupt, or quarantine a room: refuse
+its model requests and shrink its network and forge access until a person
+releases it. Its verdicts land in the audit log, the room's Activity tab and
+the observatory. ADR 0011 has the details.
+
+### 6.6 Layered room settings and shared volumes
+
+Some settings apply to everyone, some to a role, and some to one room. They
+are written at three levels, applied in this order, with later levels
+overriding earlier ones by key:
+
+1. **Workspace** (`Workspace.spec.roomDefaults`): every room in the
+   workspace.
+2. **Role** (`RoleTemplate.spec.roomDefaults`): rooms of that role.
+3. **Room** (`Room.spec`): the room itself.
+
+| Setting | Merged by |
+|---|---|
+| `env` | variable name; non-secret values only |
+| `secretEnv` | variable name; each value comes from a key of a Secret in the workspace namespace, copied into the room's identity Secret |
+| `mcpServers` | server name, in the `.mcp.json` format (stdio, `http`). Header and env values may reference Secrets (`valueFrom`). A level can remove an inherited server with `disabled: true` |
+| `network` | the mode as a whole (`none`, `limited` or `full`), with `domains` merged as a union and `packageManagers` taken from the latest level that sets it |
+
+The operator renders the merged result into the room:
+
+- **Variables:** in the room's environment, and for SSH-less shells in the
+  supervisor's environment file.
+- **MCP servers:** in Claude Code's managed MCP file, next to the `swarm`
+  server, and in ore's `config.toml`. ore doesn't expand `${VAR}`
+  placeholders, so the operator writes values in directly, inside the
+  room's own files.
+- **Network:** the room's NetworkPolicy and egress allowlist (§11.2).
+
+Changing a workspace or role default rolls the rooms it affects, one at a
+time, and only when each is idle (the same policy as image updates, §3.5).
+It never rolls them all at once.
+
+Secrets a room receives are readable by its agent, as everything mounted in a
+room is (§11). Give MCP servers keys scoped to what the agents may do.
+
+**Shared volumes.** `Workspace.spec.sharedVolumes` declares ReadWriteMany
+volumes. Each one has:
+
+- a name, a size and an optional StorageClass
+- mounts by selector (`everyone`, `role:<t>`, `group:<g>`, `room:<name>`),
+  each read-only or read-write
+
+The operator creates the claim in the workspace namespace and mounts it at
+`/srv/shared/<name>` in each matching room.
+
+- **Walls:** a volume may not be mounted read-write on both sides of a
+  wall. The workspace controller refuses that, so a wall can't be crossed
+  through a disk.
+- **No ReadWriteMany:** preflight reports whether the cluster offers RWX
+  (§3.4). Without it, the wizard hides shared volumes.
+- **Identity mapping:** under the `userns` tier, a shared volume needs a
+  filesystem that supports idmapped mounts. Files written by one room's
+  agent (uid 1000 in each room) appear as the same uid in the others.
+
 ## 7. The messaging service
 
 ADR 0002 covers storage, ADR 0003 the wire protocol.
@@ -1217,23 +1297,70 @@ collapsed: one notification per room and event until it changes.
 **Running with permissions bypassed** is supported. Every row above except
 "Personas" holds regardless of what the agent does inside the room.
 
-### 11.2 Room egress NetworkPolicy
+### 11.2 Room network access
 
-Room egress:
+Each room has one of three network access modes. The mode is a layered
+setting (§6.6): a workspace default, a role's, or a room's own.
 
-1. **DNS:** kube-dns, UDP and TCP 53.
-2. **Platform services:** messaging (443), Forgejo HTTP (443) and SSH (22),
-   LiteLLM (443) and the registry cache (5000), by namespace and pod
-   labels.
-3. **Internet:** an `ipBlock` of `0.0.0.0/0` and `::/0` **except** the
-   cluster's pod and service CIDRs, node addresses, RFC 1918, CGNAT
-   `100.64.0.0/10`, link-local `169.254.0.0/16` (cloud metadata), and the
-   admin's `extraDeniedCIDRs`. A workspace can switch the internet off or
-   allow named CIDRs, for example a model server on the LAN.
+| Mode | The room reaches |
+|---|---|
+| `none` | the platform services only: messaging, Forgejo (HTTP and SSH), the gateway, the registry cache, and DNS |
+| `limited` | the platform services, plus the listed domains through the egress proxy; one switch adds the package managers |
+| `full` | the platform services and the internet, minus private and cluster ranges |
+
+**Enforcement.** Every mode starts from the same NetworkPolicy: DNS
+(kube-dns, UDP and TCP 53) and the platform services, selected by namespace
+and pod labels. The modes then differ:
+
+- `none` adds nothing.
+- `limited` adds the egress proxy (below) and nothing else. Tools that ignore
+  the proxy settings fail to connect, so nothing gets out unchecked.
+- `full` adds an `ipBlock` of `0.0.0.0/0` and `::/0` except:
+  - the cluster's pod and service CIDRs, and node addresses
+  - RFC 1918 ranges and CGNAT `100.64.0.0/10`
+  - link-local `169.254.0.0/16`, which covers cloud metadata
+  - the admin's `extraDeniedCIDRs`
+
+`allowedCIDRs` (for example a model server on the LAN) adds direct ipBlocks
+in `limited` and `full`.
+
+**The egress proxy** (`egress`, two replicas in the platform namespace,
+written in Go):
+
+- **Protocols:** an HTTP proxy that handles `CONNECT` for HTTPS and plain
+  HTTP requests.
+- **Identity:** each room authenticates with `Proxy-Authorization`, using a
+  credential from its identity Secret. The proxy looks up the room's
+  allowlist.
+- **What it checks:** the `CONNECT` host (and, for HTTPS, that the TLS SNI
+  matches it) or the request host. It never terminates TLS.
+- **Allowlist entries:** exact hosts or `*.suffix`, with an optional port
+  (default 443 and 80).
+- **The package-managers switch** adds a list maintained in the operator:
+  - npm, Yarn and pnpm registries
+  - PyPI and its files host
+  - the Go module proxy and sum database
+  - crates.io and its index
+  - RubyGems
+  - Maven Central
+  - the Ubuntu archive and security mirrors
+  - GitHub release downloads
+
+  Docker Hub is already covered by the registry cache.
+- **Refusals:** a 403 with a plain-text body naming the room's mode and how
+  to change it, such as "athena's network access is limited; this host is
+  not on its list. A person can add it in the control center."
+- **Audit:** every refusal, and (optionally) every connection's host, is
+  logged to the room's audit stream.
+
+The supervisor sets `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` (the
+platform services and cluster domains) for the CLI and for shells, and
+writes them into Podman's `containers.conf`, so nested containers use the
+proxy too. In `full` mode no proxy is set.
 
 Nested containers' traffic leaves through the pod's network namespace, so the
-same policy applies to them. Preflight's NetworkPolicy check fails the
-install if policies aren't enforced, rather than pretending.
+same NetworkPolicy applies to them. Preflight's NetworkPolicy check fails the
+install if policies aren't enforced, rather than pretending they are.
 
 ### 11.3 RBAC
 
