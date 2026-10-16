@@ -89,7 +89,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 |---|---|
 | `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version` |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
-| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca`, `--data /data`, `--nats-routes`, `--server-name`, `--cluster-size`, `--namespace` |
+| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |
 | `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>` |
 | `mockmodel` | `--listen :9999`, `--script <file>`; serves Anthropic `/v1/messages`, OpenAI `/v1/responses` and `/v1/chat/completions` |
@@ -99,3 +99,13 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 `ghcr.io/usr-lex/swarmageddon/<name>:<version>`: `operator`, `control-center`,
 `messaging`, `room`, `runner`, `mockmodel`. Third-party images are pinned by
 the operator in `internal/operator/images/images.go`.
+
+## Messaging storage
+
+One JetStream stream per workspace and kind, so retention is that stream's
+`MaxAge`: `INBOX_<ws>` (`inbox.<ws>.<name>`), `AUDIT_<ws>`
+(`audit.<ws>.{message,crossing,refusal,presence}`) and `APPROVALS_<ws>`
+(`approval.<ws>.<room>`); KV buckets `presence`, `status` and `people`. Each
+recipient has a durable consumer named after it. `Nats-Msg-Id` is
+`<id>/<recipient>`. Names match `^[a-z0-9][a-z0-9_-]{0,62}$`; `forge` and
+`status` are reserved system addresses.
