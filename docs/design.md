@@ -105,7 +105,12 @@ no org or repository names.
 | `messaging` | platform namespace, 3 replicas (1 on a single node) | NATS between its own replicas; Kubernetes API (read Workspaces and Rooms) |
 | `supervisor` | PID 1 of every room | messaging (mTLS), the local CLI, the local engine |
 | `swarm` | in rooms: MCP server, hook helper, CLI for people in a shell | the local supervisor over a Unix socket |
-| `devicecheck` (preflight) | short-lived Jobs | none |
+| `warden` | platform namespace, 2 replicas, in front of LiteLLM (ADR 0011) | LiteLLM, messaging, Kubernetes API (patch rooms to quarantine) |
+| `egress` | platform namespace, 2 replicas (§11.2) | the internet, for rooms in `limited` mode |
+| `devices` | DaemonSet in `swarmageddon-devices`: a device plugin giving `userns` rooms `/dev/fuse` and `/dev/net/tun` (ADR 0001) | the kubelet |
+| `mockmodel` | dev and tests only | none |
+
+Preflight probes run as short-lived Jobs with stock images.
 
 **Namespaces.**
 
@@ -468,8 +473,8 @@ pausing and deleting room B leaves room A's pod UID and its StatefulSet's
 ### 6.1 The image
 
 One base image, `room`, built for amd64 and arm64 in CI (`docker buildx`
-with native arm64 runners, no QEMU for the big layers). Fedora, as in
-remote-labs. It contains:
+with native arm64 runners, no QEMU for the big layers). Ubuntu 26.04 (see
+the note at the top). It contains:
 
 - **Development tools:** git, Node (via a system-wide nvm under `/opt/nvm`,
   owned by the agent user), Python with uv, build tools, ripgrep, jq, tmux.
@@ -710,8 +715,9 @@ watched read-only. In order:
 
 1. **Identity.** The sender is the certificate's subject. Rooms can't set
    `from`. Only the control center's principal may send as a person, and only
-   for a signed-in person of that workspace, carried in a signed header the
-   control center adds.
+   for a signed-in person of that workspace, named in the
+   `x-swarm-on-behalf-of` header. Messaging trusts that header only on the
+   control center's mTLS connection; rooms that send it are refused.
 2. **Size and rate limits.** Per sender (token bucket; per replica, so
    approximate across replicas, which is fine for this purpose).
 3. **Reachability.** Is there a link from the sender's group to the
@@ -1453,8 +1459,11 @@ The lesson: a 126 GB disk filled quietly. So:
 api/v1alpha1/            CRD types (kubebuilder markers) and generated deepcopy
 cmd/
   operator/  control-center/  messaging/  supervisor/  swarm/
+  warden/  egress/  devices/  mockmodel/
 internal/
-  operator/{platform,workspace,room,runnerpool,preflight}/
+  operator/{platform,workspace,room,runnerpool,preflight,addons,persona,manifests}/
+  roomsettings/          the one merge of layered room settings (§6.6)
+  warden/  egress/  devices/  mockmodel/
   forgejo/               admin client (generated from swagger, trimmed)
   gateway/               LiteLLM client
   messaging/{server,policy,store}/
@@ -1465,8 +1474,7 @@ proto/swarm/…/v1/        protobuf (buf)
 web/                     React UI (Vite)
 images/room/  images/runner/
 charts/swarmageddon/     Helm chart; install.yaml is rendered from it in CI
-manifests/               embedded platform service templates
-hack/                    dev scripts (k3d cluster, Keycloak realm, mock model)
+hack/                    dev scripts (k3d cluster, Keycloak realm, dev extras)
 test/e2e/  test/canary/
 docs/                    design.md, adr/, user docs
 ```
@@ -1502,7 +1510,7 @@ docs/                    design.md, adr/, user docs
 | UI | Playwright for the wizards, the fleet view, approvals on a mobile viewport | `make e2e` |
 | Acceptance (M1) | fresh single-node k3s VM: the one install command, then only a browser (driven by Playwright), until a terminal shows a working room | release checklist; nightly |
 
-**The mock model** (`hack/mockmodel`) speaks Anthropic Messages and the
+**The mock model** (`cmd/mockmodel`, `internal/mockmodel`) speaks Anthropic Messages and the
 OpenAI Responses and Chat APIs, with streaming. It replays scripted turns:
 text, tool calls (run a command, edit a file, call `swarm.send_message`) and
 waits, keyed by a marker in the prompt. It's served through the real LiteLLM
