@@ -163,7 +163,18 @@ func (r *Reconciler) reconcileRepo(ctx context.Context, w *v1alpha1.Workspace, f
 	var got *forgejo.Repository
 	var err error
 	if repo.ImportURL != "" {
-		got, err = fc.EnsureMigratedRepo(ctx, forgejo.MigrateOption{CloneAddr: repo.ImportURL, RepoName: repo.Name, RepoOwner: org, Private: true})
+		opt := forgejo.MigrateOption{CloneAddr: repo.ImportURL, RepoName: repo.Name, RepoOwner: org, Private: true}
+		if repo.ImportSecretName != "" {
+			if _, err := fc.GetRepo(ctx, org, repo.Name); forgejo.IsNotFound(err) {
+				// Read the credential only when there is something to import.
+				user, token, err := r.repoCredential(ctx, w, repo.ImportSecretName)
+				if err != nil {
+					return fmt.Errorf("import secret: %w", err)
+				}
+				opt.AuthUsername, opt.AuthToken = user, token
+			}
+		}
+		got, err = fc.EnsureMigratedRepo(ctx, opt)
 	} else {
 		got, err = fc.EnsureOrgRepo(ctx, org, repo.Name)
 	}
@@ -199,18 +210,35 @@ func (r *Reconciler) reconcileRepo(ctx context.Context, w *v1alpha1.Workspace, f
 	if repo.PushMirror != "" {
 		var user, token string
 		if repo.MirrorSecretName != "" {
-			var sec corev1.Secret
-			key := types.NamespacedName{Namespace: v1alpha1.SystemNamespace, Name: repo.MirrorSecretName}
-			if err := r.Get(ctx, key, &sec); err != nil {
-				return fmt.Errorf("mirror secret %s: %w", key, err)
+			if user, token, err = r.repoCredential(ctx, w, repo.MirrorSecretName); err != nil {
+				return fmt.Errorf("mirror secret: %w", err)
 			}
-			user, token = "oauth2", string(sec.Data["token"])
 		}
 		if err := fc.EnsurePushMirror(ctx, org, repo.Name, repo.PushMirror, user, token); err != nil {
 			return fmt.Errorf("push mirror: %w", err)
 		}
 	}
 	return nil
+}
+
+// repoCredential reads a git credential for imports and push mirrors from a
+// Secret in the workspace namespace: key token, and username (default
+// "oauth2", which GitHub accepts with a token).
+func (r *Reconciler) repoCredential(ctx context.Context, w *v1alpha1.Workspace, name string) (user, token string, err error) {
+	var sec corev1.Secret
+	key := types.NamespacedName{Namespace: v1alpha1.WorkspaceNamespace(w.Name), Name: name}
+	if err := r.Get(ctx, key, &sec); err != nil {
+		return "", "", fmt.Errorf("%s: %w", key, err)
+	}
+	token = string(sec.Data["token"])
+	if token == "" {
+		return "", "", fmt.Errorf("%s has no key token", key)
+	}
+	user = string(sec.Data["username"])
+	if user == "" {
+		user = "oauth2"
+	}
+	return user, token, nil
 }
 
 // reconcileGateway keeps the workspace's LiteLLM team; its budget is the

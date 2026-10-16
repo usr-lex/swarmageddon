@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +32,7 @@ import (
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/operator/apply"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
+	"github.com/usr-lex/swarmageddon/internal/operator/room"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
 
@@ -38,6 +42,9 @@ const (
 	ConditionRepositoriesReady  = "RepositoriesReady"
 	ConditionForgeWebhookReady  = "ForgeWebhookReady"
 	ConditionGatewayTeamReady   = "GatewayTeamReady"
+	// ConditionSharedVolumesValid is false when a shared volume would be
+	// writable on both sides of a wall.
+	ConditionSharedVolumesValid = "SharedVolumesValid"
 )
 
 // ControlCenterServiceAccount is bound to the per-workspace Role.
@@ -130,6 +137,10 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 		return ctrl.Result{}, err
 	}
 
+	if err := r.checkSharedVolumes(ctx, w, ns); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	retry := false
 	if err := r.reconcileForge(ctx, w); err != nil {
 		if !errors.Is(err, deps.ErrNotReady) {
@@ -148,6 +159,31 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 	}
 	// Periodic resync catches repositories and changes made outside the operator.
 	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+}
+
+// checkSharedVolumes sets SharedVolumesValid: false, naming the volumes,
+// when a shared volume would be writable on both sides of a wall (design
+// §6.6). The room controller mounts those read-only everywhere.
+func (r *Reconciler) checkSharedVolumes(ctx context.Context, w *v1alpha1.Workspace, ns string) error {
+	if len(w.Spec.SharedVolumes) == 0 {
+		meta.RemoveStatusCondition(&w.Status.Conditions, ConditionSharedVolumesValid)
+		return nil
+	}
+	var rooms v1alpha1.RoomList
+	if err := r.List(ctx, &rooms, client.InNamespace(ns)); err != nil {
+		return err
+	}
+	walls := room.WallViolations(w, rooms.Items)
+	if len(walls) == 0 {
+		setCond(w, ConditionSharedVolumesValid, true, "Valid", fmt.Sprintf("%d shared volumes, none writable across a wall", len(w.Spec.SharedVolumes)))
+		return nil
+	}
+	var msgs []string
+	for _, name := range slices.Sorted(maps.Keys(walls)) {
+		msgs = append(msgs, walls[name])
+	}
+	setCond(w, ConditionSharedVolumesValid, false, "WallCrossed", strings.Join(msgs, "; "))
+	return nil
 }
 
 // ensureNamespace applies the namespace and its baseline objects.

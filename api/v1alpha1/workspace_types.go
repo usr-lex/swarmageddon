@@ -291,12 +291,19 @@ type RepositorySpec struct {
 	// ImportURL to clone from instead of creating an empty repository.
 	// +optional
 	ImportURL string `json:"importURL,omitempty"`
+	// ImportSecretName is a Secret in the workspace namespace with the
+	// credential for ImportURL (keys token, and optionally username), used
+	// for the one import only.
+	// +optional
+	ImportSecretName string `json:"importSecretName,omitempty"`
 	// Group whose team owns it; empty: the default teams.
 	// +optional
 	Group string `json:"group,omitempty"`
 	// PushMirror to GitHub (or any git URL); credentials from MirrorSecretName (key token).
 	// +optional
 	PushMirror string `json:"pushMirror,omitempty"`
+	// MirrorSecretName is a Secret in the workspace namespace (key token,
+	// optionally username), used only by Forgejo, never mounted in a room.
 	// +optional
 	MirrorSecretName string `json:"mirrorSecretName,omitempty"`
 	// StatusChecks required on the default branch.
