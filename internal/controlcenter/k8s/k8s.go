@@ -38,6 +38,7 @@ const (
 	SecretGateway            = "control-center-gateway" // key masterKey: a gateway key for reading spend
 	SecretForgeReader        = "forge-reader"           // key token: read-only Forgejo token
 	SecretForgeWebhookPrefix = "forge-webhook-"         // + workspace: key secret (HMAC for /hooks/forgejo/<ws>)
+	SecretNtfyPublisher      = "ntfy-publisher"         // keys token, url: what the control center publishes to ntfy with
 )
 
 // Prefixes of Secrets the control center writes for the wizard, all in the
@@ -48,7 +49,8 @@ var secretPrefixes = []string{"gateway-provider-", "oidc-", "notify-", "forge-we
 // this name in the system namespace.
 func AllowedSecret(name string) bool {
 	switch name {
-	case SecretSetupToken, SecretLocalAdmin, SecretSession, SecretDB, SecretVAPID, SecretSAML, SecretGateway, SecretForgeReader:
+	case SecretSetupToken, SecretLocalAdmin, SecretSession, SecretDB, SecretVAPID, SecretSAML, SecretGateway, SecretForgeReader,
+		SecretNtfyPublisher:
 		return true
 	}
 	for _, p := range secretPrefixes {
