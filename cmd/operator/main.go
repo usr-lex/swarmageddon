@@ -65,7 +65,13 @@ func main() {
 
 func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage string) error {
 	log := ctrl.Log.WithName("setup")
-	imgs, err := images.Load(imagesFrom, version.Version)
+	base := images.Defaults(version.Version)
+	// Our own images come from the chart's image.registry and image.tag;
+	// --images-from and --room-image still win.
+	if reg, tag := os.Getenv("IMAGE_REGISTRY"), os.Getenv("IMAGE_TAG"); reg != "" && tag != "" {
+		base.Own(reg, tag)
+	}
+	imgs, err := images.LoadOnto(base, imagesFrom)
 	if err != nil {
 		return fmt.Errorf("images: %w", err)
 	}

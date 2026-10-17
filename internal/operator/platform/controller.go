@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -241,9 +242,11 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 	if wait > 0 {
 		requeue(wait)
 	}
-	if err := r.expose(ctx, p, ingressTLS); err != nil {
+	if d, err := r.expose(ctx, p, ingressTLS); err != nil {
 		setCond(p, ConditionExposed, false, "Error", err.Error())
 		return result, err
+	} else if d > 0 {
+		requeue(d)
 	}
 	if err := r.limitControlCenterIngress(ctx, p); err != nil {
 		return result, err
@@ -376,11 +379,12 @@ func (r *Reconciler) nodeIPs(ctx context.Context) ([]net.IP, error) {
 // expose publishes the control center through the default IngressClass,
 // serving tlsSecret, or, without one, a NodePort (design §3.2), and records
 // status.url.
-func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret string) error {
+// It returns how soon to look again while it waits for k3s's Traefik.
+func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret string) (time.Duration, error) {
 	sys := v1alpha1.SystemNamespace
 	var classes networkingv1.IngressClassList
 	if err := r.List(ctx, &classes); err != nil {
-		return err
+		return 0, err
 	}
 	class := ""
 	for _, ic := range classes.Items {
@@ -390,7 +394,7 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret
 	}
 	ips, err := r.nodeIPs(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	host := "127.0.0.1"
 	if len(ips) > 0 {
@@ -402,7 +406,7 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret
 	var svc corev1.Service
 	svcErr := r.Get(ctx, types.NamespacedName{Namespace: sys, Name: "control-center"}, &svc)
 	if svcErr != nil && !apierrors.IsNotFound(svcErr) {
-		return svcErr
+		return 0, svcErr
 	}
 	portForward := "kubectl -n " + sys + " port-forward svc/control-center 8443:443, then https://localhost:8443/"
 	v := manifests.Values{SystemNamespace: sys, Ingress: manifests.IngressValues{ClassName: class, Hostname: p.Spec.Hostname}}
@@ -410,18 +414,18 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret
 	if class != "" {
 		objs, err := manifests.Render(manifests.ControlCenterIngress, v)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if err := useTLSSecret(objs, tlsSecret); err != nil {
-			return err
+			return 0, err
 		}
 		if err := r.applier().ApplyAll(ctx, p, toObjects(objs)); err != nil {
-			return err
+			return 0, err
 		}
 		if r.hasKind(schema.GroupVersionKind{Group: "traefik.io", Version: "v1alpha1", Kind: "ServersTransport"}) && svcErr == nil {
 			objs, err := manifests.Render(manifests.ControlCenterTraefik, v)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			for _, o := range objs {
 				owner := client.Object(p)
@@ -429,40 +433,52 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret
 					owner = nil // the install owns the Service; we only add annotations
 				}
 				if err := r.applier().Apply(ctx, owner, o); err != nil {
-					return err
+					return 0, err
 				}
 			}
 		}
 		note, err := r.traefikDefaultCert(ctx, p)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		p.Status.URL = "https://" + host + "/"
 		setCond(p, ConditionExposed, true, "Ingress", "IngressClass "+class+"; or "+portForward+note)
-		return nil
+		return 0, nil
+	}
+
+	// k3s installs its bundled Traefik, and so the default IngressClass, a
+	// minute or so after the API server is up, often after the operator
+	// starts. Wait for it rather than publish a NodePort URL (which the
+	// welcome Job prints) that is about to change.
+	if wait, err := r.awaitBundledIngress(ctx, p); err != nil {
+		return 0, err
+	} else if wait > 0 {
+		p.Status.URL = ""
+		setCond(p, ConditionExposed, false, "WaitingForIngress", "waiting for k3s's bundled Traefik IngressClass; meanwhile "+portForward)
+		return wait, nil
 	}
 
 	// No default IngressClass: drop our Ingress and use a NodePort.
 	ing := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Namespace: sys, Name: "control-center"}}
 	if err := r.Delete(ctx, ing); err != nil && !apierrors.IsNotFound(err) {
-		return err
+		return 0, err
 	}
 	if err := r.removeTraefikDefaultCert(ctx); err != nil {
-		return err
+		return 0, err
 	}
 	if svcErr != nil {
 		p.Status.URL = "https://localhost:8443/"
 		setCond(p, ConditionExposed, false, "NoService", "Service control-center not found; is the control center installed?")
-		return nil
+		return 0, nil
 	}
 	if err := r.applier().Apply(ctx, nil, &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: sys, Name: "control-center"},
 		Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeNodePort},
 	}); err != nil {
-		return err
+		return 0, err
 	}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: sys, Name: "control-center"}, &svc); err != nil {
-		return err
+		return 0, err
 	}
 	var port int32
 	for _, sp := range svc.Spec.Ports {
@@ -473,11 +489,35 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret
 	if port == 0 {
 		p.Status.URL = "https://localhost:8443/"
 		setCond(p, ConditionExposed, false, "NodePortPending", "waiting for a node port; meanwhile "+portForward)
-		return nil
+		return 0, nil
 	}
 	p.Status.URL = fmt.Sprintf("https://%s:%d/", host, port)
 	setCond(p, ConditionExposed, true, "NodePort", fmt.Sprintf("node port %d (no default IngressClass); or %s", port, portForward))
-	return nil
+	return 0, nil
+}
+
+// bundledIngressGrace is how long a new install on k3s waits for its
+// bundled Traefik's IngressClass before falling back to a NodePort.
+const bundledIngressGrace = 3 * time.Minute
+
+// awaitBundledIngress returns how soon to look again for a default
+// IngressClass when the cluster is k3s and the Platform is new; 0 when
+// there's nothing to wait for (not k3s, or k3s with Traefik disabled).
+func (r *Reconciler) awaitBundledIngress(ctx context.Context, p *v1alpha1.Platform) (time.Duration, error) {
+	left := bundledIngressGrace - r.now().Sub(p.CreationTimestamp.Time)
+	if left <= 0 {
+		return 0, nil
+	}
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		return 0, err
+	}
+	for _, n := range nodes.Items {
+		if strings.Contains(n.Status.NodeInfo.KubeletVersion, "+k3s") {
+			return min(left, 10*time.Second), nil
+		}
+	}
+	return 0, nil
 }
 
 func toObjects[T client.Object](in []T) []client.Object {
