@@ -26,7 +26,7 @@ const (
 	IdentityDir    = "/run/swarm/identity"
 	CABundle       = "/etc/swarm/ca/ca.crt"
 	SupervisorSock = "/run/swarm/supervisor.sock"
-	OreSock        = "/run/swarm/ore.sock"
+	OreSock        = "/run/swarm/ore/app-server.sock"
 	DockerSock     = "/var/run/docker.sock"
 	EngineDir      = "/var/lib/containers"
 	ClaudeEtc      = "/etc/claude-code"

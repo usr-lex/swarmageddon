@@ -90,7 +90,7 @@ Change them here first.
 | `/etc/codex/requirements.toml`, `/etc/codex/config.toml`, `/etc/codex/rules/persona.rules` | persona (ore rooms) |
 | `/etc/swarm/role.md` | the role text (both CLIs) |
 | `/run/swarm/supervisor.sock` | room-local API (proto `swarm.room.v1`), Connect over HTTP on a Unix socket |
-| `/run/swarm/ore.sock` | ore app-server (ore rooms) |
+| `/run/swarm/ore/app-server.sock` | ore app-server (ore rooms); the directory is the agent user's, mode 0700, as ore requires |
 | `/var/run/docker.sock` | Podman's Docker-compatible API |
 | `/home/<room>` | home volume; the agent user is the room name, uid 1000 |
 | `/var/lib/containers` | engine volume |

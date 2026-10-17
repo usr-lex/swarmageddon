@@ -105,7 +105,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}); err != nil {
 		log.Warn("identity setup incomplete", "err", err)
 	}
-	// /run/swarm holds our socket and ore's, which the agent user creates.
+	// /run/swarm holds our socket and ore's directory (the ore driver makes it).
 	if err := os.MkdirAll("/run/swarm", 0o770); err == nil {
 		_ = os.Chown("/run/swarm", 0, int(user.GID))
 		_ = os.Chmod("/run/swarm", 0o770)

@@ -17,6 +17,7 @@ import (
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/tmux"
 )
 
@@ -29,7 +30,7 @@ type Driver struct {
 	CodexHome string
 	Home      string
 	WorkDir   string
-	// Socket is the app-server socket (default /run/swarm/ore.sock).
+	// Socket is the app-server socket (default roomcfg.OreSock).
 	Socket string
 	User   *proc.User
 	// Env for the app-server and TUI (SWARM_GATEWAY_KEY, ...).
@@ -73,7 +74,7 @@ func (d *Driver) init() {
 		d.CodexHome = filepath.Join(d.Home, ".ore")
 	}
 	if d.Socket == "" {
-		d.Socket = "/run/swarm/ore.sock"
+		d.Socket = roomcfg.OreSock
 	}
 	if d.Session.Name == "" {
 		d.Session.Name = "agent"
@@ -190,6 +191,16 @@ func (d *Driver) runOnce(ctx context.Context) error {
 	if err := UpdateUserConfig(filepath.Join(d.CodexHome, "config.toml"), s, uid, gid); err != nil {
 		return fmt.Errorf("ore config: %w", err)
 	}
+	// ore refuses a socket whose directory others can write ("socket parent
+	// must be owned by the user or root"), and /run/swarm is group-writable:
+	// the socket gets a directory of the agent user's own.
+	if err := os.MkdirAll(filepath.Dir(d.Socket), 0o700); err != nil {
+		return err
+	}
+	if os.Getuid() == 0 {
+		_ = os.Chown(filepath.Dir(d.Socket), uid, gid)
+	}
+	_ = os.Chmod(filepath.Dir(d.Socket), 0o700)
 	_ = os.Remove(d.Socket)
 
 	runCtx, cancel := context.WithCancel(ctx)
@@ -211,17 +222,23 @@ func (d *Driver) runOnce(ctx context.Context) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	// The exit is observed in several places (connect, the final select and
+	// this cleanup), so it is a closed channel plus the error, not a
+	// one-shot value: when connect took it, the cleanup used to wait for a
+	// second one forever and the driver never restarted ore.
+	ex := &exit{done: make(chan struct{})}
+	go func() { ex.err = cmd.Wait(); close(ex.done) }()
 	defer func() {
 		select {
-		case <-exited:
+		case <-ex.done:
 		default:
-			proc.Stop(cmd, exited, 10*time.Second)
+			stopped := make(chan error, 1)
+			go func() { <-ex.done; stopped <- ex.err }()
+			proc.Stop(cmd, stopped, 10*time.Second)
 		}
 	}()
 
-	c, err := d.connect(runCtx, exited)
+	c, err := d.connect(runCtx, ex)
 	if err != nil {
 		return err
 	}
@@ -255,15 +272,21 @@ func (d *Driver) runOnce(ctx context.Context) error {
 	select {
 	case err := <-readDone:
 		return fmt.Errorf("app-server connection: %w", err)
-	case err := <-exited:
-		return fmt.Errorf("app-server exited: %v", err)
+	case <-ex.done:
+		return fmt.Errorf("app-server exited: %v", ex.err)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
 // connect waits for the socket to accept connections and initializes.
-func (d *Driver) connect(ctx context.Context, exited <-chan error) (*Client, error) {
+// exit is the app-server's exit: done closes when it has exited, with err.
+type exit struct {
+	done chan struct{}
+	err  error
+}
+
+func (d *Driver) connect(ctx context.Context, ex *exit) (*Client, error) {
 	deadline := time.Now().Add(60 * time.Second)
 	for {
 		if conn, err := net.Dial("unix", d.Socket); err == nil {
@@ -274,8 +297,8 @@ func (d *Driver) connect(ctx context.Context, exited <-chan error) (*Client, err
 			return nil, errors.New("app-server socket did not appear")
 		}
 		select {
-		case err := <-exited:
-			return nil, fmt.Errorf("app-server exited at start: %v", err)
+		case <-ex.done:
+			return nil, fmt.Errorf("app-server exited at start: %v", ex.err)
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-time.After(100 * time.Millisecond):
