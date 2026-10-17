@@ -1,0 +1,188 @@
+From 83be2f03c9af814ae32644371d84a6dfc53555d9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 22:24:28 +0000
+Subject: [PATCH] messaging: an operator principal (CN=operator) that may only
+ watch presence and approvals
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HoBXSNopGDs6XChYAFgc9C
+---
+ internal/messaging/server/approvals.go        |  4 +-
+ internal/messaging/server/identity.go         | 12 +++
+ .../server/operator_principal_test.go         | 76 +++++++++++++++++++
+ internal/messaging/server/server.go           | 10 +++
+ 4 files changed, 100 insertions(+), 2 deletions(-)
+ create mode 100644 internal/messaging/server/operator_principal_test.go
+
+diff --git a/internal/messaging/server/approvals.go b/internal/messaging/server/approvals.go
+index 8f75aaf..2e31b9b 100644
+--- a/internal/messaging/server/approvals.go
++++ b/internal/messaging/server/approvals.go
+@@ -101,7 +101,7 @@ func (s *Server) AnswerApproval(ctx context.Context, req *connect.Request[messag
+ // every request, answer and withdrawal. With no workspaces named it follows
+ // all of them, including ones created later.
+ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messagingv1.WatchApprovalsRequest], stream *connect.ServerStream[messagingv1.ApprovalEvent]) error {
+-	if _, err := controlCenter(ctx); err != nil {
++	if err := watcher(ctx); err != nil {
+ 		return err
+ 	}
+ 	ctx, cancel := context.WithCancelCause(ctx)
+@@ -170,7 +170,7 @@ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messag
+ 
+ // WatchPresence implements MessagingService.
+ func (s *Server) WatchPresence(ctx context.Context, req *connect.Request[messagingv1.WatchPresenceRequest], stream *connect.ServerStream[messagingv1.PresenceEvent]) error {
+-	if _, err := controlCenter(ctx); err != nil {
++	if err := watcher(ctx); err != nil {
+ 		return err
+ 	}
+ 	names := req.Msg.Workspaces
+diff --git a/internal/messaging/server/identity.go b/internal/messaging/server/identity.go
+index 8f93984..9a32316 100644
+--- a/internal/messaging/server/identity.go
++++ b/internal/messaging/server/identity.go
+@@ -23,6 +23,9 @@ const (
+ 	ControlCenterCN = "control-center"
+ 	// WardenCN is the gateway guard's certificate CN (ADR 0011).
+ 	WardenCN = "warden"
++	// OperatorCN is the operator's certificate CN. It may only watch
++	// presence and approvals (read-only), to roll idle rooms (design §3.5).
++	OperatorCN = "operator"
+ 	// HeaderOperatorPost ("1") marks a post the control center makes for a
+ 	// workspace operator, who may post to any channel of the workspace
+ 	// (design §7.8). Honored only from the control center acting for a
+@@ -36,6 +39,9 @@ type Caller struct {
+ 	ControlCenter bool
+ 	// Warden is the gateway guard's principal; it may only report verdicts.
+ 	Warden bool
++	// Operator is the operator's principal; it may only watch presence
++	// and approvals.
++	Operator bool
+ 	// Workspace and Name are the room, or the party the control center acts
+ 	// for; empty for the control center acting as itself.
+ 	Workspace, Name string
+@@ -50,6 +56,9 @@ func (c Caller) Address() string {
+ 	if c.Warden {
+ 		return WardenCN
+ 	}
++	if c.Operator {
++		return OperatorCN
++	}
+ 	if c.Name == "" {
+ 		return ControlCenterCN
+ 	}
+@@ -112,6 +121,9 @@ func parseCaller(cn, onBehalf string) (Caller, error) {
+ 	if cn == WardenCN {
+ 		return Caller{Warden: true}, nil
+ 	}
++	if cn == OperatorCN {
++		return Caller{Operator: true}, nil
++	}
+ 	name, ws, err := policy.SplitAddress(cn)
+ 	if err != nil || policy.IsSystem(name) {
+ 		return Caller{}, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("certificate subject %q is not a room (name@workspace)", cn))
+diff --git a/internal/messaging/server/operator_principal_test.go b/internal/messaging/server/operator_principal_test.go
+new file mode 100644
+index 0000000..b54fbf1
+--- /dev/null
++++ b/internal/messaging/server/operator_principal_test.go
+@@ -0,0 +1,76 @@
++package server
++
++import (
++	"context"
++	"testing"
++	"time"
++
++	"connectrpc.com/connect"
++	"github.com/oklog/ulid/v2"
++
++	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
++)
++
++func TestParseCallerOperator(t *testing.T) {
++	c, err := parseCaller(OperatorCN, "")
++	if err != nil || !c.Operator || c.ControlCenter || c.Name != "" || c.Address() != OperatorCN {
++		t.Fatalf("operator caller = %+v, %v", c, err)
++	}
++	if _, err := parseCaller(OperatorCN, "alice@acme"); connect.CodeOf(err) != connect.CodePermissionDenied {
++		t.Fatalf("operator acting for someone: %v", err)
++	}
++}
++
++// TestOperatorPrincipal: the operator may watch presence and approvals, and
++// nothing else.
++func TestOperatorPrincipal(t *testing.T) {
++	if testing.Short() {
++		t.Skip("cluster test")
++	}
++	reps := startCluster(t, 3, testDirectory())
++	ctx := context.Background()
++	op := clientFor(reps[0], OperatorCN, "")
++
++	wctx, cancel := context.WithTimeout(ctx, 15*time.Second)
++	defer cancel()
++	watch, err := op.WatchPresence(wctx, connect.NewRequest(&messagingv1.WatchPresenceRequest{Workspaces: []string{"fast"}}))
++	if err != nil {
++		t.Fatal(err)
++	}
++	a := clientFor(reps[0], "a@fast", "")
++	if _, err := a.ReportPresence(ctx, connect.NewRequest(&messagingv1.ReportPresenceRequest{Presence: messagingv1.Presence_PRESENCE_IDLE})); err != nil {
++		t.Fatal(err)
++	}
++	for {
++		if !watch.Receive() {
++			t.Fatalf("presence watch ended: %v", watch.Err())
++		}
++		if ev := watch.Msg(); ev.Address == "a@fast" && ev.Presence == messagingv1.Presence_PRESENCE_IDLE {
++			break
++		}
++	}
++	appr, err := op.WatchApprovals(wctx, connect.NewRequest(&messagingv1.WatchApprovalsRequest{Workspaces: []string{"fast"}}))
++	if err != nil {
++		t.Fatal(err)
++	}
++	_ = appr.Close()
++
++	denied := map[string]error{}
++	_, denied["Send"] = op.Send(ctx, connect.NewRequest(&messagingv1.SendRequest{Id: ulid.Make().String(), To: "a@fast", Body: "hi"}))
++	_, denied["ListPeers"] = op.ListPeers(ctx, connect.NewRequest(&messagingv1.ListPeersRequest{}))
++	_, denied["ReportPresence"] = op.ReportPresence(ctx, connect.NewRequest(&messagingv1.ReportPresenceRequest{Presence: messagingv1.Presence_PRESENCE_IDLE}))
++	_, denied["AnswerApproval"] = op.AnswerApproval(ctx, connect.NewRequest(&messagingv1.AnswerApprovalRequest{
++		Answer: &messagingv1.ApprovalAnswer{ApprovalId: ulid.Make().String(), Decision: messagingv1.Decision_DECISION_ALLOW}, Room: "a@fast"}))
++	if q, err := op.QueryAudit(ctx, connect.NewRequest(&messagingv1.QueryAuditRequest{Workspace: "fast"})); err == nil {
++		for q.Receive() {
++		}
++		denied["QueryAudit"] = q.Err()
++	} else {
++		denied["QueryAudit"] = err
++	}
++	for rpc, err := range denied {
++		if connect.CodeOf(err) != connect.CodePermissionDenied {
++			t.Errorf("operator %s: %v, want PermissionDenied", rpc, err)
++		}
++	}
++}
+diff --git a/internal/messaging/server/server.go b/internal/messaging/server/server.go
+index 848a5f2..e25afa3 100644
+--- a/internal/messaging/server/server.go
++++ b/internal/messaging/server/server.go
+@@ -198,6 +198,16 @@ func controlCenter(ctx context.Context) (Caller, error) {
+ 	return c, nil
+ }
+ 
++// watcher checks that the caller may watch presence and approvals: the
++// control center, or the operator (read-only, to roll idle rooms).
++func watcher(ctx context.Context) error {
++	if c, _ := CallerFrom(ctx); c.Operator {
++		return nil
++	}
++	_, err := controlCenter(ctx)
++	return err
++}
++
+ func unavailable(err error) error {
+ 	if ce := new(connect.Error); errors.As(err, &ce) {
+ 		return err
+-- 
+2.43.0
+

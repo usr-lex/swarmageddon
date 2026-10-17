@@ -1,0 +1,127 @@
+From 02ccb1879192918a7e8686e42fbb2defacd3917f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 22:21:38 +0000
+Subject: [PATCH 1/2] control center: publish to ntfy with the ntfy-publisher
+ bearer token
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HoBXSNopGDs6XChYAFgc9C
+---
+ internal/controlcenter/k8s/k8s.go          |  4 ++-
+ internal/controlcenter/notify/notify.go    | 18 ++++++++++
+ internal/controlcenter/notify/ntfy_test.go | 39 ++++++++++++++++++++++
+ 3 files changed, 60 insertions(+), 1 deletion(-)
+ create mode 100644 internal/controlcenter/notify/ntfy_test.go
+
+diff --git a/internal/controlcenter/k8s/k8s.go b/internal/controlcenter/k8s/k8s.go
+index 881d940..ad5a209 100644
+--- a/internal/controlcenter/k8s/k8s.go
++++ b/internal/controlcenter/k8s/k8s.go
+@@ -38,6 +38,7 @@ const (
+ 	SecretGateway            = "control-center-gateway" // key masterKey: a gateway key for reading spend
+ 	SecretForgeReader        = "forge-reader"           // key token: read-only Forgejo token
+ 	SecretForgeWebhookPrefix = "forge-webhook-"         // + workspace: key secret (HMAC for /hooks/forgejo/<ws>)
++	SecretNtfyPublisher      = "ntfy-publisher"         // keys token, url: what the control center publishes to ntfy with
+ )
+ 
+ // Prefixes of Secrets the control center writes for the wizard, all in the
+@@ -48,7 +49,8 @@ var secretPrefixes = []string{"gateway-provider-", "oidc-", "notify-", "forge-we
+ // this name in the system namespace.
+ func AllowedSecret(name string) bool {
+ 	switch name {
+-	case SecretSetupToken, SecretLocalAdmin, SecretSession, SecretDB, SecretVAPID, SecretSAML, SecretGateway, SecretForgeReader:
++	case SecretSetupToken, SecretLocalAdmin, SecretSession, SecretDB, SecretVAPID, SecretSAML, SecretGateway, SecretForgeReader,
++		SecretNtfyPublisher:
+ 		return true
+ 	}
+ 	for _, p := range secretPrefixes {
+diff --git a/internal/controlcenter/notify/notify.go b/internal/controlcenter/notify/notify.go
+index 3e178ed..fa31e44 100644
+--- a/internal/controlcenter/notify/notify.go
++++ b/internal/controlcenter/notify/notify.go
+@@ -95,12 +95,18 @@ type VAPID struct {
+ 	Subscriber            string // mailto: or https: contact
+ }
+ 
++// NtfySecretName is the system-namespace Secret with the ntfy publisher token.
++const NtfySecretName = "ntfy-publisher"
++
+ // Dispatcher sends events.
+ type Dispatcher struct {
+ 	Dedup   Dedup
+ 	Dir     Directory
+ 	VAPID   func() *VAPID
+ 	NtfyURL string // base URL of ntfy
++	// NtfySecret names the Secret (read through Dir.Secret) whose key token
++	// is sent as Authorization: Bearer on publish; empty: NtfySecretName.
++	NtfySecret string
+ 	HTTP    *http.Client
+ 	Log     *slog.Logger
+ 	// Sent records each delivery attempt (tests, metrics).
+@@ -246,6 +252,18 @@ func (d *Dispatcher) ntfy(ctx context.Context, topic string, ev Event) error {
+ 	if err != nil {
+ 		return err
+ 	}
++	// ntfy denies anonymous publishing (docs/conventions.md).
++	name := d.NtfySecret
++	if name == "" {
++		name = NtfySecretName
++	}
++	sec, err := d.Dir.Secret(ctx, name)
++	if err != nil {
++		return fmt.Errorf("ntfy token (Secret %s): %w", name, err)
++	}
++	if tok := strings.TrimSpace(string(sec["token"])); tok != "" {
++		req.Header.Set("Authorization", "Bearer "+tok)
++	}
+ 	req.Header.Set("Title", ev.Title)
+ 	req.Header.Set("Tags", string(ev.Kind))
+ 	if ev.Kind == v1alpha1.EventApprovalWaiting || ev.Kind == v1alpha1.EventRoomCrashed {
+diff --git a/internal/controlcenter/notify/ntfy_test.go b/internal/controlcenter/notify/ntfy_test.go
+new file mode 100644
+index 0000000..aafcda8
+--- /dev/null
++++ b/internal/controlcenter/notify/ntfy_test.go
+@@ -0,0 +1,39 @@
++package notify
++
++import (
++	"context"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++
++	"github.com/usr-lex/swarmageddon/api/v1alpha1"
++)
++
++func TestNtfyBearerToken(t *testing.T) {
++	var auth, path string
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		auth, path = r.Header.Get("Authorization"), r.URL.Path
++		if auth != "Bearer tk_secret" {
++			w.WriteHeader(http.StatusForbidden)
++			return
++		}
++		w.WriteHeader(http.StatusOK)
++	}))
++	defer s.Close()
++	dir := &fakeDir{
++		settings: v1alpha1.NotificationSettings{Channels: []v1alpha1.NotificationChannel{{Kind: "ntfy", Topic: "acme"}}},
++		secrets:  map[string]map[string][]byte{NtfySecretName: {"token": []byte("tk_secret\n")}},
++	}
++	var sendErr error
++	d := &Dispatcher{Dir: dir, NtfyURL: s.URL, Sent: func(_ string, _ Event, err error) { sendErr = err }}
++	d.Raise(context.Background(), Event{Kind: v1alpha1.EventCIRed, Workspace: "acme", Title: "t", Body: "b", Fingerprint: "1"})
++	if sendErr != nil || auth != "Bearer tk_secret" || path != "/acme" {
++		t.Fatalf("err=%v auth=%q path=%q", sendErr, auth, path)
++	}
++	// Without a token ntfy refuses (deny-all), and the failure is reported.
++	dir.secrets = nil
++	d.Raise(context.Background(), Event{Kind: v1alpha1.EventCIRed, Workspace: "acme", Title: "t", Body: "b", Fingerprint: "2"})
++	if sendErr == nil || auth != "" {
++		t.Fatalf("anonymous publish: err=%v auth=%q", sendErr, auth)
++	}
++}
+-- 
+2.43.0
+
