@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -127,15 +128,37 @@ func (s *suite) workspace(t *testing.T) {
 		return notTrue(gw.GetSummary().GetConditions(), "NamespaceReady", "RoleTemplatesReady", "ForgeOrgReady",
 			"RepositoriesReady", "ForgeWebhookReady", "GatewayTeamReady")
 	})
-	again, err := call(s.cc.workspaces.PreviewWorkspace, &ccv1.PreviewWorkspaceRequest{Plan: plan()})
+}
+
+// rerunWizard opens the wizard on the existing workspace (GetWorkspace's
+// plan, as the UI does) and previews it unchanged: nothing may change
+// (§8.3, "applies only changes").
+func (s *suite) rerunWizard(t *testing.T) {
+	gw, err := call(s.cc.workspaces.GetWorkspace, &ccv1.GetWorkspaceRequest{Name: ws})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range again.GetChanges() {
+	pv, err := call(s.cc.workspaces.PreviewWorkspace, &ccv1.PreviewWorkspaceRequest{Plan: gw.GetPlan()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range pv.GetChanges() {
 		if c.GetAction() != ccv1.ChangeAction_CHANGE_ACTION_UNCHANGED {
-			t.Errorf("re-running the wizard with the same plan would %v %s/%s (fields %v)", c.GetAction(), c.GetKind(), c.GetName(), c.GetFields())
+			t.Errorf("re-running the wizard on its own plan would %v %s/%s:%s", c.GetAction(), c.GetKind(), c.GetName(), fieldChanges(c))
 		}
 	}
+}
+
+// fieldChanges shows each changed top-level spec field before and after.
+func fieldChanges(c *ccv1.Change) string {
+	var before, after map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(c.GetBefore()), &before)
+	_ = json.Unmarshal([]byte(c.GetAfter()), &after)
+	var b strings.Builder
+	for _, f := range c.GetFields() {
+		fmt.Fprintf(&b, "\n  %s: %s\n   -> %s", f, clip(string(before[f])), clip(string(after[f])))
+	}
+	return b.String()
 }
 
 func change(cs []*ccv1.Change, kind, name string) *ccv1.Change {

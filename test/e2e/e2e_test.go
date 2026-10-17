@@ -35,6 +35,7 @@ func TestPlatform(t *testing.T) {
 	s.step("preflight checks", []string{"preflight and isolation"}, s.preflightChecks)
 	s.step("platform services", []string{"preflight and isolation"}, s.services)
 	s.step("workspace wizard", []string{"platform services"}, s.workspace)
+	s.step("wizard re-run changes nothing", []string{"workspace wizard"}, s.rerunWizard)
 	s.step("rooms run", []string{"workspace wizard"}, s.roomsRun)
 
 	rooms := []string{"rooms run"}
@@ -44,11 +45,14 @@ func TestPlatform(t *testing.T) {
 	s.step("message claude to claude", rooms, s.direct("athena", "artemis"))
 	s.step("message ore to ore", rooms, s.direct("hermes", "apollo"))
 	s.step("message person to agent", rooms, s.personToAgent)
+	s.step("Agent tab shows a delivered message", []string{"message person to agent"}, s.agentTab)
 	s.step("message agent to person", rooms, s.agentToPerson)
 	s.step("mention in a channel", rooms, s.mention)
 	s.step("crossing refused", rooms, s.crossingRefused)
 	s.step("crossing over a mediated link", rooms, s.crossingMediated)
+	s.step("message with a token refused", rooms, s.tokenRefused)
 
+	s.step("repos cloned at start", rooms, s.cloned)
 	s.step("forge signed push", rooms, s.signedPush)
 	s.step("forge pull request", []string{"forge signed push"}, s.pullRequest)
 	s.step("forge CI on an ephemeral runner", []string{"forge pull request"}, s.ciRunner)
@@ -60,5 +64,7 @@ func TestPlatform(t *testing.T) {
 	s.step("quarantine and release", rooms, s.quarantine)
 	s.step("observatory edges", []string{"message claude to ore", "message person to agent", "crossing over a mediated link"}, s.observatory)
 
+	// Last, since rooms don't need it and it's slowest to come up.
+	s.step("registry cache", []string{"platform services"}, s.registryCache)
 	s.step("no secret in any log", []string{"install"}, s.noSecretsInLogs)
 }

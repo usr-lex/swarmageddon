@@ -25,14 +25,31 @@ func (s *suite) forgeAPI(room, path, jq string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
+// cloned: every room has its spec.repos cloned into ~/work by its
+// supervisor at start (§6.3).
+func (s *suite) cloned(t *testing.T) {
+	for _, r := range planned {
+		if out, err := s.inRoom(r, "test -d ~/work/api/.git"); err != nil {
+			logs, _ := s.kc("-n", wsNS, "logs", podOf(r), "-c", "room")
+			var why []string
+			for _, l := range strings.Split(logs, "\n") {
+				if strings.Contains(l, "clone") {
+					why = append(why, l)
+				}
+			}
+			t.Errorf("%s: acme/api not cloned into ~/work/api (%s); supervisor: %s", r, clip(out), clip(strings.Join(why, "\n")))
+		}
+	}
+}
+
 // signedPush commits on a branch in athena's clone, signed with her GPG key,
 // pushes it, and checks that main itself refuses pushes, force pushes and
 // deletion (§9.2, §9.3). The branch carries a workflow for the CI step.
 func (s *suite) signedPush(t *testing.T) {
 	s.branch = "e2e-" + s.nonce
 	m := s.marker("commit")
-	if out, err := s.inRoom("athena", "test -d ~/work/api/.git"); err != nil {
-		t.Errorf("athena's spec.repos acme/api was not cloned into ~/work/api at start: %s", clip(out))
+	if _, err := s.inRoom("athena", "test -d ~/work/api/.git"); err != nil {
+		t.Log("athena has no clone of acme/api (see the cloned-at-start step); cloning it by hand")
 		if out, err := s.inRoom("athena", `git clone -q "ssh://git@$(jq -r .forgeSSHHost /etc/swarm/room.json)/acme/api.git" ~/work/api`); err != nil {
 			t.Fatalf("cloning it by hand: %v: %s", err, clip(out))
 		}
