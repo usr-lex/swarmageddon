@@ -33,6 +33,13 @@ export interface InboxItem {
 /** all, direct, mentions, or a channel name. */
 export type ReadScope = "all" | "direct" | "mentions" | `#${string}`;
 
+/** Unread counts across the person's workspaces; mentions are also counted in direct or channels. */
+export interface UnreadSummary {
+  direct: number;
+  mentions: number;
+  channels: number;
+}
+
 export interface ReadPage {
   items: InboxItem[];
   nextCursor: string;

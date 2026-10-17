@@ -12,8 +12,10 @@
 //     (subprotocol "binary").
 //
 // Both need the operator role on the workspace. Opening, closing and the
-// duration are audited; keystrokes are not recorded. Nothing is ever
-// forwarded into a room: VNC flows from the room to the browser only.
+// duration are audited; what people type is recorded (terminal.input) only
+// in workspaces with spec.recordKeystrokes, and the server then tells the
+// browser with {"type":"recording"}. Nothing is ever forwarded into a room:
+// VNC flows from the room to the browser only.
 package terminal
 
 import (
@@ -33,6 +35,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/auth"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/k8s"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/store"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 )
 
 // Size is a terminal size.
@@ -63,6 +66,8 @@ type Handler struct {
 	Exec   Execer
 	Fwd    Forwarder
 	Audit  func(ctx context.Context, ev store.AuditEvent)
+	// RecordInput reports whether a workspace records keystrokes; nil: none do.
+	RecordInput func(ctx context.Context, workspace string) bool
 	// OriginPatterns allowed for the WebSocket handshake; empty means same host only.
 	OriginPatterns []string
 	Container      string // default "room"
@@ -162,15 +167,28 @@ func (h *Handler) ServeTerminal(w http.ResponseWriter, r *http.Request) {
 	if mode == "" {
 		mode = "agent"
 	}
+	record := mode != "view" && h.RecordInput != nil && h.RecordInput(r.Context(), ws)
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: h.OriginPatterns})
 	if err != nil {
 		return
 	}
 	c.SetReadLimit(1 << 20)
 	start := time.Now()
-	h.audit(r, p, "terminal.open", ws, room, "ok", fmt.Sprintf(`{"mode":%q}`, mode))
 	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
 	defer cancel()
+	var rec *inputRecorder
+	if record {
+		h.audit(r, p, "terminal.open", ws, room, "ok", fmt.Sprintf(`{"mode":%q,"recording":true}`, mode))
+		rec = newInputRecorder(func(input string) {
+			d, _ := json.Marshal(map[string]string{"mode": mode, "input": redact.Default.String(input)})
+			h.audit(r, p, "terminal.input", ws, room, "ok", string(d))
+		})
+		if b, err := json.Marshal(control{Type: "recording"}); err == nil {
+			_ = c.Write(ctx, websocket.MessageText, b)
+		}
+	} else {
+		h.audit(r, p, "terminal.open", ws, room, "ok", fmt.Sprintf(`{"mode":%q}`, mode))
+	}
 
 	stdinR, stdinW := io.Pipe()
 	resize := make(chan Size, 4)
@@ -184,6 +202,9 @@ func (h *Handler) ServeTerminal(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if typ == websocket.MessageBinary {
+				if rec != nil {
+					rec.write(data)
+				}
 				if _, err := stdinW.Write(data); err != nil {
 					return
 				}
@@ -212,6 +233,10 @@ func (h *Handler) ServeTerminal(w http.ResponseWriter, r *http.Request) {
 		wcancel()
 	}
 	_ = c.Close(websocket.StatusNormalClosure, "")
+	if rec != nil {
+		cancel() // the reader stops writing to rec
+		rec.Close()
+	}
 	h.audit(r, p, "terminal.close", ws, room, result, fmt.Sprintf(`{"mode":%q,"durationSeconds":%d}`, mode, int(time.Since(start).Seconds())))
 }
 

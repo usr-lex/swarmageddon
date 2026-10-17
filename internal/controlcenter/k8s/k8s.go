@@ -38,6 +38,7 @@ const (
 	SecretGateway            = "control-center-gateway" // key masterKey: a gateway key for reading spend
 	SecretForgeReader        = "forge-reader"           // key token: read-only Forgejo token
 	SecretForgeWebhookPrefix = "forge-webhook-"         // + workspace: key secret (HMAC for /hooks/forgejo/<ws>)
+	SecretNtfyPublisher      = "ntfy-publisher"         // keys token, url: what the control center publishes to ntfy with
 )
 
 // AllowedSecret reports whether the control center may touch a Secret of

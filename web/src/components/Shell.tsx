@@ -73,6 +73,12 @@ function BareHeader() {
   );
 }
 
+/** Unread counts for the badges; the messages feed refreshes them. */
+export function useUnread() {
+  const me = useMe();
+  return useQuery({ queryKey: ["unread"], queryFn: () => api().unreadSummary(), enabled: !!me.data, refetchInterval: 30_000 });
+}
+
 function AppHeader() {
   const me = useMe();
   const approvals = useApprovals();
@@ -87,12 +93,13 @@ function AppHeader() {
     },
   });
   const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => api().listWorkspaces() });
+  const unread = useUnread();
   const firstWs = workspaces.data?.[0]?.name;
-  const links: { to: string; label: string; badge?: number; admin?: boolean }[] = [
+  const links: { to: string; label: string; badge?: number; badgeLabel?: string; calm?: boolean; admin?: boolean }[] = [
     ...(firstWs ? [{ to: `/w/${firstWs}`, label: "Observatory" }] : []),
     { to: "/fleet", label: "Fleet" },
-    { to: "/approvals", label: "Approvals", badge: pending },
-    { to: "/channels", label: "Messages" },
+    { to: "/approvals", label: "Approvals", badge: pending, badgeLabel: "pending" },
+    { to: "/channels", label: "Messages", badge: unread.data ? unread.data.direct + unread.data.channels : 0, badgeLabel: "unread", calm: true },
     { to: "/workspaces", label: "Workspaces" },
     { to: "/spend", label: "Spend" },
     { to: "/audit", label: "Audit" },
@@ -128,9 +135,12 @@ function AppHeader() {
                 >
                   {l.label}
                   {!!l.badge && (
-                    <span className="rounded-full bg-bad px-1.5 text-xs font-semibold text-white" data-testid="approvals-badge">
+                    <span
+                      className={cx("rounded-full px-1.5 text-xs font-semibold", l.calm ? "bg-fg text-bg" : "bg-bad text-white")}
+                      data-testid={`${l.label.toLowerCase()}-badge`}
+                    >
                       {l.badge}
-                      <span className="sr-only"> pending</span>
+                      <span className="sr-only"> {l.badgeLabel}</span>
                     </span>
                   )}
                 </Link>

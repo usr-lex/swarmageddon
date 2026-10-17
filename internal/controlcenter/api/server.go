@@ -106,6 +106,10 @@ func (s *Server) Handler() http.Handler {
 		Exec:      s.Exec,
 		Fwd:       s.Fwd,
 		Audit:     s.Audit.Record,
+		RecordInput: func(ctx context.Context, ws string) bool {
+			w, err := s.K.Workspace(ctx, ws)
+			return err == nil && w.Spec.RecordKeystrokes
+		},
 	}
 	mux.HandleFunc("/ws/terminal", th.ServeTerminal)
 	mux.HandleFunc("/ws/vnc", th.ServeVNC)

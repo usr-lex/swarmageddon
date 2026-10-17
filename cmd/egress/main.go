@@ -20,6 +20,7 @@ import (
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/egress"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
@@ -36,7 +37,7 @@ func main() {
 		fmt.Println(version.Version)
 		return
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
 	if err := run(log, *listen, *health, *namespace, *logConns); err != nil {
 		log.Error("egress", "err", err)
 		os.Exit(1)

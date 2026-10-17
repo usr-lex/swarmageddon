@@ -4190,9 +4190,20 @@ type RepositoryPlan struct {
 	ImportUrl  string                 `protobuf:"bytes,2,opt,name=import_url,json=importUrl,proto3" json:"import_url,omitempty"`
 	Group      string                 `protobuf:"bytes,3,opt,name=group,proto3" json:"group,omitempty"`
 	PushMirror string                 `protobuf:"bytes,4,opt,name=push_mirror,json=pushMirror,proto3" json:"push_mirror,omitempty"`
-	// Secret in the workspace namespace holding the mirror token (key token).
+	// Secret in the workspace namespace holding the mirror token (keys token
+	// and, optionally, username).
 	MirrorSecretName string   `protobuf:"bytes,5,opt,name=mirror_secret_name,json=mirrorSecretName,proto3" json:"mirror_secret_name,omitempty"`
 	StatusChecks     []string `protobuf:"bytes,6,rep,name=status_checks,json=statusChecks,proto3" json:"status_checks,omitempty"`
+	// Write-only: the credential for import_url ("token" or "username:token"),
+	// used once for the import. Applying stores it in a new Secret in the
+	// workspace namespace and points import_secret_name at it; never returned.
+	ImportCredential string `protobuf:"bytes,7,opt,name=import_credential,json=importCredential,proto3" json:"import_credential,omitempty"`
+	// Write-only: the push mirror's credential ("token" or "username:token"),
+	// stored like import_credential, in mirror_secret_name; never returned.
+	MirrorToken string `protobuf:"bytes,8,opt,name=mirror_token,json=mirrorToken,proto3" json:"mirror_token,omitempty"`
+	// Secret in the workspace namespace holding the import credential (keys
+	// token and, optionally, username).
+	ImportSecretName string `protobuf:"bytes,9,opt,name=import_secret_name,json=importSecretName,proto3" json:"import_secret_name,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -4267,6 +4278,27 @@ func (x *RepositoryPlan) GetStatusChecks() []string {
 		return x.StatusChecks
 	}
 	return nil
+}
+
+func (x *RepositoryPlan) GetImportCredential() string {
+	if x != nil {
+		return x.ImportCredential
+	}
+	return ""
+}
+
+func (x *RepositoryPlan) GetMirrorToken() string {
+	if x != nil {
+		return x.MirrorToken
+	}
+	return ""
+}
+
+func (x *RepositoryPlan) GetImportSecretName() string {
+	if x != nil {
+		return x.ImportSecretName
+	}
+	return ""
 }
 
 type GroupPlan struct {
@@ -4578,9 +4610,12 @@ type WorkspacePlan struct {
 	RoleAdvisors map[string]*AdvisorPlan `protobuf:"bytes,29,rep,name=role_advisors,json=roleAdvisors,proto3" json:"role_advisors,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Workspace.spec.warden. Set: replaces warden_mode and warden_model;
 	// unset: those two apply and the rest is kept.
-	Warden        *WardenPlan `protobuf:"bytes,30,opt,name=warden,proto3" json:"warden,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Warden *WardenPlan `protobuf:"bytes,30,opt,name=warden,proto3" json:"warden,omitempty"`
+	// Workspace.spec.recordKeystrokes: what people type in room terminals goes
+	// to the audit log (docs/design.md §8.4). Off by default.
+	RecordKeystrokes bool `protobuf:"varint,31,opt,name=record_keystrokes,json=recordKeystrokes,proto3" json:"record_keystrokes,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *WorkspacePlan) Reset() {
@@ -4821,6 +4856,13 @@ func (x *WorkspacePlan) GetWarden() *WardenPlan {
 		return x.Warden
 	}
 	return nil
+}
+
+func (x *WorkspacePlan) GetRecordKeystrokes() bool {
+	if x != nil {
+		return x.RecordKeystrokes
+	}
+	return false
 }
 
 type ChannelMemberPlan struct {
@@ -14771,7 +14813,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x11interrupt_on_high\x18\x03 \x01(\bR\x0finterruptOnHigh\x12,\n" +
 	"\x12quarantine_on_high\x18\x04 \x01(\bR\x10quarantineOnHigh\x12\x1f\n" +
 	"\vmonthly_usd\x18\x05 \x01(\x05R\n" +
-	"monthlyUsd\"\xcd\x01\n" +
+	"monthlyUsd\"\xcb\x02\n" +
 	"\x0eRepositoryPlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
@@ -14780,7 +14822,10 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\vpush_mirror\x18\x04 \x01(\tR\n" +
 	"pushMirror\x12,\n" +
 	"\x12mirror_secret_name\x18\x05 \x01(\tR\x10mirrorSecretName\x12#\n" +
-	"\rstatus_checks\x18\x06 \x03(\tR\fstatusChecks\"A\n" +
+	"\rstatus_checks\x18\x06 \x03(\tR\fstatusChecks\x12+\n" +
+	"\x11import_credential\x18\a \x01(\tR\x10importCredential\x12!\n" +
+	"\fmirror_token\x18\b \x01(\tR\vmirrorToken\x12,\n" +
+	"\x12import_secret_name\x18\t \x01(\tR\x10importSecretName\"A\n" +
 	"\tGroupPlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\"\xa3\x01\n" +
@@ -14807,7 +14852,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\n" +
 	"email_from\x18\t \x01(\tR\temailFrom\x12\x19\n" +
 	"\bemail_to\x18\n" +
-	" \x01(\tR\aemailTo\"\xf6\r\n" +
+	" \x01(\tR\aemailTo\"\xa3\x0e\n" +
 	"\rWorkspacePlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -14841,7 +14886,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\rrole_defaults\x18\x1b \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntryR\froleDefaults\x12O\n" +
 	"\x0eshared_volumes\x18\x1c \x03(\v2(.swarm.controlcenter.v1.SharedVolumePlanR\rsharedVolumes\x12\\\n" +
 	"\rrole_advisors\x18\x1d \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntryR\froleAdvisors\x12:\n" +
-	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x1ai\n" +
+	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x12+\n" +
+	"\x11record_keystrokes\x18\x1f \x01(\bR\x10recordKeystrokes\x1ai\n" +
 	"\x11RoleDefaultsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12>\n" +
 	"\x05value\x18\x02 \x01(\v2(.swarm.controlcenter.v1.RoomSettingsPlanR\x05value:\x028\x01\x1ad\n" +

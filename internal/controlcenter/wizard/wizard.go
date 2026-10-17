@@ -24,7 +24,70 @@ import (
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
+	"github.com/usr-lex/swarmageddon/internal/controlcenter/k8s"
 )
+
+// RepoCredential is a write-only credential a plan carries for one
+// repository: kind "import" or "mirror", stored in Secret SecretName.
+type RepoCredential struct {
+	Repo, Kind, SecretName string
+	Username, Token        string
+}
+
+// StageRepoCredentials gives each repository credential in the plan a fresh
+// Secret name (k8s.RepoCredentialSecretName), set in the plan's
+// import_secret_name or mirror_secret_name so Build points the spec at it,
+// and returns the credentials to create. A credential is "token" or
+// "username:token".
+func StageRepoCredentials(p *ccv1.WorkspacePlan) []RepoCredential {
+	var out []RepoCredential
+	add := func(repo, kind, cred string) string {
+		user, token, ok := strings.Cut(cred, ":")
+		if !ok {
+			user, token = "", cred
+		}
+		c := RepoCredential{Repo: repo, Kind: kind, SecretName: k8s.RepoCredentialSecretName(repo, kind), Username: user, Token: token}
+		out = append(out, c)
+		return c.SecretName
+	}
+	for _, r := range p.GetRepositories() {
+		if r.GetImportCredential() != "" {
+			r.ImportSecretName = add(r.GetName(), "import", r.GetImportCredential())
+		}
+		if r.GetMirrorToken() != "" {
+			r.MirrorSecretName = add(r.GetName(), "mirror", r.GetMirrorToken())
+		}
+	}
+	return out
+}
+
+// validateRepos checks repository names and credentials.
+func validateRepos(p *ccv1.WorkspacePlan) []string {
+	var probs []string
+	for _, r := range p.GetRepositories() {
+		n := r.GetName()
+		if !repoRE.MatchString(n) {
+			probs = append(probs, fmt.Sprintf("repository %q: the name is not valid", n))
+		}
+		for _, c := range []struct{ what, cred, url string }{
+			{"import credential", r.GetImportCredential(), r.GetImportUrl()},
+			{"mirror token", r.GetMirrorToken(), r.GetPushMirror()},
+		} {
+			if c.cred == "" {
+				continue
+			}
+			if c.url == "" {
+				probs = append(probs, fmt.Sprintf("repository %q: a %s needs its URL", n, c.what))
+			}
+			if _, token, ok := strings.Cut(c.cred, ":"); ok && token == "" || strings.TrimSpace(c.cred) != c.cred {
+				probs = append(probs, fmt.Sprintf("repository %q: the %s is not a token or username:token", n, c.what))
+			}
+		}
+	}
+	return probs
+}
+
+var repoRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 // Names is the default agent name pool: Greek gods, titans and spirits.
 var Names = []string{
@@ -160,6 +223,7 @@ func Validate(p *ccv1.WorkspacePlan, reserved map[string]bool) []string {
 		}
 	}
 	probs = append(probs, validateChannels(p)...)
+	probs = append(probs, validateRepos(p)...)
 	return append(probs, validateLayers(p)...)
 }
 
@@ -245,8 +309,8 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	}
 	s.Repositories = nil
 	for _, r := range p.GetRepositories() {
-		s.Repositories = append(s.Repositories, v1alpha1.RepositorySpec{Name: r.GetName(), ImportURL: r.GetImportUrl(), Group: r.GetGroup(),
-			PushMirror: r.GetPushMirror(), MirrorSecretName: r.GetMirrorSecretName(), StatusChecks: r.GetStatusChecks()})
+		s.Repositories = append(s.Repositories, v1alpha1.RepositorySpec{Name: r.GetName(), ImportURL: r.GetImportUrl(), ImportSecretName: r.GetImportSecretName(),
+			Group: r.GetGroup(), PushMirror: r.GetPushMirror(), MirrorSecretName: r.GetMirrorSecretName(), StatusChecks: r.GetStatusChecks()})
 	}
 	s.Owners = p.GetOwners()
 	if p.RoomDefaults != nil {
@@ -271,6 +335,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	for _, e := range p.GetForgeNotifications() {
 		s.ForgeNotifications = append(s.ForgeNotifications, v1alpha1.ForgeEvent(e))
 	}
+	s.RecordKeystrokes = p.GetRecordKeystrokes()
 	applyChannels(p, s)
 
 	existing := map[string]v1alpha1.Room{}
@@ -359,6 +424,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Internet:     s.Internet == nil || *s.Internet, //nolint:staticcheck // still read for workspaces written before roomDefaults.network
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
 		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{}, RoleAdvisors: map[string]*ccv1.AdvisorPlan{},
+		RecordKeystrokes: s.RecordKeystrokes,
 	}
 	for _, t := range cur.RoleTemplates {
 		if !isEmpty(t.Spec.RoomDefaults) {
@@ -388,8 +454,8 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 	}
 	channelsToPlan(s, p)
 	for _, r := range s.Repositories {
-		p.Repositories = append(p.Repositories, &ccv1.RepositoryPlan{Name: r.Name, ImportUrl: r.ImportURL, Group: r.Group,
-			PushMirror: r.PushMirror, MirrorSecretName: r.MirrorSecretName, StatusChecks: r.StatusChecks})
+		p.Repositories = append(p.Repositories, &ccv1.RepositoryPlan{Name: r.Name, ImportUrl: r.ImportURL, ImportSecretName: r.ImportSecretName,
+			Group: r.Group, PushMirror: r.PushMirror, MirrorSecretName: r.MirrorSecretName, StatusChecks: r.StatusChecks})
 	}
 	rooms := append([]v1alpha1.Room(nil), cur.Rooms...)
 	sort.Slice(rooms, func(i, j int) bool { return rooms[i].Name < rooms[j].Name })

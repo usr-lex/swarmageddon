@@ -96,8 +96,9 @@ func (c *Client) DeleteOrgHook(ctx context.Context, org string, id int64) error 
 }
 
 // ReaderTokenScopes are the scopes of the read-only token the control
-// center uses to check repository access (§9.7).
-var ReaderTokenScopes = []string{"read:admin", "read:repository", "read:organization", "read:user"}
+// center uses to check repository access (§9.7) and to find agents' open
+// issues and pull requests (§10.3).
+var ReaderTokenScopes = []string{"read:admin", "read:repository", "read:organization", "read:user", "read:issue"}
 
 // RepoPermission is a user's permission on a repository.
 type RepoPermission struct {

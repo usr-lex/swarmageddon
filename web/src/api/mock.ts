@@ -385,6 +385,7 @@ export function createMockApi(mode: string): Api {
     upsert(r);
   };
   const itemHub = new Hub<InboxItem>();
+  const verdictHub = new Hub<Verdict>();
   const access = (ws: string, ch: ChatChannelDraft): ChannelAccess | null => {
     const handle = s.me?.handle ?? "";
     let best: ChannelAccess | null = null;
@@ -1063,6 +1064,22 @@ export function createMockApi(mode: string): Api {
       const page = items.slice(start, end);
       return { items: page, nextCursor: start > 0 ? page[0]?.id ?? "" : "", unreadRemaining: items.filter((p) => !p.read).length };
     },
+    async getMessage(ws, mid) {
+      requireMe();
+      const it = [...s.posts.filter((p) => p.workspace === ws), ...directItems(ws)].find((p) => p.id === mid);
+      if (!it) throw new ApiError("not_found", "No such message.");
+      return { ...it, read: it.read || s.readIds.includes(it.id) };
+    },
+    async unreadSummary() {
+      requireMe();
+      const out = { direct: 0, mentions: 0, channels: 0 };
+      for (const [ws, d] of Object.entries(s.workspaces)) {
+        for (const c of d.chatChannels) if (access(ws, c)) out.channels += unreadIn(ws, c.name);
+        out.direct += directItems(ws).filter((i) => !i.read).length;
+        out.mentions += s.posts.filter((p) => p.workspace === ws && p.mentionsMe && !s.readIds.includes(p.id)).length;
+      }
+      return out;
+    },
     async post(ws, channel, body) {
       const me = requireMe();
       const p = newPost(ws, channel, me.handle, "human", body);
@@ -1120,7 +1137,12 @@ export function createMockApi(mode: string): Api {
       v.decision = { kind: decision, by: s.me!.handle, at: now() };
       audit(`verdict.${decision === "confirmed" ? "confirm" : "dismiss"}`, `Room/${v.workspace}/${v.room}`, `${v.severity}: ${v.reason}`, v.workspace);
       refreshVerdict(v.workspace, v.room);
+      verdictHub.publish(structuredClone(v));
       save();
+    },
+    async *watchVerdicts(wss, signal) {
+      requireMe();
+      for await (const v of verdictHub.subscribe(signal)) if (!wss.length || wss.includes(v.workspace)) yield v;
     },
     async sendTestNotification(channel) {
       requireMe();

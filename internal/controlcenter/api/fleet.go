@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
@@ -35,8 +37,9 @@ type Fleet struct {
 	Approvals *approvals.Manager
 	// Spend returns current spend per workspace/room; optional.
 	Spend func() map[string]float64
-	// OnPodRestarts is told each room's container restart count; optional.
-	OnPodRestarts func(ctx context.Context, ws, room string, restarts int32)
+	// OnPodRestarts is told each room's container restart count and why a
+	// container last ended (e.g. "OOMKilled, exit code 137"); optional.
+	OnPodRestarts func(ctx context.Context, ws, room string, restarts int32, reason string)
 	// Badges returns undecided warden verdict badges per ws/room; optional.
 	Badges func(ctx context.Context) map[string]VerdictBadge
 	// OnPresence is told each presence event; optional.
@@ -94,8 +97,8 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 	}
 	next := map[string]*ccv1.RoomSummary{}
 	type restart struct {
-		ws, room string
-		n        int32
+		ws, room, reason string
+		n                int32
 	}
 	var restarts []restart
 	for _, w := range wss {
@@ -122,7 +125,7 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 				for _, cs := range p.Status.ContainerStatuses {
 					s.PodRestarts += cs.RestartCount
 				}
-				restarts = append(restarts, restart{w.Name, r.Name, s.PodRestarts})
+				restarts = append(restarts, restart{w.Name, r.Name, lastTermination(p), s.PodRestarts})
 			}
 			next[w.Name+"/"+r.Name] = s
 		}
@@ -137,7 +140,7 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 	}
 	if f.OnPodRestarts != nil {
 		for _, r := range restarts {
-			f.OnPodRestarts(ctx, r.ws, r.room, r.n)
+			f.OnPodRestarts(ctx, r.ws, r.room, r.n, r.reason)
 		}
 	}
 	f.mu.Lock()
@@ -163,6 +166,25 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 	}
 	f.rooms = next
 	return nil
+}
+
+// lastTermination says why a pod's most recently ended container ended.
+func lastTermination(p *corev1.Pod) string {
+	var last *corev1.ContainerStateTerminated
+	name := ""
+	for _, cs := range p.Status.ContainerStatuses {
+		if t := cs.LastTerminationState.Terminated; t != nil && (last == nil || t.FinishedAt.After(last.FinishedAt.Time)) {
+			last, name = t, cs.Name
+		}
+	}
+	if last == nil {
+		return ""
+	}
+	reason := last.Reason
+	if reason == "" {
+		reason = "Exited"
+	}
+	return fmt.Sprintf("%s: %s, exit code %d", name, reason, last.ExitCode)
 }
 
 // merge adds presence, status, approvals and spend to a summary (f.mu held).

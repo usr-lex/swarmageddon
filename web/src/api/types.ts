@@ -194,10 +194,11 @@ export interface GroupLink {
 export interface RepositoryDraft {
   name: string;
   importURL: string;
-  /** Used once for the import; never stored in the spec. */
+  /** Write-only, "token" or "user:token"; used once for the import, never stored in the spec. */
   importCredential: string;
   group: string;
   pushMirror: string;
+  /** Write-only, like importCredential; empty keeps the stored one. */
   mirrorToken: string;
 }
 
@@ -250,6 +251,8 @@ export interface WorkspaceDraft {
   roleDefaults: Record<string, RoomSettings>;
   /** Offered only when preflight found ReadWriteMany volumes. */
   sharedVolumes: SharedVolumeDraft[];
+  /** Record what people type in room terminals in the audit log (§8.4). Off by default. */
+  recordKeystrokes?: boolean;
   /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
   source?: unknown;
 }

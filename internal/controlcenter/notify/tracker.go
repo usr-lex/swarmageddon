@@ -29,6 +29,9 @@ type OpenWork interface {
 type Tracker struct {
 	D        *Dispatcher
 	OpenWork OpenWork // nil: no forge check (idleWithOpenWork never fires)
+	// NodeDisk returns, per workspace, why node disk is low ("" when it
+	// isn't), for the workspace-wide diskLow (docs/design.md §12); nil: off.
+	NodeDisk func(ctx context.Context) (map[string]string, error)
 	Now      func() time.Time
 
 	mu       sync.Mutex
@@ -85,22 +88,28 @@ func (t *Tracker) Presence(ctx context.Context, ws, room string, p messagingv1.P
 	}
 }
 
-// PodRestarts handles a room pod's restart count, as the fleet sees it.
-func (t *Tracker) PodRestarts(ctx context.Context, ws, room string, restarts int32) {
+// PodRestarts handles a room pod's restart count, as the fleet sees it, and
+// why its container last ended.
+func (t *Tracker) PodRestarts(ctx context.Context, ws, room string, restarts int32, reason string) {
 	key := ws + "/" + room
 	t.mu.Lock()
 	prev, seen := t.restarts[key]
 	t.restarts[key] = restarts
 	t.mu.Unlock()
 	if seen && restarts > prev {
+		body := fmt.Sprintf("The room's container restarted (%d restarts).", restarts)
+		if reason != "" {
+			body = fmt.Sprintf("The room's container restarted (%d restarts; last ended %s).", restarts, reason)
+		}
 		t.D.Raise(ctx, Event{Kind: v1alpha1.EventRoomCrashed, Workspace: ws, Room: room, Fingerprint: fmt.Sprint("pod-", restarts),
-			Title: room + ": room restarted", Body: fmt.Sprintf("The room's container restarted (%d restarts).", restarts),
-			URL: roomURL(ws, room, "logs")})
+			Title: room + ": room restarted", Body: body, URL: roomURL(ws, room, "logs")})
 	}
 }
 
-// Tick raises idleWithOpenWork for rooms idle for IdleAfter with open work.
+// Tick raises idleWithOpenWork for rooms idle for IdleAfter with open work,
+// and the workspace-wide diskLow.
 func (t *Tracker) Tick(ctx context.Context) {
+	t.nodeDisk(ctx)
 	if t.OpenWork == nil {
 		return
 	}
@@ -131,6 +140,25 @@ func (t *Tracker) Tick(ctx context.Context) {
 		t.D.Raise(ctx, Event{Kind: v1alpha1.EventIdleWithOpenWork, Workspace: ws, Room: room, Fingerprint: since.String(),
 			Title: room + " is idle with open work", Body: "It has assigned issues, pull requests or unread messages.",
 			URL: roomURL(ws, room, "activity")})
+	}
+}
+
+// nodeDisk raises or clears each workspace's node diskLow (no room).
+func (t *Tracker) nodeDisk(ctx context.Context) {
+	if t.NodeDisk == nil {
+		return
+	}
+	low, err := t.NodeDisk(ctx)
+	if err != nil {
+		return
+	}
+	for ws, why := range low {
+		if why == "" {
+			t.D.Clear(ws, "", v1alpha1.EventDiskLow)
+			continue
+		}
+		t.D.Raise(ctx, Event{Kind: v1alpha1.EventDiskLow, Workspace: ws, Fingerprint: "node",
+			Title: ws + ": node disk almost full", Body: "CI jobs wait until there is room: " + why + ".", URL: "/workspaces/" + ws})
 	}
 }
 

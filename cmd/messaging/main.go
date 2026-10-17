@@ -23,6 +23,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/messaging/directory"
 	"github.com/usr-lex/swarmageddon/internal/messaging/server"
 	"github.com/usr-lex/swarmageddon/internal/messaging/store"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
@@ -56,7 +57,7 @@ func run() error {
 		fmt.Println(version.Version)
 		return nil
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
 	slog.SetDefault(log)
 	log.Info("starting", "version", version.Version, "server", *serverName, "namespace", *namespace)
 
