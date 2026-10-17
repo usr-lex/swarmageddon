@@ -82,6 +82,9 @@ spec:
             - {name: FORGEJO__service__DISABLE_REGISTRATION, value: "true"}
             - {name: FORGEJO__service__DEFAULT_ALLOW_CREATE_ORGANIZATION, value: "false"}
             - {name: FORGEJO__service__REQUIRE_SIGNIN_VIEW, value: "true"}
+            # People who sign in through the platform's OIDC provider get an account (design §9.6).
+            - {name: FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION, value: "true"}
+            - {name: FORGEJO__oauth2_client__USERNAME, value: email}
             - {name: FORGEJO__repository__DEFAULT_PRIVATE, value: private}
             - {name: FORGEJO__webhook__ALLOWED_HOST_LIST, value: private}
             - {name: FORGEJO__log__LEVEL, value: Info}

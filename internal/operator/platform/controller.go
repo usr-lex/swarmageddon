@@ -70,6 +70,8 @@ type Reconciler struct {
 	ForgejoURL string
 	// Out receives the WELCOME block; nil is stdout.
 	Out io.Writer
+	// Exec runs commands in the Forgejo pod (forgejooidc.go).
+	Exec Execer
 }
 
 // +kubebuilder:rbac:groups=swarmageddon.dev,resources=platforms;workspaces;rooms;roletemplates;runnerpools,verbs=get;list;watch;create;update;patch;delete
@@ -99,7 +101,7 @@ type Reconciler struct {
 // SetupWithManager registers the controller and a runnable that creates the
 // Platform "default" if it is missing.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps, pf *preflight.Runner) error {
-	r := &Reconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf}
+	r := &Reconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf, Exec: KubeExec{Config: mgr.GetConfig()}}
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		return EnsurePlatform(ctx, mgr.GetClient())
 	})); err != nil {
@@ -291,6 +293,9 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 			continue
 		}
 		setCond(p, s.condition, true, "Ready", msg)
+	}
+	if d := r.forgejoOIDC(ctx, p); d > 0 {
+		requeue(d)
 	}
 	if allReady {
 		setCond(p, v1alpha1.ConditionReady, true, "Ready", "all platform services are ready")

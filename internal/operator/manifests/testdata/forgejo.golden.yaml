@@ -114,6 +114,10 @@ spec:
           value: "false"
         - name: FORGEJO__service__REQUIRE_SIGNIN_VIEW
           value: "true"
+        - name: FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION
+          value: "true"
+        - name: FORGEJO__oauth2_client__USERNAME
+          value: email
         - name: FORGEJO__repository__DEFAULT_PRIVATE
           value: private
         - name: FORGEJO__webhook__ALLOWED_HOST_LIST
@@ -229,6 +233,10 @@ spec:
           value: "false"
         - name: FORGEJO__service__REQUIRE_SIGNIN_VIEW
           value: "true"
+        - name: FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION
+          value: "true"
+        - name: FORGEJO__oauth2_client__USERNAME
+          value: email
         - name: FORGEJO__repository__DEFAULT_PRIVATE
           value: private
         - name: FORGEJO__webhook__ALLOWED_HOST_LIST
