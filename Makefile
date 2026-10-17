@@ -152,10 +152,14 @@ dev-images:
 dev-down: $(K3D)
 	K3D=$(K3D) hack/dev/down.sh
 
-## e2e: the k3d end-to-end suite. canary: CLI protocol checks.
-.PHONY: e2e canary
+## e2e: the k3d end-to-end suite (after make dev). playwright: the web UI in
+## mock mode. canary: CLI protocol checks.
+.PHONY: e2e playwright canary
 e2e:
-	go test -tags e2e -count=1 -timeout 60m ./test/e2e/...
+	go test -tags e2e -count=1 -timeout 60m -v ./test/e2e/...
+
+playwright:
+	cd web && npm ci && npm run e2e
 
 canary:
 	go test -tags canary -count=1 -timeout 30m ./test/canary/...
