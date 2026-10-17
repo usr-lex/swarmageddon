@@ -9,6 +9,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	sentryslog "github.com/getsentry/sentry-go/slog"
 	sentryzap "github.com/getsentry/sentry-go/zap"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -146,16 +147,18 @@ func callerStack() *sentry.Stacktrace {
 	return st
 }
 
-// ZapCore returns a zapcore.Core for the operator (controller-runtime logs
-// through zap), to tee with its console core: entries at Error and above
-// become events, Info and Warn breadcrumbs, and all of them Sentry Logs
-// (sentryzap). It is enabled where enab is, from Info up. Without
-// reporting, it is a no-op core.
-func ZapCore(enab zapcore.LevelEnabler) zapcore.Core {
-	if !Enabled() {
-		return zapcore.NewNopCore()
-	}
-	return &zapCore{enab: enab, logs: sentryzap.NewSentryCore(context.Background(), sentryzap.Option{})}
+// ZapOption adds Sentry to a zap logger, for the operator, whose
+// controller-runtime logs through zap (pass it to zap.RawZapOpts): entries
+// at Error and above become events, Info and Warn breadcrumbs, and all of
+// them Sentry Logs (sentryzap), at the levels the logger's own core logs.
+// Its output is unchanged. Without reporting it changes nothing.
+func ZapOption() zap.Option {
+	return zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		if !Enabled() {
+			return c
+		}
+		return zapcore.NewTee(c, &zapCore{enab: c, logs: sentryzap.NewSentryCore(context.Background(), sentryzap.Option{})})
+	})
 }
 
 type zapCore struct {

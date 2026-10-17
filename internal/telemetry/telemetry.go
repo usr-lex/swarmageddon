@@ -118,8 +118,12 @@ var propagationTargets = []string{
 }
 
 // ignoreErrors are routine errors that aren't worth an event: a controller
-// retries an update that lost a race.
-var ignoreErrors = []string{"the object has been modified; please apply your changes to the latest version"}
+// retries an update that lost a race, and httputil.ReverseProxy (the
+// warden) panics with http.ErrAbortHandler when a client goes away.
+var ignoreErrors = []string{
+	"the object has been modified; please apply your changes to the latest version",
+	"^" + http.ErrAbortHandler.Error() + "$",
+}
 
 // start initialises the SDK; tr nil means Sentry's own HTTP transport.
 func start(component string, c Config, tr sentry.Transport) error {

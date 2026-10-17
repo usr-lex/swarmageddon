@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/types/known/emptypb"
+	crzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/usr-lex/swarmageddon/internal/redact"
 )
@@ -274,14 +276,16 @@ func TestLogEvents(t *testing.T) {
 	}
 }
 
-func TestZapCore(t *testing.T) {
+// TestZapOption logs the way the operator does: controller-runtime's zap
+// with ZapOption, through logr.
+func TestZapOption(t *testing.T) {
 	tr := capture(t, 0)
 	var buf bytes.Buffer
-	console := zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(&buf), zapcore.InfoLevel)
-	log := zap.New(console, zap.WrapCore(func(c zapcore.Core) zapcore.Core { return zapcore.NewTee(c, ZapCore(c)) })).Named("controller")
-	log.Debug("below the console's level")
-	log.Info("reconciling", zap.String("room", "athena"))
-	log.With(zap.String("controller", "room")).Error("Reconciler error", zap.Error(errors.New("forgejo is down")))
+	opts := crzap.Options{DestWriter: &buf}
+	log := crzap.New(crzap.UseFlagOptions(&opts), crzap.RawZapOpts(ZapOption())).WithName("controller")
+	log.V(1).Info("below the console's level")
+	log.Info("reconciling", "room", "athena")
+	log.WithValues("controller", "room").Error(errors.New("forgejo is down"), "Reconciler error")
 
 	evs, raw := tr.sent(t)
 	e := eventWith(evs, func(e *sentry.Event) bool { return e.Message == "Reconciler error" })
@@ -326,6 +330,34 @@ func TestHandlerKeepsProxying(t *testing.T) {
 	}
 }
 
+// TestHandlerPanics: a handler's panic is reported and raised again for
+// net/http, except http.ErrAbortHandler, which only means the client left.
+func TestHandlerPanics(t *testing.T) {
+	tr := capture(t, 0)
+	srv := httptest.NewUnstartedServer(Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/abort" {
+			panic(http.ErrAbortHandler)
+		}
+		panic(errors.New("handler blew up"))
+	})))
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+	srv.Start()
+	defer srv.Close()
+	for _, p := range []string{"/abort", "/boom"} {
+		if _, err := http.Get(srv.URL + p); err == nil {
+			t.Errorf("%s: net/http didn't see the panic", p)
+		}
+	}
+	tr.waitFor(t, func(e *sentry.Event) bool { return len(e.Exception) > 0 && e.Exception[0].Value == "handler blew up" })
+	evs, raw := tr.sent(t)
+	if e := eventWith(evs, func(e *sentry.Event) bool { return len(e.Exception) > 0 }); e.Level != sentry.LevelFatal || e.Request == nil {
+		t.Errorf("panic event %+v", e)
+	}
+	if strings.Contains(raw, "abort Handler") {
+		t.Error("ErrAbortHandler was reported")
+	}
+}
+
 func TestRecoverPanic(t *testing.T) {
 	tr := capture(t, 0)
 	func() {
@@ -351,8 +383,9 @@ func TestOff(t *testing.T) {
 	if Handler(mux) != http.Handler(mux) || LogHandler(next) != slog.Handler(next) || Browser() != nil {
 		t.Fatal("not a no-op without a DSN")
 	}
-	if _, ok := ZapCore(zapcore.InfoLevel).(*zapCore); ok {
-		t.Fatal("zap core without a DSN")
+	core := zapcore.NewNopCore()
+	if zap.New(core, ZapOption()).Core() != core {
+		t.Fatal("zap core changed without a DSN")
 	}
 }
 

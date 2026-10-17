@@ -9,8 +9,6 @@ import (
 	"os"
 	"time"
 
-	uberzap "go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
@@ -62,9 +60,7 @@ func main() {
 	flush, terr := telemetry.Init("operator")
 	// Error entries become Sentry events, and panicking reconciles (which
 	// controller-runtime recovers) are reported with their stack.
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts), zap.RawZapOpts(uberzap.WrapCore(func(c zapcore.Core) zapcore.Core {
-		return zapcore.NewTee(c, telemetry.ZapCore(c))
-	}))))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts), zap.RawZapOpts(telemetry.ZapOption())))
 	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, telemetry.RecoverPanic)
 	log := ctrl.Log.WithName("setup")
 	if terr != nil {
