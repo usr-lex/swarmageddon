@@ -35,7 +35,7 @@ import type {
 } from "./types";
 import type { ObservatoryApi } from "./observatory";
 import type { EffectiveSettings, RoomSecrets, RoomSettings, RoomSettingsView, SecretRef } from "./settings";
-import type { ChannelInfo, ChatChannelDraft, DeliveryMode, InboxItem, MentionCandidate, ReadPage, ReadScope, Verdict } from "./channels";
+import type { ChannelInfo, ChatChannelDraft, DeliveryMode, InboxItem, MentionCandidate, ReadPage, ReadScope, UnreadSummary, Verdict } from "./channels";
 
 /** Error with a Connect-like code, so pages can react to "unauthenticated". */
 export class ApiError extends Error {
@@ -124,6 +124,10 @@ export interface Api {
   // Channels (§7.8): the person reads and posts like any member.
   listChannels(): Promise<ChannelInfo[]>;
   readMessages(workspace: string, scope: ReadScope, opts: { unreadOnly: boolean; limit: number; cursor?: string }): Promise<ReadPage>;
+  /** One message in full, for its permalink. */
+  getMessage(workspace: string, id: string): Promise<InboxItem>;
+  /** Unread counts for the badges: direct messages, mentions and channel posts. */
+  unreadSummary(): Promise<UnreadSummary>;
   post(workspace: string, channel: string, body: string): Promise<{ id: string; mentioned: string[] }>;
   setDelivery(workspace: string, channel: string, mode: DeliveryMode): Promise<void>;
   markRead(workspace: string, scope: ReadScope, upTo?: string): Promise<void>;
@@ -133,6 +137,8 @@ export interface Api {
   // Warden (ADR 0011)
   listVerdicts(workspace: string, room?: string): Promise<Verdict[]>;
   decideVerdict(id: string, decision: "confirmed" | "dismissed"): Promise<void>;
+  /** New and decided verdicts as they happen, in these workspaces (all the person sees when empty). */
+  watchVerdicts(workspaces: string[], signal: AbortSignal): AsyncIterable<Verdict>;
 
   // Audit, spend, users, notifications
   queryAudit(filter: AuditFilter): Promise<AuditEntry[]>;
