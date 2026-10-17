@@ -78,6 +78,9 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: swarmageddon-system
+    - podSelector:
+        matchLabels:
+          swarmageddon.dev/component: warden
     ports:
     - port: 8443
       protocol: TCP

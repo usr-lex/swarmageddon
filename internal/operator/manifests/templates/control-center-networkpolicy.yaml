@@ -1,0 +1,48 @@
+# The control center's ingress (design §11.1): its API and UI only from the
+# ingress controller, and from Forgejo, whose webhooks go to
+# https://control-center.{{ .SystemNamespace }}.svc/hooks/forgejo/<ws>.
+# Nothing else in the cluster calls it. Probes on the health port come from
+# the node, which NetworkPolicies always admit, and kubectl port-forward
+# isn't subject to them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: control-center
+  namespace: {{ .SystemNamespace }}
+  labels: {swarmageddon.dev/component: control-center, app.kubernetes.io/name: control-center}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: control-center}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8443, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .Namespace }}}
+          podSelector:
+            matchLabels: {swarmageddon.dev/component: forgejo}
+{{- if .Ingress.ClassName }}
+        # The default IngressClass's controller: pods with the labels of the
+        # controllers we know (IngressControllerPods: k3s's Traefik in
+        # kube-system, ingress-nginx), in any namespace but the workspaces'
+        # and the platform's. For a controller we don't know, any pod in
+        # those other namespaces.
+        - namespaceSelector:
+            matchExpressions:
+              - {key: swarmageddon.dev/workspace, operator: DoesNotExist}
+              - {key: kubernetes.io/metadata.name, operator: NotIn, values: [{{ .Namespace }}]}
+{{- with .Ingress.ControllerPods }}
+          podSelector:
+            matchLabels:
+{{- range $k, $v := . }}
+              {{ $k }}: {{ quote $v }}
+{{- end }}
+{{- end }}
+{{- else }}
+        # No IngressClass, so a NodePort: clients arrive through kube-proxy
+        # from their own or a node's address, so from any address. Rooms and
+        # runners stay out through their own egress policies, which deny the
+        # cluster's ranges.
+        - ipBlock: {cidr: 0.0.0.0/0}
+        - ipBlock: {cidr: "::/0"}
+{{- end }}

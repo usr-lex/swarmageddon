@@ -85,10 +85,17 @@ spec:
             - {name: FORGEJO__repository__DEFAULT_PRIVATE, value: private}
             - {name: FORGEJO__webhook__ALLOWED_HOST_LIST, value: private}
             - {name: FORGEJO__log__LEVEL, value: Info}
+            # Webhooks go to https://control-center.<system>.svc, whose
+            # certificate is from the platform CA. Go reads every file in
+            # SSL_CERT_DIR's directories on top of the system bundle file,
+            # so mirrors to the internet still verify; git's OpenSSL keeps
+            # /etc/ssl/certs.
+            - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/swarm/ca"}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
           volumeMounts:
             - {name: data, mountPath: /var/lib/gitea}
             - {name: tmp, mountPath: /tmp/gitea}
+            - {name: ca, mountPath: /etc/swarm/ca, readOnly: true}
       containers:
         - name: forgejo
           image: {{ .Images.Forgejo }}
@@ -110,9 +117,12 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/gitea}
             - {name: tmp, mountPath: /tmp/gitea}
+            - {name: ca, mountPath: /etc/swarm/ca, readOnly: true}
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: ca
+          configMap: {name: platform-ca-bundle}
   volumeClaimTemplates:
     - metadata:
         name: data

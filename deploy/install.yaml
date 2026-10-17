@@ -2577,8 +2577,12 @@ subjects:
     namespace: swarmageddon-system
 ---
 # Source: swarmageddon/templates/control-center-rbac.yaml
-# Its own Secrets in the system namespace, by name. `create` can't be limited
-# by name in RBAC, so it may create Secrets here but read and change only these.
+# Its own Secrets and ConfigMaps in the system namespace, by name (the
+# fixed names of api/v1alpha1/controlcenter_names.go). `create` can't be
+# limited by name in RBAC, so it may create Secrets and ConfigMaps here but
+# read and change only these; the operator's Role control-center-owned adds
+# the ones it created with a per-provider, per-channel or per-workspace
+# name. Its certificates are mounted, not read through the API.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -2594,20 +2598,22 @@ rules:
     resources: [secrets]
     resourceNames:
       - setup-token
-      - control-center-tls
-      - control-center-client
+      - local-admin
       - control-center-session
       - control-center-db
-      - local-admin
       - vapid
-    verbs: [get, list, watch, update, patch]
+      - control-center-saml
+      - control-center-gateway
+      - forge-reader
+      - ntfy-publisher
+    verbs: [get, update, patch]
   - apiGroups: [""]
-    resources: [secrets]
+    resources: [secrets, configmaps]
     verbs: [create]
   - apiGroups: [""]
     resources: [configmaps]
     resourceNames: [platform-ca-bundle]
-    verbs: [get, list, watch]
+    verbs: [get]
 ---
 # Source: swarmageddon/templates/welcome.yaml
 apiVersion: rbac.authorization.k8s.io/v1

@@ -233,6 +233,9 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		setCond(p, ConditionExposed, false, "Error", err.Error())
 		return result, err
 	}
+	if err := r.limitControlCenterIngress(ctx, p); err != nil {
+		return result, err
+	}
 
 	if err := r.setupToken(ctx, logger, p); err != nil {
 		return result, err

@@ -35,14 +35,14 @@ func testValues() Values {
 		Gateway:   GatewayValues{Config: cfg, ConfigHash: Hash(cfg), Providers: provs},
 		Registry:  RegistryValues{Storage: "100Gi", RemoteURL: "https://registry-1.docker.io", TTL: "168h"},
 		Ntfy:      NtfyValues{Storage: "1Gi", BaseURL: "https://ntfy.example.com"},
-		Ingress:   IngressValues{ClassName: "traefik"},
+		Ingress:   IngressValues{ClassName: "traefik", ControllerPods: IngressControllerPods("traefik.io/ingress-controller")},
 		Devices:   DevicesValues{Namespace: DevicesNamespace},
 	}
 }
 
 func TestGolden(t *testing.T) {
 	v := testValues()
-	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik, Devices, ForgejoIngress} {
+	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik, ControlCenterNetworkPolicy, Devices, ForgejoIngress} {
 		t.Run(name, func(t *testing.T) {
 			v := v
 			if name == ForgejoIngress {
@@ -106,6 +106,31 @@ func TestForgejoConfig(t *testing.T) {
 	// The YAML anchor must have expanded into both containers.
 	if strings.Count(s, "FORGEJO__database__PASSWD") != 2 {
 		t.Error("env not shared by init and main container")
+	}
+	// Webhooks to the control center verify against the platform CA.
+	if strings.Count(s, "/etc/ssl/certs:/etc/swarm/ca") != 2 || strings.Count(s, "mountPath: /etc/swarm/ca") != 2 ||
+		!strings.Contains(s, "name: platform-ca-bundle") {
+		t.Error("forgejo does not trust the platform CA")
+	}
+}
+
+func TestControlCenterNetworkPolicyNodePort(t *testing.T) {
+	v := testValues()
+	v.Ingress = IngressValues{}
+	objs, err := Render(ControlCenterNetworkPolicy, v)
+	if err != nil || len(objs) != 1 {
+		t.Fatal(objs, err)
+	}
+	b, _ := yaml.Marshal(objs[0].Object)
+	if s := string(b); !strings.Contains(s, "cidr: 0.0.0.0/0") || strings.Contains(s, "DoesNotExist") {
+		t.Fatalf("NodePort policy:\n%s", s)
+	}
+}
+
+func TestIngressControllerPods(t *testing.T) {
+	if IngressControllerPods("traefik.io/ingress-controller")["app.kubernetes.io/name"] != "traefik" ||
+		IngressControllerPods("example.com/other") != nil {
+		t.Fatal("ingress controller pods")
 	}
 }
 
