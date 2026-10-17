@@ -20,6 +20,7 @@ generate:
 ## manifests: the operator's ClusterRole from the +kubebuilder:rbac markers
 manifests:
 	controller-gen rbac:roleName=swarmageddon-operator paths=./internal/operator/... output:rbac:artifacts:config=config/rbac
+	$(MAKE) -s chart-crds
 
 ## envtest: download the API server and etcd for controller tests
 ENVTEST_K8S ?= 1.36.x
@@ -108,11 +109,12 @@ CHART_VERSION ?= $(shell sed -n 's/^version: //p' $(CHART)/Chart.yaml)
 CHART_APP_VERSION ?= $(shell sed -n 's/^appVersion: "\(.*\)"/\1/p' $(CHART)/Chart.yaml)
 
 .PHONY: chart-crds chart-lint chart install-yaml install-yaml-check
-## chart-crds: copy the generated CRDs into the chart
+## chart-crds: copy the generated CRDs and the operator's rules into the chart
 chart-crds:
-	@mkdir -p $(CHART)/crds
+	@mkdir -p $(CHART)/crds $(CHART)/files
 	rm -f $(CHART)/crds/*.yaml
 	cp config/crd/*.yaml $(CHART)/crds/
+	sed '1,/^rules:$$/d' config/rbac/role.yaml > $(CHART)/files/operator-rules.yaml
 
 chart-lint: $(HELM) chart-crds
 	$(HELM) lint --kube-version 1.36.0 $(CHART)
@@ -130,9 +132,9 @@ install-yaml: $(HELM) chart-crds
 		--kube-version 1.36.0 --include-crds --set namespace.create=true \
 		--set image.tag=$(CHART_APP_VERSION); } > deploy/install.yaml
 
-## install-yaml-check: fail if the committed install.yaml or chart CRDs are stale
+## install-yaml-check: fail if the committed install.yaml, chart CRDs or rules are stale
 install-yaml-check: install-yaml
-	git diff --exit-code -- deploy/install.yaml $(CHART)/crds
+	git diff --exit-code -- deploy/install.yaml $(CHART)/crds $(CHART)/files
 
 ## dev: k3d cluster with a local registry, every image, the chart with dev values
 .PHONY: dev dev-down dev-images

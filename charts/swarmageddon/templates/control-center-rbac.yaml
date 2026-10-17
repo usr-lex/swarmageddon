@@ -18,8 +18,12 @@ rules:
   - apiGroups: ["swarmageddon.dev"]
     resources: [platforms, workspaces]
     verbs: [get, list, watch, create, update, patch]
+  # platforms/status: claiming admin (status.adminClaimed).
   - apiGroups: ["swarmageddon.dev"]
-    resources: [platforms/status, workspaces/status]
+    resources: [platforms/status]
+    verbs: [get, patch]
+  - apiGroups: ["swarmageddon.dev"]
+    resources: [workspaces/status]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
