@@ -142,7 +142,9 @@ func start(component string, c Config, tr sentry.Transport) error {
 		// A fixed rate, whatever a caller's sentry-trace header says: rooms
 		// and the internet reach some of these servers, and mustn't be able
 		// to make us trace (and send) every request.
-		TracesSampler:           func(sentry.SamplingContext) float64 { return rate },
+		TracesSampler: func(sentry.SamplingContext) float64 { return rate },
+		// Continue only traces that carry our Sentry organization.
+		StrictTraceContinuation: true,
 		TracePropagationTargets: propagationTargets,
 		DataCollection:          dataCollection(),
 		BeforeSend:              scrubEvent,
@@ -165,9 +167,13 @@ func start(component string, c Config, tr sentry.Transport) error {
 
 // dataCollection keeps users, cookies and bodies out of what the SDK
 // collects, and filters header and query values whose names look
-// sensitive. scrubRequest drops credential headers outright.
+// sensitive: besides the SDK's own list (auth, key, token, secret,
+// session...), ours and, as the SDK's private default does, client
+// addresses and proxies' user headers. scrubRequest drops credential
+// headers outright.
 func dataCollection() *sentry.DataCollection {
-	deny := &sentry.KeyValueCollectionBehavior{Mode: sentry.CollectionDenyList, Terms: []string{"x-swarm-", "cookie"}}
+	deny := &sentry.KeyValueCollectionBehavior{Mode: sentry.CollectionDenyList,
+		Terms: []string{"x-swarm-", "cookie", "forwarded", "-ip", "remote-", "via", "-user"}}
 	return &sentry.DataCollection{
 		UserInfo:    sentry.Set(false),
 		Cookies:     &sentry.KeyValueCollectionBehavior{Mode: sentry.CollectionOff},

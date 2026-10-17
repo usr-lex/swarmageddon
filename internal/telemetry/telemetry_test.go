@@ -142,7 +142,7 @@ func TestSecretsNeverReachTheTransport(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/hooks/acme?token="+secret+"&q="+secret, strings.NewReader(`{"password":"`+secret+`"}`))
 	for k, v := range map[string]string{
 		"Authorization": "Bearer " + secret, "Proxy-Authorization": "Basic " + secret, "Cookie": "session=" + secret,
-		"X-Swarm-On-Behalf-Of": "ada@acme", "X-Api-Key": secret, "X-Custom": "v=" + secret,
+		"X-Swarm-On-Behalf-Of": "ada@acme", "X-Api-Key": secret, "X-Custom": "v=" + secret, "X-Forwarded-For": "198.51.100.7",
 	} {
 		req.Header.Set(k, v)
 	}
@@ -164,7 +164,7 @@ func TestSecretsNeverReachTheTransport(t *testing.T) {
 	if strings.Contains(raw, secret) || strings.Contains(raw, "0123456789abcdef") {
 		t.Fatalf("the secret reached the transport:\n%s", raw)
 	}
-	for _, h := range []string{"Authorization", "Proxy-Authorization", "Cookie", "X-Swarm-On-Behalf-Of", "ada@acme", "X-Api-Key", "password"} {
+	for _, h := range []string{"Authorization", "Proxy-Authorization", "Cookie", "X-Swarm-On-Behalf-Of", "ada@acme", "X-Api-Key", "password", "198.51.100.7"} {
 		if strings.Contains(raw, h) {
 			t.Errorf("%s was sent", h)
 		}
