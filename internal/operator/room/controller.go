@@ -169,6 +169,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var room v1.Room
 	if err := r.Get(ctx, req.NamespacedName, &room); err != nil {
 		if apierrors.IsNotFound(err) {
+			// Its identity Secret may have just gone: drop its tokens.
+			if err := r.syncTokenHashes(ctx, req.Namespace, nil, req.Name); err != nil {
+				log.FromContext(ctx).Error(err, "token hashes")
+			}
 			return r.cleanupVolumes(ctx, req.Namespace, req.Name)
 		}
 		return ctrl.Result{}, err
@@ -261,6 +265,9 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 	sec, ready, err := r.reconcileIdentity(ctx, room, &ws, &role, st, secretValues)
 	if err != nil {
 		return retry, err
+	}
+	if err := r.syncTokenHashes(ctx, room.Namespace, sec, ""); err != nil {
+		return retry, fmt.Errorf("token hashes: %w", err)
 	}
 
 	data, err := persona.Render(persona.Input{Room: room, Role: &role, Workspace: &ws, Settings: &set, Endpoints: persona.Endpoints{
@@ -982,6 +989,9 @@ func (r *Reconciler) finalize(ctx context.Context, room *v1.Room, wsName string)
 
 	if err := r.removeTables(ctx, wsName, room.Name); err != nil {
 		return ctrl.Result{}, err
+	}
+	if err := r.syncTokenHashes(ctx, room.Namespace, nil, room.Name); err != nil {
+		log.FromContext(ctx).Error(err, "token hashes") // its tokens are revoked anyway
 	}
 	retention := defaultDeletedRetention
 	var ws v1.Workspace
