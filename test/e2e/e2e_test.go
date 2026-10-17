@@ -45,6 +45,7 @@ func TestPlatform(t *testing.T) {
 	s.step("message claude to claude", rooms, s.direct("athena", "artemis"))
 	s.step("message ore to ore", rooms, s.direct("hermes", "apollo"))
 	s.step("message person to agent", rooms, s.personToAgent)
+	s.step("Agent tab shows a delivered message", []string{"message person to agent"}, s.agentTab)
 	s.step("message agent to person", rooms, s.agentToPerson)
 	s.step("mention in a channel", rooms, s.mention)
 	s.step("crossing refused", rooms, s.crossingRefused)
