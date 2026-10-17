@@ -146,8 +146,13 @@ func (p *Parser) claude(line []byte) []Item {
 		UUID      string `json:"uuid"`
 		Timestamp string `json:"timestamp"`
 		IsMeta    bool   `json:"isMeta"`
-		Content   string `json:"content"`
-		Message   struct {
+		// Origin.Kind "peer": a cross-session message (from another agent or
+		// a person), which Claude Code 2.1.301 also marks isMeta.
+		Origin struct {
+			Kind string `json:"kind"`
+		} `json:"origin"`
+		Content string `json:"content"`
+		Message struct {
 			Role    string          `json:"role"`
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
@@ -170,7 +175,7 @@ func (p *Parser) claude(line []byte) []Item {
 	default:
 		return nil
 	}
-	if e.IsMeta {
+	if e.IsMeta && e.Origin.Kind != "peer" {
 		return nil
 	}
 	var s string

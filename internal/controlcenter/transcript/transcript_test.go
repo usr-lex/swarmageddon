@@ -21,9 +21,10 @@ func TestClaude(t *testing.T) {
 {"type":"assistant","uuid":"a1","timestamp":"2026-10-16T10:00:01Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"Looking."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go   build ./...","description":"build"}}]}}
 {"type":"user","uuid":"u2","timestamp":"2026-10-16T10:00:02Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"ok"}],"is_error":true}]}}
 {"type":"system","uuid":"s1","content":"Conversation compacted"}
+{"type":"user","uuid":"p1","isMeta":true,"origin":{"kind":"peer"},"message":{"role":"user","content":"Another Claude session sent a message:\n<cross-session-message from=\"hermes@acme\">hi</cross-session-message>"}}
 not json`
 	got := parseAll("claude", in)
-	if len(got) != 5 {
+	if len(got) != 6 {
 		t.Fatalf("items %+v", got)
 	}
 	if got[0].Role != RoleUser || got[0].Text != "fix the build" || got[0].ID != "u1" || got[0].At.IsZero() {
@@ -40,6 +41,10 @@ not json`
 	}
 	if got[4].Role != RoleSystem || got[4].Text != "Conversation compacted" {
 		t.Errorf("system %+v", got[4])
+	}
+	// Messages from other agents and people arrive isMeta with a peer origin.
+	if got[5].Role != RoleUser || got[5].ID != "p1" || !strings.Contains(got[5].Text, "hermes@acme") {
+		t.Errorf("peer message %+v", got[5])
 	}
 }
 
