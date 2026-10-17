@@ -15,6 +15,11 @@ rules:
   - apiGroups: [swarmageddon.dev]
     resources: [workspaces, rooms, roletemplates]
     verbs: [get, list, watch]
+  # Each workspace's issued-token digests (design §11.4), read with a metadata.name field selector.
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [messaging-token-hashes]
+    verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -77,6 +77,40 @@ type RoomSpec struct {
 	// Image overrides the room image (for development).
 	// +optional
 	Image string `json:"image,omitempty"`
+	// Janitor tunes the room's disk janitor (docs/design.md §12).
+	// +optional
+	Janitor *JanitorSpec `json:"janitor,omitempty"`
+}
+
+// JanitorSpec tunes a room's disk janitor (docs/design.md §12). Zero values
+// keep the defaults.
+type JanitorSpec struct {
+	// Disabled turns the janitor off.
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
+	// IntervalMinutes between runs. Default 60.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	IntervalMinutes int32 `json:"intervalMinutes,omitempty"`
+	// PruneAfterHours: stopped containers and dangling images older than this are removed. Default 24.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	PruneAfterHours int32 `json:"pruneAfterHours,omitempty"`
+	// ImagesAbovePercent of the engine volume also removes unused tagged images. Default 70.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ImagesAbovePercent int32 `json:"imagesAbovePercent,omitempty"`
+	// WarnPercent of a volume raises diskLow. Default 80.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	WarnPercent int32 `json:"warnPercent,omitempty"`
+	// AggressivePercent of a volume prunes everything unused. Default 90.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	AggressivePercent int32 `json:"aggressivePercent,omitempty"`
 }
 
 type RoomResources struct {

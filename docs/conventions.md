@@ -23,6 +23,7 @@ Change them here first.
 | Forgejo web UI | with `Platform.spec.hostname`: Ingress `forgejo` at `forge.<hostname>` behind the default IngressClass, TLS from the platform CA (Secret `forgejo-tls`), plus NetworkPolicy `forgejo-ingress` opening port 3000 to the ingress controller |
 | Device plugin | DaemonSet `devices` in namespace `swarmageddon-devices` (Pod Security `privileged`: it needs hostPath), only in the `userns` tier. Resources `swarmageddon.dev/fuse` and `swarmageddon.dev/tun` (250 units per node each; any number of units mounts `/dev/fuse` or `/dev/net/tun`); userns-tier room and runner containers request 1 of each |
 | Messaging deny list | ConfigMap `messaging-revoked` in the platform namespace: one key per revoked client certificate, its serial in lowercase hex; value `<notAfter RFC 3339> <CN>`. The room controller adds removed rooms' and rotated certificates and drops expired entries; messaging mounts it at `/etc/swarm/revoked` (`--revoked`) and refuses those certificates at the TLS handshake until they expire |
+| Messaging token digests | ConfigMap `messaging-token-hashes` in each `ws-<ws>` namespace, data key `sha256`: the lowercase hex SHA-256 of every token issued for the workspace's rooms (`forge_token`, `gateway_key`, `advisor_key`, `warden_key`, `egress_auth`), sorted, one per line; never the tokens. Written by the room controller; messaging watches it by name (`internal/messaging/tokenhash`) and refuses sends and posts containing one (design §11.4) |
 | Runner pools | a pool with `spec.group: <g>` serves only repositories team `group-<g>` has (narrowed by `spec.repos`); its runners carry the extra label `group-<g>` (so workflows can ask `runs-on: group-<g>`) and are registered on the job's repository, so Forgejo can't give them another repository's job |
 | Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway` (the warden's pods), `litellm`, `egress`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
 | Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080. NetworkPolicy `control-center` admits port 8443 only from Forgejo (webhooks) and the default IngressClass's controller (pods `app.kubernetes.io/name: traefik` or `ingress-nginx` outside workspace and platform namespaces; any pod there for other controllers), or from any address when it's a NodePort. With Traefik's CRDs, TLSStore `default` in the system namespace makes `control-center-tls` the certificate for clients without SNI (`https://<node-ip>/`), unless another namespace already has one |
@@ -36,6 +37,7 @@ Change them here first.
 | `platform-ca` | system | `ca.crt`, `ca.key`: the internal CA (operator only) |
 | `platform-ca-bundle` | every managed namespace (ConfigMap, not Secret) | `ca.crt` |
 | `control-center-tls` | system | `tls.crt`, `tls.key`: serving cert for the control center |
+| `control-center-public-tls` | system | in TLS mode `certManager`: cert-manager's certificate for `spec.hostname` (Certificate `control-center`), served by the control center's Ingress once ready |
 | `control-center-client` | system | `tls.crt`, `tls.key`: client cert, CN `control-center` |
 | `control-center-session` | system | `key`: 32 random bytes for signing session cookies |
 | `local-admin` | system | `username`, `passwordHash` (argon2id PHC string), `email` |
@@ -62,6 +64,10 @@ Change them here first.
   `spiffe://swarmageddon/ws/<workspace>/room/<room>`, 30-day lifetime.
 - Control center client certificate: `CN=control-center`, URI SAN
   `spiffe://swarmageddon/system/control-center`.
+- Operator client certificate: `CN=operator`, URI SAN
+  `spiffe://swarmageddon/system/operator`, issued in the operator's memory
+  (24 h, renewed at 2/3). Messaging lets it only `WatchPresence` and
+  `WatchApprovals`, to roll idle rooms (design §3.5).
 - Messaging serving certificate: DNS SANs `messaging`,
   `messaging.swarmageddon-platform.svc`,
   `messaging.swarmageddon-platform.svc.cluster.local`, and
@@ -131,7 +137,7 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 |---|---|
 | `operator` | `--metrics-bind-address`, `--health-probe-bind-address`, `--leader-elect`, `--images-from` (file with image refs), `--room-image`, `--version`; env `POD_NAMESPACE`. `operator welcome` (the chart's welcome Job): waits for Platform `default` `status.url` and Secret `setup-token`, prints the URL, the token, `status.caFingerprint` and the port-forward fallback, exits 0 |
 | `control-center` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--messaging-url`, `--client-cert`, `--client-key`, `--ca`, `--dev` (plain HTTP, no TLS) |
-| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--revoked /etc/messaging/revoked` (the deny list directory; missing means empty), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates` |
+| `messaging` | `--listen :8443`, `--health :8080`, `--tls-cert`, `--tls-key`, `--ca` (defaults under `/etc/messaging/tls/`), `--revoked /etc/messaging/revoked` (the deny list directory; missing means empty), `--data /data`, `--nats-routes` (comma-separated `host:6222` or `nats://` URLs; may include itself), `--server-name` (default hostname), `--cluster-size` (0: number of routes, or 1), `--namespace`, `--dev-insecure` (h2c; identity from `x-swarm-dev-identity`), `--directory-file` (Workspace/Room/RoleTemplate YAML instead of Kubernetes), `--version`. Needs get/list/watch on `workspaces`, `rooms`, `roletemplates`, and on ConfigMaps named `messaging-token-hashes` |
 | `warden` | `--listen :4000`, `--health :8080`, `--upstream` (LiteLLM URL), `--namespace` (of `warden-keys`), `--messaging-url`, `--client-cert`, `--client-key`, `--ca` (defaults under `/etc/warden/tls/`), `--review-key-file /etc/warden/review/key`, `--review-every 1m`, `--max-body 8388608`. Needs get/list/watch on ConfigMap `warden-keys`, get/patch on `rooms` (quarantine: `spec.quarantined` and annotations `swarmageddon.dev/quarantine-reason`, `-quarantined-by`, `-quarantined-at`) |
 | `egress` | `--listen :3128`, `--health :8080`, `--namespace` (of `egress-allowlist`), `--log-connections`. Needs get/list/watch on ConfigMap `egress-allowlist` |
 | `supervisor` | runs as PID 1 under tini; reads `/etc/swarm/room.json` |

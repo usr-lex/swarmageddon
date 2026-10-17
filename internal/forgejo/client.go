@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -569,6 +570,8 @@ type Repository struct {
 	DefaultBranch string `json:"default_branch"`
 	Private       bool   `json:"private"`
 	Empty         bool   `json:"empty"`
+	Mirror        bool   `json:"mirror"`
+	Archived      bool   `json:"archived"`
 	CloneURL      string `json:"clone_url"`
 	SSHURL        string `json:"ssh_url"`
 }
@@ -673,6 +676,35 @@ func (c *Client) EnsureBranchProtection(ctx context.Context, owner, repo string,
 	}
 	if err != nil {
 		return err
+	}
+	return c.do(ctx, http.MethodPatch, base+"/"+esc(bp.RuleName), bp, nil)
+}
+
+// EnsureBaseBranchProtection creates bp if the branch has no rule. An
+// existing rule is brought up to bp, keeping its status checks and file
+// patterns (people edit those, §9.3) and a higher approval count; nothing is
+// written when it already holds.
+func (c *Client) EnsureBaseBranchProtection(ctx context.Context, owner, repo string, bp BranchProtection) error {
+	base := "/repos/" + esc(owner) + "/" + esc(repo) + "/branch_protections"
+	var cur BranchProtection
+	err := c.do(ctx, http.MethodGet, base+"/"+esc(bp.RuleName), nil, &cur)
+	if IsNotFound(err) {
+		return c.do(ctx, http.MethodPost, base, bp, nil)
+	}
+	if err != nil {
+		return err
+	}
+	bp.EnableStatusCheck, bp.StatusCheckContexts = cur.EnableStatusCheck, cur.StatusCheckContexts
+	if bp.StatusCheckContexts == nil {
+		bp.StatusCheckContexts = []string{}
+	}
+	bp.ProtectedFilePatterns, bp.UnprotectedFilePatterns = cur.ProtectedFilePatterns, cur.UnprotectedFilePatterns
+	bp.RequiredApprovals = max(bp.RequiredApprovals, cur.RequiredApprovals)
+	if cur.EnablePush == bp.EnablePush && cur.RequireSignedCommits == bp.RequireSignedCommits &&
+		cur.RequiredApprovals == bp.RequiredApprovals && cur.DismissStaleApprovals == bp.DismissStaleApprovals &&
+		cur.BlockOnRejectedReviews == bp.BlockOnRejectedReviews && cur.EnableMergeWhitelist == bp.EnableMergeWhitelist &&
+		slices.Equal(cur.MergeWhitelistTeams, bp.MergeWhitelistTeams) && cur.ApplyToAdmins == bp.ApplyToAdmins {
+		return nil
 	}
 	return c.do(ctx, http.MethodPatch, base+"/"+esc(bp.RuleName), bp, nil)
 }

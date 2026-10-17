@@ -339,6 +339,11 @@ type WardenSpec struct {
 	// Monthly budget of each room's warden key in USD. Default 20.
 	// +optional
 	MonthlyUSD int32 `json:"monthlyUSD,omitempty"`
+	// ReviewEveryToolCalls also reviews a room's trajectory every N tool
+	// calls, besides after each turn (ADR 0011, layer 3). Default 20.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	ReviewEveryToolCalls int32 `json:"reviewEveryToolCalls,omitempty"`
 }
 
 // ForgeEvent is a kind of forge activity delivered to agents.

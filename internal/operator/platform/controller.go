@@ -72,6 +72,8 @@ type Reconciler struct {
 	ForgejoURL string
 	// Out receives the WELCOME block; nil is stdout.
 	Out io.Writer
+	// Exec runs commands in the Forgejo pod (forgejooidc.go).
+	Exec Execer
 }
 
 // +kubebuilder:rbac:groups=swarmageddon.dev,resources=platforms;workspaces;rooms;roletemplates;runnerpools,verbs=get;list;watch;create;update;patch;delete
@@ -101,7 +103,7 @@ type Reconciler struct {
 // SetupWithManager registers the controller and a runnable that creates the
 // Platform "default" if it is missing.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps, pf *preflight.Runner) error {
-	r := &Reconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf}
+	r := &Reconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf, Exec: KubeExec{Config: mgr.GetConfig()}}
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		return EnsurePlatform(ctx, mgr.GetClient())
 	})); err != nil {
@@ -231,7 +233,15 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 	}
 	setCond(p, v1alpha1.ConditionControlCenterTLS, true, "Issued", "control-center-tls and control-center-client are current")
 
-	if err := r.expose(ctx, p); err != nil {
+	ingressTLS, wait, err := r.publicTLS(ctx, p)
+	if err != nil {
+		setCond(p, v1alpha1.ConditionControlCenterTLS, false, "Error", err.Error())
+		return result, err
+	}
+	if wait > 0 {
+		requeue(wait)
+	}
+	if err := r.expose(ctx, p, ingressTLS); err != nil {
 		setCond(p, ConditionExposed, false, "Error", err.Error())
 		return result, err
 	}
@@ -288,6 +298,9 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 			continue
 		}
 		setCond(p, s.condition, true, "Ready", msg)
+	}
+	if d := r.forgejoOIDC(ctx, p); d > 0 {
+		requeue(d)
 	}
 	if allReady {
 		setCond(p, v1alpha1.ConditionReady, true, "Ready", "all platform services are ready")
@@ -360,9 +373,10 @@ func (r *Reconciler) nodeIPs(ctx context.Context) ([]net.IP, error) {
 	return out, nil
 }
 
-// expose publishes the control center through the default IngressClass or,
-// without one, a NodePort (design §3.2), and records status.url.
-func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform) error {
+// expose publishes the control center through the default IngressClass,
+// serving tlsSecret, or, without one, a NodePort (design §3.2), and records
+// status.url.
+func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform, tlsSecret string) error {
 	sys := v1alpha1.SystemNamespace
 	var classes networkingv1.IngressClassList
 	if err := r.List(ctx, &classes); err != nil {
@@ -396,6 +410,9 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform) error {
 	if class != "" {
 		objs, err := manifests.Render(manifests.ControlCenterIngress, v)
 		if err != nil {
+			return err
+		}
+		if err := useTLSSecret(objs, tlsSecret); err != nil {
 			return err
 		}
 		if err := r.applier().ApplyAll(ctx, p, toObjects(objs)); err != nil {

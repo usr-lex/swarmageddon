@@ -83,6 +83,9 @@ func (s *Server) Post(ctx context.Context, req *connect.Request[messagingv1.Post
 	}
 	name := strings.TrimPrefix(m.Channel, "#")
 	target := "#" + name
+	if from.ws.TokenHashes.Contains(m.Body) {
+		return nil, s.refused(ctx, from, target, m.Id, "", secretRefusal)
+	}
 	ch, mem, err := s.channel(ctx, from.ws, name)
 	if err != nil {
 		return nil, err

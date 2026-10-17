@@ -101,7 +101,7 @@ func (s *Server) AnswerApproval(ctx context.Context, req *connect.Request[messag
 // every request, answer and withdrawal. With no workspaces named it follows
 // all of them, including ones created later.
 func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messagingv1.WatchApprovalsRequest], stream *connect.ServerStream[messagingv1.ApprovalEvent]) error {
-	if _, err := controlCenter(ctx); err != nil {
+	if err := watcher(ctx); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
@@ -170,7 +170,7 @@ func (s *Server) WatchApprovals(ctx context.Context, req *connect.Request[messag
 
 // WatchPresence implements MessagingService.
 func (s *Server) WatchPresence(ctx context.Context, req *connect.Request[messagingv1.WatchPresenceRequest], stream *connect.ServerStream[messagingv1.PresenceEvent]) error {
-	if _, err := controlCenter(ctx); err != nil {
+	if err := watcher(ctx); err != nil {
 		return err
 	}
 	names := req.Msg.Workspaces
