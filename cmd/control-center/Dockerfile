@@ -6,8 +6,11 @@ FROM golang:1.26 AS build
 ARG VERSION=dev
 ENV GOTOOLCHAIN=go1.26.9 CGO_ENABLED=0
 WORKDIR /src
+# BUILD_CA (Makefile): a TLS-intercepting proxy's CA, for downloads only.
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
+    go mod download
 COPY . .
 RUN go build -trimpath -ldflags "-s -w -X github.com/usr-lex/swarmageddon/internal/version.Version=${VERSION}" \
       -o /out/control-center ./cmd/control-center
