@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,9 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"k8s.io/apimachinery/pkg/types"
 
+	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
 )
 
@@ -134,6 +137,19 @@ func (s *suite) workspace(t *testing.T) {
 // plan, as the UI does) and previews it unchanged: nothing may change
 // (§8.3, "applies only changes").
 func (s *suite) rerunWizard(t *testing.T) {
+	// The operator adds the default channels to the spec once the workspace
+	// has rooms (swarmageddon.dev/default-channels); a person opening the
+	// wizard later sees them in the plan.
+	s.eventually(t, 3*time.Minute, "the operator's default channels", func() error {
+		var w v1.Workspace
+		if err := s.kube.Get(context.Background(), types.NamespacedName{Name: ws}, &w); err != nil {
+			return err
+		}
+		if w.Annotations["swarmageddon.dev/default-channels"] == "" {
+			return errors.New("annotation swarmageddon.dev/default-channels not set yet")
+		}
+		return nil
+	})
 	gw, err := call(s.cc.workspaces.GetWorkspace, &ccv1.GetWorkspaceRequest{Name: ws})
 	if err != nil {
 		t.Fatal(err)
