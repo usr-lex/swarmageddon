@@ -166,6 +166,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 		return vapid
 	}}
 	srv.Tracker = notify.NewTracker(srv.Notify, nil) // forge open-work check: TODO
+	srv.Tracker.NodeDisk = kc.NodeDiskLow
 
 	// Spend.
 	srv.Spend = &spend.Poller{

@@ -189,9 +189,9 @@ func TestTracker(t *testing.T) {
 	if ntfy.n() != 3 {
 		t.Fatalf("roomCrashed deliveries: %d", ntfy.n())
 	}
-	tr.PodRestarts(ctx, "acme", "hermes", 0)
-	tr.PodRestarts(ctx, "acme", "hermes", 0)
-	tr.PodRestarts(ctx, "acme", "hermes", 1)
+	tr.PodRestarts(ctx, "acme", "hermes", 0, "")
+	tr.PodRestarts(ctx, "acme", "hermes", 0, "")
+	tr.PodRestarts(ctx, "acme", "hermes", 1, "room: OOMKilled, exit code 137")
 	if ntfy.n() != 4 {
 		t.Fatalf("pod restart deliveries: %d", ntfy.n())
 	}
