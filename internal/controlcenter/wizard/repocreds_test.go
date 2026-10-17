@@ -48,6 +48,18 @@ func TestRepoCredentials(t *testing.T) {
 	}
 }
 
+func TestRecordKeystrokes(t *testing.T) {
+	p := &ccv1.WorkspacePlan{Name: "acme", Org: "acme", RecordKeystrokes: true}
+	d := Build(p, Current{})
+	if !d.Workspace.Spec.RecordKeystrokes || !FromCluster(Current{Workspace: d.Workspace}).RecordKeystrokes {
+		t.Fatal("recordKeystrokes lost")
+	}
+	p.RecordKeystrokes = false
+	if Build(p, Current{Workspace: d.Workspace}).Workspace.Spec.RecordKeystrokes {
+		t.Fatal("recordKeystrokes not turned off")
+	}
+}
+
 func TestValidateRepos(t *testing.T) {
 	p := &ccv1.WorkspacePlan{Name: "acme", Org: "acme", Repositories: []*ccv1.RepositoryPlan{
 		{Name: "ok", ImportUrl: "https://x/ok.git", ImportCredential: "user:tok"},

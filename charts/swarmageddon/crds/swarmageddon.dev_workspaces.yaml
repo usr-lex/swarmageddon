@@ -378,6 +378,12 @@ spec:
                 items:
                   type: string
                 type: array
+              recordKeystrokes:
+                description: |-
+                  RecordKeystrokes records what people type in room terminals (the
+                  agent's TUI and shells) in the control center's audit log. Off by
+                  default (docs/design.md §8.4).
+                type: boolean
               repositories:
                 items:
                   properties:

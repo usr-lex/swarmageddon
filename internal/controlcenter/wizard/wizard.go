@@ -335,6 +335,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	for _, e := range p.GetForgeNotifications() {
 		s.ForgeNotifications = append(s.ForgeNotifications, v1alpha1.ForgeEvent(e))
 	}
+	s.RecordKeystrokes = p.GetRecordKeystrokes()
 	applyChannels(p, s)
 
 	existing := map[string]v1alpha1.Room{}
@@ -423,6 +424,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		Internet:     s.Internet == nil || *s.Internet, //nolint:staticcheck // still read for workspaces written before roomDefaults.network
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
 		RoleDefaults: map[string]*ccv1.RoomSettingsPlan{}, RoleAdvisors: map[string]*ccv1.AdvisorPlan{},
+		RecordKeystrokes: s.RecordKeystrokes,
 	}
 	for _, t := range cur.RoleTemplates {
 		if !isEmpty(t.Spec.RoomDefaults) {

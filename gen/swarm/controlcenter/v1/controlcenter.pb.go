@@ -4610,9 +4610,12 @@ type WorkspacePlan struct {
 	RoleAdvisors map[string]*AdvisorPlan `protobuf:"bytes,29,rep,name=role_advisors,json=roleAdvisors,proto3" json:"role_advisors,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Workspace.spec.warden. Set: replaces warden_mode and warden_model;
 	// unset: those two apply and the rest is kept.
-	Warden        *WardenPlan `protobuf:"bytes,30,opt,name=warden,proto3" json:"warden,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Warden *WardenPlan `protobuf:"bytes,30,opt,name=warden,proto3" json:"warden,omitempty"`
+	// Workspace.spec.recordKeystrokes: what people type in room terminals goes
+	// to the audit log (docs/design.md §8.4). Off by default.
+	RecordKeystrokes bool `protobuf:"varint,31,opt,name=record_keystrokes,json=recordKeystrokes,proto3" json:"record_keystrokes,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *WorkspacePlan) Reset() {
@@ -4853,6 +4856,13 @@ func (x *WorkspacePlan) GetWarden() *WardenPlan {
 		return x.Warden
 	}
 	return nil
+}
+
+func (x *WorkspacePlan) GetRecordKeystrokes() bool {
+	if x != nil {
+		return x.RecordKeystrokes
+	}
+	return false
 }
 
 type ChannelMemberPlan struct {
@@ -14842,7 +14852,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\n" +
 	"email_from\x18\t \x01(\tR\temailFrom\x12\x19\n" +
 	"\bemail_to\x18\n" +
-	" \x01(\tR\aemailTo\"\xf6\r\n" +
+	" \x01(\tR\aemailTo\"\xa3\x0e\n" +
 	"\rWorkspacePlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -14876,7 +14886,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\rrole_defaults\x18\x1b \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntryR\froleDefaults\x12O\n" +
 	"\x0eshared_volumes\x18\x1c \x03(\v2(.swarm.controlcenter.v1.SharedVolumePlanR\rsharedVolumes\x12\\\n" +
 	"\rrole_advisors\x18\x1d \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntryR\froleAdvisors\x12:\n" +
-	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x1ai\n" +
+	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x12+\n" +
+	"\x11record_keystrokes\x18\x1f \x01(\bR\x10recordKeystrokes\x1ai\n" +
 	"\x11RoleDefaultsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12>\n" +
 	"\x05value\x18\x02 \x01(\v2(.swarm.controlcenter.v1.RoomSettingsPlanR\x05value:\x028\x01\x1ad\n" +

@@ -419,6 +419,7 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     roomDefaults: settingsFrom(p.roomDefaults),
     roleDefaults: mapValues(p.roleDefaults, settingsFrom),
     sharedVolumes: p.sharedVolumes.map(sharedVolumeFrom),
+    recordKeystrokes: p.recordKeystrokes,
     source: p,
   };
 }
@@ -498,6 +499,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     roomDefaults: settingsTo(d.roomDefaults),
     roleDefaults: mapValues(d.roleDefaults, settingsTo),
     sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
+    recordKeystrokes: d.recordKeystrokes ?? false,
   });
 }
 

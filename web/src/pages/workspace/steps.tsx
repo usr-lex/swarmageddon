@@ -43,6 +43,13 @@ export function BasicsStep({ draft, set, existing, models }: DraftProps & { mode
           )}
         </Field>
       </div>
+      <div className="mt-3">
+        <Checkbox
+          label="Record what people type in terminals, in the audit log"
+          checked={draft.recordKeystrokes ?? false}
+          onChange={(e) => set({ ...draft, recordKeystrokes: e.target.checked })}
+        />
+      </div>
     </Card>
   );
 }

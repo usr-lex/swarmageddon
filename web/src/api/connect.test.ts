@@ -30,6 +30,7 @@ function fake() {
           agents: [{ name: "hermes", role: "implementer", cli: "ore", cpu: "500m", memory: "6Gi", homeVolume: "30Gi", engineVolume: "1Ti", workDir: "work/api" }],
           notificationChannels: [{ kind: "slack", secretName: "notify-acme-slack" }],
           repositories: [{ name: "api", pushMirror: "https://github.com/acme/api.git", mirrorSecretName: "repo-api-mirror-abc" }],
+          recordKeystrokes: true,
         },
       }),
       applyWorkspace: (req) => {
@@ -77,6 +78,8 @@ describe("connect api", () => {
     const p = f.applied()!;
     expect(p.owners).toEqual(["alice"]);
     expect(p.requiredApprovals).toBe(2);
+    expect(d.recordKeystrokes).toBe(true);
+    expect(p.recordKeystrokes).toBe(true);
     expect(p.agents[0]).toMatchObject({ model: "claude-opus-5-5", workDir: "work/api", cpu: "0.5", engineVolume: "1024Gi" });
     // An empty webhook keeps the stored secret.
     expect(p.notificationChannels[0]).toMatchObject({ secretName: "notify-acme-slack", webhookUrl: "" });

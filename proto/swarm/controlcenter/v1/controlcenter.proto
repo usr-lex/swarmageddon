@@ -637,6 +637,9 @@ message WorkspacePlan {
   // Workspace.spec.warden. Set: replaces warden_mode and warden_model;
   // unset: those two apply and the rest is kept.
   WardenPlan warden = 30;
+  // Workspace.spec.recordKeystrokes: what people type in room terminals goes
+  // to the audit log (docs/design.md §8.4). Off by default.
+  bool record_keystrokes = 31;
 }
 
 message ChannelMemberPlan {
