@@ -950,6 +950,45 @@ spec:
               image:
                 description: Image overrides the room image (for development).
                 type: string
+              janitor:
+                description: Janitor tunes the room's disk janitor (docs/design.md
+                  §12).
+                properties:
+                  aggressivePercent:
+                    description: AggressivePercent of a volume prunes everything unused.
+                      Default 90.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                  disabled:
+                    description: Disabled turns the janitor off.
+                    type: boolean
+                  imagesAbovePercent:
+                    description: ImagesAbovePercent of the engine volume also removes
+                      unused tagged images. Default 70.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                  intervalMinutes:
+                    description: IntervalMinutes between runs. Default 60.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  pruneAfterHours:
+                    description: 'PruneAfterHours: stopped containers and dangling
+                      images older than this are removed. Default 24.'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  warnPercent:
+                    description: WarnPercent of a volume raises diskLow. Default 80.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                type: object
               mcpServers:
                 additionalProperties:
                   description: MCPServer is one MCP server, as in .mcp.json.
@@ -2074,6 +2113,13 @@ spec:
                     description: QuarantineOnHigh quarantines on high verdicts from
                       the gateway guard, not only critical ones.
                     type: boolean
+                  reviewEveryToolCalls:
+                    description: |-
+                      ReviewEveryToolCalls also reviews a room's trajectory every N tool
+                      calls, besides after each turn (ADR 0011, layer 3). Default 20.
+                    format: int32
+                    minimum: 1
+                    type: integer
                 type: object
             required:
             - forge
