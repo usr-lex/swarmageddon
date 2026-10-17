@@ -199,7 +199,8 @@ func Main(ctx context.Context, log *slog.Logger) error {
 		dedup, _ = msgclient.LoadDedup(filepath.Join(stateDir, "delivered.new"), 10000)
 	}
 	core.Dedup = dedup
-	core.Agent = newAgent(room, user, work, roleText, roomEnv, core, log)
+	gatewayKey := readSecret(KeyGateway)
+	core.Agent = newAgent(room, user, work, roleText, roomEnv, gatewayKey, core, log)
 	core.Warden = NewWarden(room, core, readSecret(KeyWarden), roleText, work)
 	if room.Advisor.Model != "" {
 		core.Advisor = &advisor.Advisor{
@@ -213,7 +214,11 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}
 
 	api := &API{Core: core}
-	wg.Add(3)
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		watchGatewayKey(ctx, func() string { return readSecret(KeyGateway) }, gatewayKey, core.Agent, gatewayKeyEnv(room), GatewayKeyEvery, log)
+	}()
 	go func() {
 		defer wg.Done()
 		if err := ServeUnix(ctx, roomcfg.SupervisorSock, int(user.GID), api.Handler()); err != nil {
@@ -321,22 +326,29 @@ func cloneRepos(ctx context.Context, room *roomcfg.Room, u *proc.User, log *slog
 	}
 }
 
+// gatewayKeyEnv is the variable that carries the gateway key to the CLI.
+func gatewayKeyEnv(room *roomcfg.Room) string {
+	if room.CLI == roomcfg.CLIOre {
+		return ore.GatewayKeyEnv
+	}
+	return "ANTHROPIC_AUTH_TOKEN"
+}
+
 // newAgent builds the CLI driver for the room. roomEnv is RoomEnv plus the
-// proxy settings.
-func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, roomEnv []string, ev agent.Events, log *slog.Logger) agent.Agent {
-	key := readSecret(KeyGateway)
+// proxy settings; key is the gateway key.
+func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, roomEnv []string, key string, ev agent.Events, log *slog.Logger) agent.Agent {
 	roomEnv = slices.Clip(roomEnv)
 	if room.CLI == roomcfg.CLIOre {
 		p := ore.Policy{GatewayURL: room.OreBaseURL(), WireAPI: room.OreWireAPI()}
 		return &ore.Driver{
 			Home: u.Home, WorkDir: work, User: u, Socket: roomcfg.OreSock,
-			Env:                   append(roomEnv, ore.GatewayKeyEnv+"="+key),
+			Env:                   append(roomEnv, gatewayKeyEnv(room)+"="+key),
 			Settings:              ore.UserSettings{Provider: p.Provider(), Model: room.Model, Effort: room.Effort},
 			DeveloperInstructions: roleText, FirstTurn: room.FirstTurnPrompt(),
 			Events: ev, Log: log,
 		}
 	}
-	env := append(roomEnv, "ANTHROPIC_AUTH_TOKEN="+key)
+	env := append(roomEnv, gatewayKeyEnv(room)+"="+key)
 	if base := room.GatewayURL; base != "" {
 		env = append(env, "ANTHROPIC_BASE_URL="+base)
 	} else if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {
