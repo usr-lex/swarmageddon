@@ -61,7 +61,11 @@ func StartNode(cfg NodeConfig) (*Node, error) {
 		LameDuckDuration:    5 * time.Second,
 		LameDuckGracePeriod: time.Second,
 	}
-	if len(cfg.Routes) > 0 {
+	// One replica runs standalone JetStream: clustered, it would wait for
+	// peers that never come (its only route is itself) and never elect a
+	// meta leader.
+	clustered := cfg.ClusterSize > 1 || (cfg.ClusterSize == 0 && len(cfg.Routes) > 1)
+	if clustered && len(cfg.Routes) > 0 {
 		opts.Cluster = server.ClusterOpts{
 			Name: "messaging",
 			Host: cfg.ClusterHost,
