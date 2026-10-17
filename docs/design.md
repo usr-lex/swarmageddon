@@ -1386,7 +1386,8 @@ install if policies aren't enforced, rather than pretending they are.
     `platforms` and `workspaces`, and read access to their status.
   - In each workspace namespace, a RoleBinding the operator creates:
     `rooms`, `roletemplates` and `runnerpools` (read and write), pods and
-    pods/log (read), `pods/exec` and `pods/portforward` (create),
+    pods/log (read), `pods/exec` and `pods/portforward` (get and create:
+    client-go streams them over WebSocket, a GET),
     `metrics.k8s.io` pods (read), and get, update and patch on the one
     Secret `room-secrets` by name, which the operator creates empty and
     which holds the values people enter for `secretEnv` and MCP `valueFrom`

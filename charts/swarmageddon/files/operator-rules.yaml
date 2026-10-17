@@ -51,6 +51,7 @@
   - pods/portforward
   verbs:
   - create
+  - get
 - apiGroups:
   - apps
   resources:

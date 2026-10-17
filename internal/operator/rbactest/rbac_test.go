@@ -281,6 +281,9 @@ func controlCenterCalls(t *testing.T, ctx context.Context, env *testenv.Env) {
 	controlCenterSA.expect(t, admin, true,
 		call{verb: "create", resource: "pods", sub: "exec", ns: wsNS, name: k8s.PodName("athena")},
 		call{verb: "create", resource: "pods", sub: "portforward", ns: wsNS, name: k8s.PodName("athena")},
+		// client-go streams exec and port-forward over WebSocket: a GET.
+		call{verb: "get", resource: "pods", sub: "exec", ns: wsNS, name: k8s.PodName("athena")},
+		call{verb: "get", resource: "pods", sub: "portforward", ns: wsNS, name: k8s.PodName("athena")},
 		call{verb: "get", group: "metrics.k8s.io", resource: "pods", ns: wsNS, name: k8s.PodName("athena")},
 		call{verb: "watch", resource: "events", ns: wsNS},
 	)

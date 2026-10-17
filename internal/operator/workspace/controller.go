@@ -280,7 +280,9 @@ func ControlCenterRole(ns string) *rbacv1.Role {
 			{APIGroups: []string{v1alpha1.GroupVersion.Group}, Resources: []string{"rooms/status", "runnerpools/status"}, Verbs: read},
 			{APIGroups: []string{""}, Resources: []string{"pods", "persistentvolumeclaims", "events"}, Verbs: read},
 			{APIGroups: []string{""}, Resources: []string{"pods/log"}, Verbs: []string{"get"}},
-			{APIGroups: []string{""}, Resources: []string{"pods/exec", "pods/portforward"}, Verbs: []string{"create"}},
+			// get: client-go streams exec and port-forward over WebSocket, an
+			// HTTP GET that RBAC checks as verb get; SPDY was a POST (create).
+			{APIGroups: []string{""}, Resources: []string{"pods/exec", "pods/portforward"}, Verbs: []string{"get", "create"}},
 			{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
 			// Only the one Secret people fill in through the control center.
 			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{RoomSecretsName}, Verbs: []string{"get", "update", "patch"}},

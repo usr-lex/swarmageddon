@@ -82,7 +82,7 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=swarmageddon.dev,resources=platforms/finalizers;workspaces/finalizers;rooms/finalizers;runnerpools/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;secrets;configmaps;services;serviceaccounts;persistentvolumeclaims;pods;resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
-// +kubebuilder:rbac:groups="",resources=pods/exec;pods/portforward,verbs=create
+// +kubebuilder:rbac:groups="",resources=pods/exec;pods/portforward,verbs=get;create
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
