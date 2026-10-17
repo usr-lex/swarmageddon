@@ -179,7 +179,7 @@ func (p *PresenceIdle) watchPresence(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	p.setPresenceUp(true)
 	defer p.setPresenceUp(false)
 	for s.Receive() {
@@ -195,7 +195,7 @@ func (p *PresenceIdle) watchApprovals(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	p.setApprovalsUp(true)
 	defer p.setApprovalsUp(false)
 	for s.Receive() {
