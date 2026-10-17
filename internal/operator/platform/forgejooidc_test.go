@@ -7,11 +7,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/operator/testenv"
@@ -44,6 +46,23 @@ func (f *fakeExec) Exec(_ context.Context, ns, pod, container string, cmd []stri
 		_, _ = io.WriteString(stdout, "ID\tName\tType\tEnabled\n"+f.list)
 	}
 	return nil
+}
+
+// waitForRBAC waits until the API server's authorizer has seen the role
+// behind c, which a just-created ClusterRole may not be yet.
+func waitForRBAC(t *testing.T, c client.Client) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		err := c.List(context.Background(), &corev1.SecretList{}, client.InNamespace(v1alpha1.SystemNamespace))
+		if err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("operator RBAC never took effect: %v", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func TestAuthSourceID(t *testing.T) {
@@ -83,6 +102,7 @@ func TestForgejoOIDC(t *testing.T) {
 
 	fx := &fakeExec{}
 	r := &Reconciler{Client: env.OperatorClient(t), Scheme: env.Scheme, Exec: fx}
+	waitForRBAC(t, r.Client)
 	p := &v1alpha1.Platform{Spec: v1alpha1.PlatformSpec{
 		Hostname: "agents.example.com",
 		Auth: v1alpha1.AuthSpec{

@@ -44,6 +44,7 @@ func TestCertManagerTLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &Reconciler{Client: env.OperatorClient(t), Scheme: env.Scheme, Deps: deps.Deps{Version: "v0.1.0"}}
+	waitForRBAC(t, r.Client)
 	if err := EnsurePlatform(ctx, env.Client); err != nil {
 		t.Fatal(err)
 	}
