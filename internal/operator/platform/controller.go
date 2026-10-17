@@ -60,8 +60,10 @@ const (
 // Reconciler reconciles the Platform named "default".
 type Reconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Deps   deps.Deps
+	// APIReader reads around the cache; nil uses Client.
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Deps      deps.Deps
 	// Preflight runs the cluster checks.
 	Preflight *preflight.Runner
 	// HTTPClient talks to Forgejo; nil uses a client with a 30 s timeout.
@@ -99,7 +101,7 @@ type Reconciler struct {
 // SetupWithManager registers the controller and a runnable that creates the
 // Platform "default" if it is missing.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps, pf *preflight.Runner) error {
-	r := &Reconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf}
+	r := &Reconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Deps: d, Preflight: pf}
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		return EnsurePlatform(ctx, mgr.GetClient())
 	})); err != nil {
@@ -570,6 +572,13 @@ func (r *Reconciler) preflight(ctx context.Context, p *v1alpha1.Platform) (time.
 	if p.Status.Preflight != nil && p.Status.Preflight.CompletedAt != nil {
 		return 0, nil
 	}
+	// Deleting the probe pods after a run triggers a reconcile that may
+	// still see the cached Platform from before completedAt; running again
+	// would recreate probe pods nobody cleans up, and the status patch would
+	// put pending checks under the old completedAt.
+	if done, err := r.preflightCompleted(ctx); err != nil || done {
+		return 0, err
+	}
 	res, err := r.Preflight.Run(ctx, &p.Spec)
 	if err != nil {
 		setCond(p, v1alpha1.ConditionPreflightDone, false, "Error", err.Error())
@@ -591,4 +600,18 @@ func (r *Reconciler) preflight(ctx context.Context, p *v1alpha1.Platform) (time.
 	msg := fmt.Sprintf("tier %q, about %d rooms, %d failed checks", res.Status.Tier, res.Status.RoomEstimate, failed)
 	setCond(p, v1alpha1.ConditionPreflightDone, true, "Completed", msg)
 	return 0, r.Preflight.Cleanup(ctx)
+}
+
+// preflightCompleted reads the Platform around the cache and reports
+// whether preflight has completed.
+func (r *Reconciler) preflightCompleted(ctx context.Context) (bool, error) {
+	var reader client.Reader = r.Client
+	if r.APIReader != nil {
+		reader = r.APIReader
+	}
+	var p v1alpha1.Platform
+	if err := reader.Get(ctx, types.NamespacedName{Name: v1alpha1.PlatformName}, &p); err != nil {
+		return false, err
+	}
+	return p.Status.Preflight != nil && p.Status.Preflight.CompletedAt != nil, nil
 }
