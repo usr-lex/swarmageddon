@@ -76,16 +76,24 @@ func (s *suite) trace(room, marker string) string {
 		fmt.Fprintf(&b, "It is not in %s's messaging inbox (swarm read).\n", room)
 	}
 	logs, _ := s.kc("-n", wsNS, "logs", podOf(room), "-c", "room", "--since=20m")
-	var lines []string
+	var deliveries, warnings []string
 	for _, l := range strings.Split(logs, "\n") {
-		if strings.Contains(l, "deliver") || strings.Contains(l, "subscribe") || strings.Contains(l, "level=WARN") || strings.Contains(l, "level=ERROR") {
-			lines = append(lines, l)
+		switch {
+		case strings.Contains(l, "deliver"):
+			deliveries = append(deliveries, l)
+		case strings.Contains(l, "service exited; restarting"):
+			// the display services' restarts drown everything else
+		case strings.Contains(l, "level=WARN") || strings.Contains(l, "level=ERROR"):
+			warnings = append(warnings, l)
 		}
 	}
-	if len(lines) > 12 {
-		lines = lines[len(lines)-12:]
+	last := func(l []string) string {
+		if len(l) > 6 {
+			l = l[len(l)-6:]
+		}
+		return strings.Join(l, "\n")
 	}
-	fmt.Fprintf(&b, "%s's supervisor log (deliveries, warnings, last 20 min):\n%s", room, strings.Join(lines, "\n"))
+	fmt.Fprintf(&b, "%s's supervisor, last 20 min: deliveries:\n%s\nwarnings:\n%s", room, last(deliveries), last(warnings))
 	return b.String()
 }
 

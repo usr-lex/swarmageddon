@@ -51,6 +51,7 @@ func TestPlatform(t *testing.T) {
 	s.step("crossing over a mediated link", rooms, s.crossingMediated)
 	s.step("message with a token refused", rooms, s.tokenRefused)
 
+	s.step("repos cloned at start", rooms, s.cloned)
 	s.step("forge signed push", rooms, s.signedPush)
 	s.step("forge pull request", []string{"forge signed push"}, s.pullRequest)
 	s.step("forge CI on an ephemeral runner", []string{"forge pull request"}, s.ciRunner)
