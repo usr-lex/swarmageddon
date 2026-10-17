@@ -365,10 +365,14 @@ func (r *Runner) podman(ctx context.Context) v1alpha1.PreflightCheck {
 	return c
 }
 
+// dnsProbe resolves the kubernetes Service, retrying for a minute: on a new
+// cluster preflight often starts before CoreDNS answers.
+const dnsProbe = "for i in $(seq 30); do nslookup kubernetes.default.svc.cluster.local && exit 0; sleep 2; done; exit 1"
+
 // dns: a probe pod resolves the kubernetes Service.
 func (r *Runner) dns(ctx context.Context) v1alpha1.PreflightCheck {
 	c := v1alpha1.PreflightCheck{Name: CheckDNS}
-	p, err := r.run(ctx, shellPod(r, podDNS, "nslookup kubernetes.default.svc.cluster.local"), true)
+	p, err := r.run(ctx, shellPod(r, podDNS, dnsProbe), true)
 	if err != nil {
 		return probeErr(c.Name, err)
 	}
