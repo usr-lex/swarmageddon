@@ -289,6 +289,32 @@ func (s *suite) preflight(t *testing.T) {
 		return nil
 	})
 	logChecks(t, "preflight with the privileged tier", st)
+}
+
+// preflightChecks: once preflight is done, no check is still pending, and
+// the ones rooms rely on pass (§3.4).
+func (s *suite) preflightChecks(t *testing.T) {
+	var st *ccv1.PlatformStatus
+	err := s.wait(2*time.Minute, func() error {
+		gp, err := call(s.cc.platform.GetPlatform, &ccv1.GetPlatformRequest{})
+		if err != nil {
+			return err
+		}
+		st = gp.GetPlatform().GetStatus()
+		var pending []string
+		for _, c := range st.GetPreflight() {
+			if c.GetResult() == "pending" {
+				pending = append(pending, c.GetName())
+			}
+		}
+		if len(pending) > 0 {
+			return fmt.Errorf("preflight_done %v with checks still pending: %v", st.GetPreflightDone(), pending)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
 	results := map[string]string{}
 	for _, c := range st.GetPreflight() {
 		results[c.GetName()] = c.GetResult()

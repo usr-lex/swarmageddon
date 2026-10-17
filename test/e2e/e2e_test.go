@@ -31,6 +31,7 @@ func TestPlatform(t *testing.T) {
 	s.step("ingress", []string{"install"}, s.ingress)
 	s.step("claim admin", []string{"install"}, s.claimAdmin)
 	s.step("preflight and isolation", []string{"claim admin"}, s.preflight)
+	s.step("preflight checks", []string{"preflight and isolation"}, s.preflightChecks)
 	s.step("platform services", []string{"preflight and isolation"}, s.services)
 	s.step("workspace wizard", []string{"platform services"}, s.workspace)
 	s.step("rooms run", []string{"workspace wizard"}, s.roomsRun)
