@@ -281,7 +281,7 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 	if err := r.render(ctx, p, manifests.NetworkPolicies, v); err != nil {
 		return result, err
 	}
-	allReady, blocked := true, ""
+	allReady, blocked, waiting := true, "", ""
 	for _, s := range services {
 		if s.enabled != nil && !s.enabled(p) {
 			setCond(p, s.condition, false, "Disabled", "not enabled")
@@ -299,7 +299,12 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		}
 		if !ready {
 			setCond(p, s.condition, false, "Progressing", msg)
-			blocked, allReady = s.condition, false
+			if !s.optional {
+				blocked = s.condition
+			} else if waiting == "" {
+				waiting = s.condition
+			}
+			allReady = false
 			requeue(10 * time.Second)
 			continue
 		}
@@ -311,6 +316,9 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 	if allReady {
 		setCond(p, v1alpha1.ConditionReady, true, "Ready", "all platform services are ready")
 	} else {
+		if blocked == "" {
+			blocked = waiting
+		}
 		setCond(p, v1alpha1.ConditionReady, false, "Progressing", "waiting for "+blocked)
 	}
 	return result, nil

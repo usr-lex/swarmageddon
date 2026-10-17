@@ -23,6 +23,10 @@ import (
 type service struct {
 	condition string
 	enabled   func(*v1alpha1.Platform) bool
+	// optional services don't hold back the ones after them while not
+	// ready: the registry cache can't start where Docker Hub is out of
+	// reach (an air-gapped cluster), and rooms work without it.
+	optional bool
 	// apply renders and applies the service and reports whether it is ready.
 	apply func(r *Reconciler, ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (ready bool, msg string, err error)
 }
@@ -33,7 +37,7 @@ var services = []service{
 	{condition: v1alpha1.ConditionMessagingReady, apply: (*Reconciler).applyMessaging},
 	{condition: v1alpha1.ConditionGatewayReady, apply: (*Reconciler).applyGateway},
 	{condition: ConditionEgressReady, apply: (*Reconciler).applyEgress},
-	{condition: v1alpha1.ConditionRegistryReady, apply: (*Reconciler).applyRegistry},
+	{condition: v1alpha1.ConditionRegistryReady, apply: (*Reconciler).applyRegistry, optional: true},
 	{condition: v1alpha1.ConditionNtfyReady, apply: (*Reconciler).applyNtfy,
 		enabled: func(p *v1alpha1.Platform) bool { return p.Spec.Services.Ntfy.Enabled }},
 }
