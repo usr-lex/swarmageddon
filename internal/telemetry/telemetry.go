@@ -79,6 +79,15 @@ var (
 // Enabled reports whether Init turned reporting on.
 func Enabled() bool { return enabled.Load() }
 
+// Current returns the settings reporting runs with, or the zero Config when
+// it is off.
+func Current() Config {
+	if !Enabled() {
+		return Config{}
+	}
+	return current
+}
+
 // Init starts reporting for component (the binary's name, sent as tag
 // "component") when SENTRY_DSN is set. Call it before building loggers and
 // servers, and call flush before the process exits. Without a DSN, or when
@@ -175,11 +184,11 @@ type BrowserConfig struct {
 
 // Browser returns the web UI's settings, or nil when reporting is off.
 func Browser() *BrowserConfig {
-	if !Enabled() {
+	c := Current()
+	if c.DSN == "" {
 		return nil
 	}
-	return &BrowserConfig{DSN: current.DSN, Environment: current.Environment, Release: "swarmageddon@" + version.Version,
-		TracesSampleRate: current.TracesSampleRate}
+	return &BrowserConfig{DSN: c.DSN, Environment: c.Environment, Release: "swarmageddon@" + version.Version, TracesSampleRate: c.TracesSampleRate}
 }
 
 // RecoverPanic reports a recovered panic. It fits

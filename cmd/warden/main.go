@@ -22,6 +22,7 @@ import (
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/redact"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/internal/version"
 	"github.com/usr-lex/swarmageddon/internal/warden"
 )
@@ -46,11 +47,17 @@ func main() {
 		println(version.Version)
 		return
 	}
-	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
+	flush, terr := telemetry.Init("warden")
+	log := slog.New(redact.NewHandler(telemetry.LogHandler(slog.NewJSONHandler(os.Stderr, nil)), nil))
+	if terr != nil {
+		log.Warn("error reporting is off", "err", terr)
+	}
 	if err := run(log, *listen, *health, *upstream, *namespace, *msgURL, *cert, *key, *ca, *reviewKey, *reviewEvery, *maxBody); err != nil {
 		log.Error("warden", "err", err)
+		flush()
 		os.Exit(1)
 	}
+	flush()
 }
 
 func run(log *slog.Logger, listen, health, upstream, ns, msgURL, cert, key, ca, reviewKey string, reviewEvery time.Duration, maxBody int64) error {
@@ -103,7 +110,7 @@ func run(log *slog.Logger, listen, health, upstream, ns, msgURL, cert, key, ca, 
 		_, _ = w.Write([]byte("ok"))
 	})
 	hs := &http.Server{Addr: health, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	ps := &http.Server{Addr: listen, Handler: p, ReadHeaderTimeout: 30 * time.Second}
+	ps := &http.Server{Addr: listen, Handler: telemetry.Handler(p), ReadHeaderTimeout: 30 * time.Second}
 	errs := make(chan error, 2)
 	go func() { errs <- hs.ListenAndServe() }()
 	go func() { errs <- ps.ListenAndServe() }()

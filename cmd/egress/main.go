@@ -21,6 +21,7 @@ import (
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/egress"
 	"github.com/usr-lex/swarmageddon/internal/redact"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
@@ -37,11 +38,17 @@ func main() {
 		fmt.Println(version.Version)
 		return
 	}
-	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
+	flush, terr := telemetry.Init("egress")
+	log := slog.New(redact.NewHandler(telemetry.LogHandler(slog.NewJSONHandler(os.Stderr, nil)), nil))
+	if terr != nil {
+		log.Warn("error reporting is off", "err", terr)
+	}
 	if err := run(log, *listen, *health, *namespace, *logConns); err != nil {
 		log.Error("egress", "err", err)
+		flush()
 		os.Exit(1)
 	}
+	flush()
 }
 
 func run(log *slog.Logger, listen, health, ns string, logConns bool) error {
@@ -68,7 +75,8 @@ func run(log *slog.Logger, listen, health, ns string, logConns bool) error {
 		_, _ = w.Write([]byte("ok"))
 	})
 	hs := &http.Server{Addr: health, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	ps := &http.Server{Addr: listen, Handler: p, ReadHeaderTimeout: 30 * time.Second}
+	// Rooms' proxy requests are traced by method only (telemetry.Handler).
+	ps := &http.Server{Addr: listen, Handler: telemetry.Handler(p), ReadHeaderTimeout: 30 * time.Second}
 	errs := make(chan error, 2)
 	go func() { errs <- hs.ListenAndServe() }()
 	go func() { errs <- ps.ListenAndServe() }()

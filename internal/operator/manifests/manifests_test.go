@@ -3,12 +3,15 @@ package manifests
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -111,6 +114,67 @@ func TestForgejoConfig(t *testing.T) {
 	if strings.Count(s, "/etc/ssl/certs:/etc/swarm/ca") != 2 || strings.Count(s, "mountPath: /etc/swarm/ca") != 2 ||
 		!strings.Contains(s, "name: platform-ca-bundle") {
 		t.Error("forgejo does not trust the platform CA")
+	}
+}
+
+// TestSentry: with a DSN, messaging, the warden and egress get SENTRY_* (the
+// DSN from Secret sentry) and a pod annotation that changes with it; without
+// one (testValues, the goldens) nothing about Sentry is rendered.
+func TestSentry(t *testing.T) {
+	v := testValues()
+	v.Sentry = SentryValues{Hash: "abc", Environment: "prod", TracesSampleRate: "0.25"}
+	for _, name := range []string{Messaging, Gateway, Egress} {
+		objs, err := Render(name, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, o := range objs {
+			var pod corev1.PodTemplateSpec
+			switch o.GetKind() {
+			case "Deployment", "StatefulSet":
+				tmpl, _, _ := unstructured.NestedMap(o.Object, "spec", "template")
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(tmpl, &pod); err != nil {
+					t.Fatal(err)
+				}
+			default:
+				continue
+			}
+			if o.GetName() == "litellm" {
+				if strings.Contains(fmt.Sprint(pod.Spec.Containers[0].Env), "SENTRY") {
+					t.Error("LiteLLM got SENTRY_*")
+				}
+				continue
+			}
+			found = true
+			env := map[string]corev1.EnvVar{}
+			for _, e := range pod.Spec.Containers[0].Env {
+				env[e.Name] = e
+			}
+			ref := env["SENTRY_DSN"].ValueFrom
+			if ref == nil || ref.SecretKeyRef == nil || ref.SecretKeyRef.Name != SentrySecret || ref.SecretKeyRef.Key != "dsn" ||
+				ref.SecretKeyRef.Optional == nil || !*ref.SecretKeyRef.Optional {
+				t.Errorf("%s: SENTRY_DSN %+v", o.GetName(), env["SENTRY_DSN"])
+			}
+			if env["SENTRY_ENVIRONMENT"].Value != "prod" || env["SENTRY_TRACES_SAMPLE_RATE"].Value != "0.25" ||
+				pod.Annotations["swarmageddon.dev/sentry"] != "abc" {
+				t.Errorf("%s: env %v, annotations %v", o.GetName(), env, pod.Annotations)
+			}
+			if name == Messaging && env["POD_NAME"].ValueFrom == nil {
+				t.Error("messaging lost POD_NAME")
+			}
+		}
+		if !found {
+			t.Errorf("%s: no workload", name)
+		}
+		off, err := Render(name, testValues())
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := yaml.Marshal(off)
+		if s := string(b); strings.Contains(s, "SENTRY") || strings.Contains(s, "swarmageddon.dev/sentry") {
+			t.Errorf("%s renders Sentry settings without a DSN", name)
+		}
 	}
 }
 

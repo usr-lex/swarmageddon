@@ -81,6 +81,7 @@ spec:
   template:
     metadata:
       labels: {swarmageddon.dev/component: messaging, app.kubernetes.io/name: messaging}
+{{- template "sentry-annotations" . }}
     spec:
       serviceAccountName: messaging
       enableServiceLinks: false
@@ -112,6 +113,7 @@ spec:
           env:
             - name: POD_NAME
               valueFrom: {fieldRef: {fieldPath: metadata.name}}
+{{- if .Sentry.Hash }}{{ template "sentry-env" . }}{{ end }}
           ports:
             - {name: api, containerPort: 8443}
             - {name: nats-route, containerPort: 6222}

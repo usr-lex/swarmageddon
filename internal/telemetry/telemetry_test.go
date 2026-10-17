@@ -202,6 +202,38 @@ func TestSecretsNeverReachTheTransport(t *testing.T) {
 	}
 }
 
+// TestSentryHTTPTransport runs Sentry's own transport (the one production
+// uses) against a fake Sentry: an event and a log record arrive, redacted.
+func TestSentryHTTPTransport(t *testing.T) {
+	const secret = "sk-http-0123456789abcdef"
+	var mu sync.Mutex
+	var got bytes.Buffer
+	sentrySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got.Write(b)
+		mu.Unlock()
+	}))
+	defer sentrySrv.Close()
+	u, _ := url.Parse(sentrySrv.URL)
+	if err := start("test", Config{DSN: "http://public@" + u.Host + "/1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { enabled.Store(false) })
+	redact.Add(secret)
+	log := slog.New(LogHandler(slog.NewJSONHandler(io.Discard, nil)))
+	log.Error("over http", "err", errors.New("key "+secret), "detail", secret)
+	if !sentry.Flush(5 * time.Second) {
+		t.Fatal("flush timed out")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	s := got.String()
+	if strings.Contains(s, secret) || !strings.Contains(s, "key [redacted]") || !strings.Contains(s, `"body":"over http"`) {
+		t.Fatalf("sent:\n%s", s)
+	}
+}
+
 func TestLogEvents(t *testing.T) {
 	tr := capture(t, 0)
 	var buf bytes.Buffer

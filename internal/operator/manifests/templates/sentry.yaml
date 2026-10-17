@@ -1,0 +1,17 @@
+{{- /*
+Error reporting for messaging, the warden and egress (docs/conventions.md):
+named templates the services' manifests use when .Sentry.Hash is set. The
+DSN comes from Secret sentry, which the operator copies here. This file
+renders nothing itself.
+*/ -}}
+{{- define "sentry-annotations" }}
+{{- if .Sentry.Hash }}
+      annotations: {swarmageddon.dev/sentry: {{ .Sentry.Hash }}}
+{{- end }}
+{{- end }}
+{{- define "sentry-env" }}
+            - name: SENTRY_DSN
+              valueFrom: {secretKeyRef: {name: sentry, key: dsn, optional: true}}
+            - {name: SENTRY_ENVIRONMENT, value: {{ quote .Sentry.Environment }}}
+            - {name: SENTRY_TRACES_SAMPLE_RATE, value: {{ quote .Sentry.TracesSampleRate }}}
+{{- end }}

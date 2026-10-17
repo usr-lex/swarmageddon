@@ -18,6 +18,9 @@ spec:
       labels:
         {{- include "swarmageddon.labels" . | nindent 8 }}
         app.kubernetes.io/name: swarmageddon-operator
+      {{- with include "swarmageddon.sentryAnnotations" . }}
+      {{- . | nindent 6 }}
+      {{- end }}
     spec:
       serviceAccountName: swarmageddon-operator
       enableServiceLinks: false
@@ -48,6 +51,9 @@ spec:
               value: {{ .Values.image.registry | quote }}
             - name: IMAGE_TAG
               value: {{ default .Chart.AppVersion .Values.image.tag | quote }}
+            {{- with include "swarmageddon.sentryEnv" . }}
+            {{- . | nindent 12 }}
+            {{- end }}
           ports:
             - name: metrics
               containerPort: 8080

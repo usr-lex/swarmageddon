@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1/messagingv1connect"
@@ -24,14 +25,21 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/messaging/server"
 	"github.com/usr-lex/swarmageddon/internal/messaging/store"
 	"github.com/usr-lex/swarmageddon/internal/redact"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
 func main() {
+	flush, terr := telemetry.Init("messaging")
+	if terr != nil {
+		slog.Warn("error reporting is off", "err", terr)
+	}
 	if err := run(); err != nil {
 		slog.Error("messaging", "err", err)
+		flush()
 		os.Exit(1)
 	}
+	flush()
 }
 
 func run() error {
@@ -57,7 +65,7 @@ func run() error {
 		fmt.Println(version.Version)
 		return nil
 	}
-	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
+	log := slog.New(redact.NewHandler(telemetry.LogHandler(slog.NewJSONHandler(os.Stderr, nil)), nil))
 	slog.SetDefault(log)
 	log.Info("starting", "version", version.Version, "server", *serverName, "namespace", *namespace)
 
@@ -134,10 +142,10 @@ func run() error {
 
 	// API.
 	mux := http.NewServeMux()
-	mux.Handle(messagingv1connect.NewMessagingServiceHandler(srv))
+	mux.Handle(messagingv1connect.NewMessagingServiceHandler(srv, connect.WithInterceptors(telemetry.Connect())))
 	reqCtx, cancelRequests := context.WithCancel(context.Background())
 	defer cancelRequests()
-	api := &http.Server{Addr: *listen, Handler: server.Identify(mux, *devInsecure), ReadHeaderTimeout: 10 * time.Second,
+	api := &http.Server{Addr: *listen, Handler: telemetry.Handler(server.Identify(mux, *devInsecure)), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return reqCtx }}
 	if *devInsecure {
 		log.Warn("--dev-insecure: no TLS, identities taken from a header; never use this in a cluster")

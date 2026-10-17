@@ -84,6 +84,22 @@ type Values struct {
 	Ntfy      NtfyValues
 	Ingress   IngressValues
 	Devices   DevicesValues
+	// Sentry is messaging's, the warden's and egress's error reporting
+	// (templates/sentry.yaml); the zero value is off.
+	Sentry SentryValues
+}
+
+// SentrySecret is the Secret in the platform namespace with the services'
+// Sentry DSN (key dsn), a copy of the operator's.
+const SentrySecret = "sentry"
+
+// SentryValues set SENTRY_* in the services that report. With Hash empty,
+// the templates render as if this didn't exist.
+type SentryValues struct {
+	// Hash of the DSN, a pod annotation, so a new DSN rolls the pods.
+	Hash             string
+	Environment      string
+	TracesSampleRate string
 }
 
 type DevicesValues struct {

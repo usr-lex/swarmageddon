@@ -9,7 +9,10 @@ import (
 	"os"
 	"time"
 
+	uberzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/clock"
@@ -29,6 +32,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/operator/runnerpool"
 	"github.com/usr-lex/swarmageddon/internal/operator/workspace"
 	"github.com/usr-lex/swarmageddon/internal/pki"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
@@ -55,12 +59,23 @@ func main() {
 		fmt.Println(version.Version)
 		return
 	}
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	flush, terr := telemetry.Init("operator")
+	// Error entries become Sentry events, and panicking reconciles (which
+	// controller-runtime recovers) are reported with their stack.
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts), zap.RawZapOpts(uberzap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		return zapcore.NewTee(c, telemetry.ZapCore(c))
+	}))))
+	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, telemetry.RecoverPanic)
 	log := ctrl.Log.WithName("setup")
+	if terr != nil {
+		log.Error(terr, "error reporting is off")
+	}
 	if err := run(*metricsAddr, *probeAddr, *leaderElect, *imagesFrom, *roomImage); err != nil {
 		log.Error(err, "operator failed")
+		flush()
 		os.Exit(1)
 	}
+	flush()
 }
 
 func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage string) error {
@@ -127,6 +142,8 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 		CAStore:      store,
 		Pinned:       imgs,
 		Version:      version.Version,
+		// The platform services report with the operator's settings.
+		Sentry: telemetry.Current(),
 	}
 	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs}
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {

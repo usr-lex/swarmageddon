@@ -6,6 +6,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -31,6 +32,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/spend"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/store"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/terminal"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/web"
 )
 
@@ -41,6 +43,8 @@ type Config struct {
 	PublicURL string
 	Dev       bool
 	ForgeURL  string // Forgejo's in-cluster URL, for permission checks
+	// Sentry is what the web UI reports errors with; nil: it doesn't.
+	Sentry *telemetry.BrowserConfig
 }
 
 // Server holds every component the API uses.
@@ -79,7 +83,7 @@ func (s *Server) SetDB(db *store.Store) { s.db.Store(db) }
 // Handler builds the HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	opts := []connect.HandlerOption{connect.WithInterceptors(errorLogger(s.Log))}
+	opts := []connect.HandlerOption{connect.WithInterceptors(errorLogger(s.Log), telemetry.Connect())}
 	add := func(p string, h http.Handler) { mux.Handle("/api"+p, http.StripPrefix("/api", h)) }
 	add(controlcenterv1connect.NewSetupServiceHandler(setupSvc{s}, opts...))
 	add(controlcenterv1connect.NewAuthServiceHandler(authSvc{s}, opts...))
@@ -117,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/hooks/forgejo/", s.forgeHook())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.HandleFunc("/readyz", s.ready)
+	mux.HandleFunc("GET /client-config.json", s.clientConfig)
 	mux.Handle("/", spa())
 	return s.withPrincipal(s.csrf(securityHeaders(mux)))
 }
@@ -229,6 +234,16 @@ func (s *Server) sameOrigin(r *http.Request) bool {
 		}
 	}
 	return false
+}
+
+// clientConfig tells the web UI how to start: {"sentry": {...}} when it
+// reports errors, else {}. A DSN is a public key, meant for browsers.
+func (s *Server) clientConfig(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	_ = json.NewEncoder(w).Encode(struct {
+		Sentry *telemetry.BrowserConfig `json:"sentry,omitempty"`
+	}{s.Cfg.Sentry})
 }
 
 // spa serves the embedded UI; unknown paths get index.html.
