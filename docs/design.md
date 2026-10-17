@@ -1435,6 +1435,18 @@ install if policies aren't enforced, rather than pretending they are.
 - Agents socially engineering each other within what policy allows. Mediated
   links and the audit log are the controls.
 
+### 11.6 Error reporting
+
+Optional and off by default. With a Sentry DSN in the chart
+(`sentry.dsn` or `sentry.existingSecret`), the operator, the control center
+and its UI, messaging, the warden and egress send errors, logs and sampled
+traces to Sentry. The §11.4 redaction list runs over everything before it
+leaves the process. Credential and `x-swarm-*` headers, cookies and request
+bodies are never sent, and the browser has no session replay. Rooms and
+runners never report: a room holds only its own identity, so a DSN there
+would be a credential shared by every room, and rooms usually have no
+internet.
+
 ## 12. Disk hygiene
 
 The lesson: a 126 GB disk filled quietly. So:
