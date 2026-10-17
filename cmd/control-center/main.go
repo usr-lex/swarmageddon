@@ -33,6 +33,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/spend"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/store"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/terminal"
+	"github.com/usr-lex/swarmageddon/internal/forgejo"
 	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/version"
 
@@ -165,7 +166,24 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 		}
 		return vapid
 	}}
-	srv.Tracker = notify.NewTracker(srv.Notify, nil) // forge open-work check: TODO
+	// idleWithOpenWork: open issues and pull requests assigned in Forgejo,
+	// read with the read-only forge-reader token.
+	srv.Tracker = notify.NewTracker(srv.Notify, &notify.ForgeOpenWork{
+		Forge: func(ctx context.Context) (*forgejo.Client, error) {
+			d, err := kc.GetSecret(ctx, k8s.SecretForgeReader)
+			if err != nil {
+				return nil, err
+			}
+			return forgejo.New(o.forgeURL, string(d["token"])), nil
+		},
+		Org: func(ctx context.Context, ws string) (string, error) {
+			w, err := kc.Workspace(ctx, ws)
+			if err != nil {
+				return "", err
+			}
+			return w.Spec.Forge.Org, nil
+		},
+	})
 	srv.Tracker.NodeDisk = kc.NodeDiskLow
 
 	// Spend.

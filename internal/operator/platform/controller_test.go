@@ -266,7 +266,7 @@ func TestPlatformReconcile(t *testing.T) {
 	if s := secret(sys, "forge-reader"); s == nil || !strings.HasPrefix(string(s.Data["token"]), "tok-swarmageddon-reader-") {
 		t.Fatal("forge-reader missing")
 	}
-	if strings.Join(*scopes, "|") != "all|read:admin,read:repository,read:organization,read:user" {
+	if strings.Join(*scopes, "|") != "all|read:admin,read:repository,read:organization,read:user,read:issue" {
 		t.Fatalf("scopes %v", *scopes)
 	}
 	if !stsExists("messaging") || secret(v1alpha1.PlatformNamespace, "messaging-tls") == nil {
