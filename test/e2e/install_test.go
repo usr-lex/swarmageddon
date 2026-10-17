@@ -369,13 +369,35 @@ func (s *suite) services(t *testing.T) {
 	if !res.GetPlatform().GetServices().GetApproved() {
 		t.Error("UpdateServices: services not approved in the returned Platform")
 	}
-	s.eventually(t, 25*time.Minute, "platform services ready", func() error {
-		gp, err := call(s.cc.platform.GetPlatform, &ccv1.GetPlatformRequest{})
-		if err != nil {
-			return err
+	// The services come up in order, each waiting for the one before (§3.4).
+	for i := range serviceConditions {
+		s.eventually(t, 15*time.Minute, serviceConditions[i], func() error {
+			gp, err := call(s.cc.platform.GetPlatform, &ccv1.GetPlatformRequest{})
+			if err != nil {
+				return err
+			}
+			return notTrue(gp.GetPlatform().GetStatus().GetConditions(), serviceConditions[:i+1]...)
+		})
+		t.Logf("%s after %s", serviceConditions[i], time.Since(s.start).Round(time.Second))
+		if serviceConditions[i] == "PostgresReady" {
+			s.database(t)
 		}
-		return notTrue(gp.GetPlatform().GetStatus().GetConditions(), serviceConditions...)
-	})
+	}
+	lm, err := call(s.cc.workspaces.ListModels, &ccv1.ListModelsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range models {
+		if !slices.Contains(lm.GetModels(), m) {
+			t.Errorf("ListModels: %v, missing %s", lm.GetModels(), m)
+		}
+	}
+}
+
+// database waits for the control center to use PostgreSQL, and checks the
+// session that started before it carries over to a stored user (§8.1).
+func (s *suite) database(t *testing.T) {
+	t.Helper()
 	s.eventually(t, 5*time.Minute, "the control center connects to PostgreSQL", func() error {
 		st, err := call(s.cc.setup.GetSetupStatus, &ccv1.GetSetupStatusRequest{})
 		if err != nil {
@@ -386,16 +408,6 @@ func (s *suite) services(t *testing.T) {
 		}
 		return nil
 	})
-	lm, err := call(s.cc.workspaces.ListModels, &ccv1.ListModelsRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, m := range models {
-		if !slices.Contains(lm.GetModels(), m) {
-			t.Errorf("ListModels: %v, missing %s", lm.GetModels(), m)
-		}
-	}
-	// The session started before PostgreSQL; it must carry over (§8.1).
 	if me, err := call(s.cc.auth.GetMe, &ccv1.GetMeRequest{}); err != nil || me.GetUser().GetId() == "" {
 		t.Errorf("GetMe once the database is up: %v, %v; want a stored user", me.GetUser(), err)
 	}
