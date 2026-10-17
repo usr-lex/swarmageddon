@@ -34,8 +34,8 @@ type WorkspaceSpec struct {
 	// SharedVolumes are ReadWriteMany volumes shared between rooms.
 	// +optional
 	SharedVolumes []SharedVolume `json:"sharedVolumes,omitempty"`
-	// Deprecated: use roomDefaults.network. false is the same as network mode none.
-	// +kubebuilder:default=true
+	// Deprecated: use roomDefaults.network. false is the same as network
+	// mode none; unset is true. No CRD default, so the wizard can clear it.
 	// +optional
 	Internet *bool `json:"internet,omitempty"`
 	// AllowedCIDRs rooms may reach even inside denied ranges (e.g. a model server on the LAN).

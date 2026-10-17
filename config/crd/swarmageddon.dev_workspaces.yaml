@@ -138,9 +138,9 @@ spec:
                   type: object
                 type: array
               internet:
-                default: true
-                description: 'Deprecated: use roomDefaults.network. false is the same
-                  as network mode none.'
+                description: |-
+                  Deprecated: use roomDefaults.network. false is the same as network
+                  mode none; unset is true. No CRD default, so the wizard can clear it.
                 type: boolean
               isolationTier:
                 default: inherit
