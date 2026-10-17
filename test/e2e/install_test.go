@@ -66,7 +66,8 @@ func (s *suite) install(t *testing.T) {
 		}
 		return nil
 	})
-	if p.Status.AdminClaimed {
+	reset := p.Status.AdminClaimed
+	if reset {
 		// A second run on the same cluster: recover the way §3.3 documents,
 		// `kubectl annotate platform default swarmageddon.dev/reset-setup-token=now`.
 		t.Log("admin is already claimed (an earlier run); asking for a new setup token")
@@ -98,7 +99,7 @@ func (s *suite) install(t *testing.T) {
 		return nil
 	})
 	if out, err := s.kc("-n", v1.SystemNamespace, "logs", "job/welcome"); err == nil {
-		if m := regexp.MustCompile(`Setup token:\s+(\S+)`).FindStringSubmatch(out); m != nil && m[1] != s.token && !strings.Contains(out, "already set up") {
+		if m := regexp.MustCompile(`Setup token:\s+(\S+)`).FindStringSubmatch(out); m != nil && m[1] != s.token && !reset {
 			t.Errorf("the welcome Job printed a different setup token than Secret setup-token holds")
 		}
 		if !strings.Contains(out, p.Status.CAFingerprint) {
