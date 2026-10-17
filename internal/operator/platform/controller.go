@@ -233,6 +233,9 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		setCond(p, ConditionExposed, false, "Error", err.Error())
 		return result, err
 	}
+	if err := r.limitControlCenterIngress(ctx, p); err != nil {
+		return result, err
+	}
 
 	if err := r.setupToken(ctx, logger, p); err != nil {
 		return result, err
@@ -411,14 +414,21 @@ func (r *Reconciler) expose(ctx context.Context, p *v1alpha1.Platform) error {
 				}
 			}
 		}
+		note, err := r.traefikDefaultCert(ctx, p)
+		if err != nil {
+			return err
+		}
 		p.Status.URL = "https://" + host + "/"
-		setCond(p, ConditionExposed, true, "Ingress", "IngressClass "+class+"; or "+portForward)
+		setCond(p, ConditionExposed, true, "Ingress", "IngressClass "+class+"; or "+portForward+note)
 		return nil
 	}
 
 	// No default IngressClass: drop our Ingress and use a NodePort.
 	ing := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Namespace: sys, Name: "control-center"}}
 	if err := r.Delete(ctx, ing); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if err := r.removeTraefikDefaultCert(ctx); err != nil {
 		return err
 	}
 	if svcErr != nil {

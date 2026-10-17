@@ -285,6 +285,7 @@ func (r *Reconciler) applyGateway(ctx context.Context, p *v1alpha1.Platform, v m
 	ready := lAvail >= 1 && wAvail >= 1
 	if ready {
 		r.ensureWardenReviewKey(ctx, p)
+		r.ensureControlCenterGatewayKey(ctx, p)
 	}
 	return ready, msg, nil
 }

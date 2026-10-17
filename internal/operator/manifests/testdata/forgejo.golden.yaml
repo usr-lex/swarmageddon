@@ -120,6 +120,8 @@ spec:
           value: private
         - name: FORGEJO__log__LEVEL
           value: Info
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs:/etc/swarm/ca
         image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
         livenessProbe:
           httpGet:
@@ -154,6 +156,9 @@ spec:
           name: data
         - mountPath: /tmp/gitea
           name: tmp
+        - mountPath: /etc/swarm/ca
+          name: ca
+          readOnly: true
       enableServiceLinks: false
       initContainers:
       - args:
@@ -235,6 +240,8 @@ spec:
           value: private
         - name: FORGEJO__log__LEVEL
           value: Info
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs:/etc/swarm/ca
         image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
         name: admin
         securityContext:
@@ -247,6 +254,9 @@ spec:
           name: data
         - mountPath: /tmp/gitea
           name: tmp
+        - mountPath: /etc/swarm/ca
+          name: ca
+          readOnly: true
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -257,6 +267,9 @@ spec:
       volumes:
       - emptyDir: {}
         name: tmp
+      - configMap:
+          name: platform-ca-bundle
+        name: ca
   volumeClaimTemplates:
   - metadata:
       name: data

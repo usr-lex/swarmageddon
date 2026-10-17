@@ -101,6 +101,7 @@ type KeyRequest struct {
 	MaxBudget      *float64          `json:"max_budget,omitempty"`
 	BudgetDuration string            `json:"budget_duration,omitempty"`
 	TeamID         string            `json:"team_id,omitempty"`
+	UserID         string            `json:"user_id,omitempty"`
 	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 

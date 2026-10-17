@@ -255,7 +255,7 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 			}},
 			Type: corev1.SecretTypeOpaque,
 		},
-		controlCenterRole(ns),
+		ControlCenterRole(ns),
 		&rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "control-center", Namespace: ns},
 			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "control-center"},
@@ -265,8 +265,8 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 	return a.ApplyAll(ctx, w, objs)
 }
 
-// controlCenterRole is the control center's access in a workspace (design §11.3).
-func controlCenterRole(ns string) *rbacv1.Role {
+// ControlCenterRole is the control center's access in a workspace (design §11.3).
+func ControlCenterRole(ns string) *rbacv1.Role {
 	rw := []string{"get", "list", "watch", "create", "update", "patch", "delete"}
 	read := []string{"get", "list", "watch"}
 	return &rbacv1.Role{

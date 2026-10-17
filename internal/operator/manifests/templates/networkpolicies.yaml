@@ -1,6 +1,8 @@
 # Ingress rules for the platform namespace. Only workspaces (rooms and
 # runners) and the system namespace (operator, control center) reach the
-# services they use; NATS routes only connect messaging pods.
+# services they use, plus the platform's own clients (Forgejo and LiteLLM
+# to PostgreSQL, the warden to LiteLLM and messaging); NATS routes only
+# connect messaging pods.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -55,12 +57,15 @@ spec:
     matchLabels: {swarmageddon.dev/component: messaging}
   policyTypes: [Ingress]
   ingress:
+    # Rooms, the operator and control center, and the warden (ReportVerdict).
     - ports: [{port: 8443, protocol: TCP}]
       from:
         - namespaceSelector:
             matchExpressions: [{key: swarmageddon.dev/workspace, operator: Exists}]
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: {{ .SystemNamespace }}}
+        - podSelector:
+            matchLabels: {swarmageddon.dev/component: warden}
     - ports: [{port: 8080, protocol: TCP}]
       from:
         - namespaceSelector:

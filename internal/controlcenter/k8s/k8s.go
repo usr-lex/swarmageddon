@@ -40,24 +40,10 @@ const (
 	SecretForgeWebhookPrefix = "forge-webhook-"         // + workspace: key secret (HMAC for /hooks/forgejo/<ws>)
 )
 
-// Prefixes of Secrets the control center writes for the wizard, all in the
-// system namespace.
-var secretPrefixes = []string{"gateway-provider-", "oidc-", "notify-", "forge-webhook-"}
-
 // AllowedSecret reports whether the control center may touch a Secret of
-// this name in the system namespace.
-func AllowedSecret(name string) bool {
-	switch name {
-	case SecretSetupToken, SecretLocalAdmin, SecretSession, SecretDB, SecretVAPID, SecretSAML, SecretGateway, SecretForgeReader:
-		return true
-	}
-	for _, p := range secretPrefixes {
-		if strings.HasPrefix(name, p) && len(name) > len(p) {
-			return true
-		}
-	}
-	return false
-}
+// this name in the system namespace: v1alpha1.ControlCenterSecret, the
+// list the chart and the operator grant from.
+func AllowedSecret(name string) bool { return v1alpha1.ControlCenterSecret(name) }
 
 // ErrSecretNotAllowed is returned for Secrets outside AllowedSecret.
 var ErrSecretNotAllowed = errors.New("the control center may not access this Secret")
@@ -110,28 +96,26 @@ func (c *Client) GetSecret(ctx context.Context, name string) (map[string][]byte,
 	return s.Data, nil
 }
 
-// ApplySecret creates or replaces an allowed Secret's data.
+// ApplySecret creates or replaces an allowed Secret's data. It creates
+// first, since a Secret the operator hasn't granted yet can't be read
+// (granted.go).
 func (c *Client) ApplySecret(ctx context.Context, name string, data map[string][]byte) error {
 	if !AllowedSecret(name) {
 		return ErrSecretNotAllowed
 	}
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var s corev1.Secret
-		err := c.C.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: name}, &s)
-		if apierrors.IsNotFound(err) {
-			s = corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: c.Namespace,
-					Labels: map[string]string{v1alpha1.LabelComponent: "control-center"}},
-				Type: corev1.SecretTypeOpaque,
-				Data: data,
+	err := c.C.Create(ctx, c.ownedSecret(name, data))
+	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return whenGranted(func() error {
+		return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var s corev1.Secret
+			if err := c.C.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: name}, &s); err != nil {
+				return err
 			}
-			return c.C.Create(ctx, &s)
-		}
-		if err != nil {
-			return err
-		}
-		s.Data = data
-		return c.C.Update(ctx, &s)
+			s.Data = data
+			return c.C.Update(ctx, &s)
+		})
 	})
 }
 
@@ -141,15 +125,14 @@ func (c *Client) CreateSecretIfMissing(ctx context.Context, name string, data ma
 	if !AllowedSecret(name) {
 		return nil, ErrSecretNotAllowed
 	}
-	s := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: c.Namespace,
-			Labels: map[string]string{v1alpha1.LabelComponent: "control-center"}},
-		Type: corev1.SecretTypeOpaque,
-		Data: data,
-	}
-	err := c.C.Create(ctx, &s)
+	err := c.C.Create(ctx, c.ownedSecret(name, data))
 	if apierrors.IsAlreadyExists(err) {
-		return c.GetSecret(ctx, name)
+		var stored map[string][]byte
+		err := whenGranted(func() (err error) {
+			stored, err = c.GetSecret(ctx, name)
+			return err
+		})
+		return stored, err
 	}
 	if err != nil {
 		return nil, err
@@ -157,30 +140,38 @@ func (c *Client) CreateSecretIfMissing(ctx context.Context, name string, data ma
 	return data, nil
 }
 
+// ErrConfigMapNotAllowed is returned for ConfigMaps outside
+// v1alpha1.ControlCenterConfigMap.
+var ErrConfigMapNotAllowed = errors.New("the control center may not access this ConfigMap")
+
 // ApplyConfigMap creates or replaces a ConfigMap in the system namespace
-// (used for pasted SAML IdP metadata, saml-<provider>).
+// (used for pasted SAML IdP metadata, saml-<provider>). Like ApplySecret,
+// it creates first.
 func (c *Client) ApplyConfigMap(ctx context.Context, name string, data map[string]string) error {
-	if !strings.HasPrefix(name, "saml-") {
+	if !v1alpha1.ControlCenterPrefixedConfigMap(name) {
 		return errors.New("the control center only writes saml-* ConfigMaps")
 	}
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var cm corev1.ConfigMap
-		err := c.C.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: name}, &cm)
-		if apierrors.IsNotFound(err) {
-			cm = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: c.Namespace,
-				Labels: map[string]string{v1alpha1.LabelComponent: "control-center"}}, Data: data}
-			return c.C.Create(ctx, &cm)
-		}
-		if err != nil {
-			return err
-		}
-		cm.Data = data
-		return c.C.Update(ctx, &cm)
+	err := c.C.Create(ctx, c.ownedConfigMap(name, data))
+	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return whenGranted(func() error {
+		return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var cm corev1.ConfigMap
+			if err := c.C.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: name}, &cm); err != nil {
+				return err
+			}
+			cm.Data = data
+			return c.C.Update(ctx, &cm)
+		})
 	})
 }
 
-// GetConfigMap reads a ConfigMap in the system namespace.
+// GetConfigMap reads an allowed ConfigMap in the system namespace.
 func (c *Client) GetConfigMap(ctx context.Context, name string) (map[string]string, error) {
+	if !v1alpha1.ControlCenterConfigMap(name) {
+		return nil, ErrConfigMapNotAllowed
+	}
 	var cm corev1.ConfigMap
 	if err := c.C.Get(ctx, types.NamespacedName{Namespace: c.Namespace, Name: name}, &cm); err != nil {
 		return nil, err

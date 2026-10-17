@@ -126,6 +126,9 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {
 		return fmt.Errorf("platform controller: %w", err)
 	}
+	if err := platform.SetupControlCenterAccess(mgr, d); err != nil {
+		return fmt.Errorf("control center access controller: %w", err)
+	}
 	if err := workspace.SetupWithManager(mgr, d); err != nil {
 		return fmt.Errorf("workspace controller: %w", err)
 	}
