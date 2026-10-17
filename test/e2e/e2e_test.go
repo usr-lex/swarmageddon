@@ -61,5 +61,7 @@ func TestPlatform(t *testing.T) {
 	s.step("quarantine and release", rooms, s.quarantine)
 	s.step("observatory edges", []string{"message claude to ore", "message person to agent", "crossing over a mediated link"}, s.observatory)
 
+	// Last, since rooms don't need it and it's slowest to come up.
+	s.step("registry cache", []string{"platform services"}, s.registryCache)
 	s.step("no secret in any log", []string{"install"}, s.noSecretsInLogs)
 }

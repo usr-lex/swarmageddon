@@ -351,8 +351,10 @@ func logChecks(t *testing.T, what string, st *ccv1.PlatformStatus) {
 	t.Logf("%s: tier %q, room estimate %d:%s", what, st.GetTier(), st.GetRoomEstimate(), b.String())
 }
 
-// serviceConditions are the platform services the wizard waits for (§3.4).
-var serviceConditions = []string{"PostgresReady", "ForgejoReady", "MessagingReady", "GatewayReady", "EgressReady", "RegistryCacheReady"}
+// serviceConditions are the platform services rooms need, in the order the
+// operator brings them up (§3.4). The registry cache comes last and has its
+// own step: rooms work without it.
+var serviceConditions = []string{"PostgresReady", "ForgejoReady", "MessagingReady", "GatewayReady", "EgressReady"}
 
 // services adds the mock model as a provider and approves the services, as
 // the wizard's services step does, then waits for them through the API.
@@ -392,6 +394,18 @@ func (s *suite) services(t *testing.T) {
 			t.Errorf("ListModels: %v, missing %s", lm.GetModels(), m)
 		}
 	}
+}
+
+// registryCache waits for the pull-through cache, the last service, and for
+// the Platform to report Ready.
+func (s *suite) registryCache(t *testing.T) {
+	s.eventually(t, 5*time.Minute, "RegistryCacheReady and Ready", func() error {
+		gp, err := call(s.cc.platform.GetPlatform, &ccv1.GetPlatformRequest{})
+		if err != nil {
+			return err
+		}
+		return notTrue(gp.GetPlatform().GetStatus().GetConditions(), "RegistryCacheReady", "Ready")
+	})
 }
 
 // database waits for the control center to use PostgreSQL, and checks the
