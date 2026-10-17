@@ -105,6 +105,9 @@ func (s *suite) install(t *testing.T) {
 		if !strings.Contains(out, p.Status.CAFingerprint) {
 			t.Errorf("the welcome Job doesn't print the CA fingerprint %s:\n%s", p.Status.CAFingerprint, clip(out))
 		}
+		if m := regexp.MustCompile(`Open:\s+(\S+)`).FindStringSubmatch(out); m == nil || m[1] != p.Status.URL {
+			t.Errorf("the welcome Job printed a URL other than status.url %s:\n%s", p.Status.URL, clip(out))
+		}
 	} else {
 		t.Logf("welcome Job log not available (it may have expired): %s", clip(out))
 	}
