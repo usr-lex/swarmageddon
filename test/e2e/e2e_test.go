@@ -35,6 +35,7 @@ func TestPlatform(t *testing.T) {
 	s.step("preflight checks", []string{"preflight and isolation"}, s.preflightChecks)
 	s.step("platform services", []string{"preflight and isolation"}, s.services)
 	s.step("workspace wizard", []string{"platform services"}, s.workspace)
+	s.step("wizard re-run changes nothing", []string{"workspace wizard"}, s.rerunWizard)
 	s.step("rooms run", []string{"workspace wizard"}, s.roomsRun)
 
 	rooms := []string{"rooms run"}
