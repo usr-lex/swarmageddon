@@ -16,6 +16,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
 	"github.com/usr-lex/swarmageddon/internal/devices"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 )
 
 func main() {
@@ -23,7 +24,12 @@ func main() {
 	hostRoot := flag.String("host-root", "", "where the host's /dev is mounted, as <host-root>/dev (empty: this container's /dev is the host's)")
 	units := flag.Int("units", devices.DefaultUnits, "units advertised per resource")
 	flag.Parse()
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	flush, terr := telemetry.Init("devices")
+	defer flush()
+	log := slog.New(telemetry.LogHandler(slog.NewJSONHandler(os.Stderr, nil)))
+	if terr != nil {
+		log.Warn("error reporting is off", "err", terr)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

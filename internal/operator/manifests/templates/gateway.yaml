@@ -167,6 +167,7 @@ spec:
   template:
     metadata:
       labels: {swarmageddon.dev/component: warden, app.kubernetes.io/name: gateway}
+{{- template "sentry-annotations" . }}
     spec:
       serviceAccountName: warden
       enableServiceLinks: false
@@ -192,6 +193,9 @@ spec:
             - --client-key=/etc/warden/tls/tls.key
             - --ca=/etc/warden/tls/ca.crt
             - --review-key-file=/etc/warden/review/key
+{{- if .Sentry.Hash }}
+          env:{{ template "sentry-env" . }}
+{{- end }}
           ports:
             - {name: http, containerPort: 4000}
             - {name: health, containerPort: 8080}

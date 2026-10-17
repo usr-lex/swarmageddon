@@ -434,6 +434,21 @@ func TestDocumentedFlows(t *testing.T) {
 	m.check(t, flows)
 }
 
+// TestSentryReachable: the components that report to Sentry (internal/telemetry)
+// reach a SaaS DSN's host on 443 with no policy change. The system
+// namespace and the devices namespace have no egress policies; in the
+// platform namespace only the egress proxy has one, and it already allows
+// 443 anywhere. Rooms and runners don't report, and stay denied.
+func TestSentryReachable(t *testing.T) {
+	m := build(t)
+	var flows []flow
+	for _, c := range []string{"swarmageddon-operator", "control-center", "messaging", "warden", "egress", "devices"} {
+		flows = append(flows, flow{from: c, to: "internet", port: 443, want: true})
+	}
+	flows = append(flows, flow{from: "room-nora", to: "internet", port: 443}, flow{from: "room-lima", to: "internet", port: 443})
+	m.check(t, flows)
+}
+
 // TestNodePortControlCenter: without an IngressClass, clients reach the
 // control center's node port from any address; rooms and runners still don't.
 func TestNodePortControlCenter(t *testing.T) {

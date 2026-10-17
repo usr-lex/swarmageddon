@@ -14,6 +14,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/gateway"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 	"github.com/usr-lex/swarmageddon/internal/pki"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 )
 
 // PKI issues certificates from the platform's internal CA. *pki.CA
@@ -50,6 +51,9 @@ type Deps struct {
 	Pinned images.Images
 	// Version of the operator.
 	Version string
+	// Sentry is the error reporting the platform services get; an empty DSN
+	// turns it off.
+	Sentry telemetry.Config
 }
 
 // ErrNotReady means a platform service isn't deployed or reachable yet;

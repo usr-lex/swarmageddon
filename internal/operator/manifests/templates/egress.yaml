@@ -65,6 +65,7 @@ spec:
   template:
     metadata:
       labels: {swarmageddon.dev/component: egress, app.kubernetes.io/name: egress}
+{{- template "sentry-annotations" . }}
     spec:
       serviceAccountName: egress
       enableServiceLinks: false
@@ -81,6 +82,9 @@ spec:
         - name: egress
           image: {{ .Images.Egress }}
           args: [--listen=:3128, --health=:8080, --namespace={{ .Namespace }}]
+{{- if .Sentry.Hash }}
+          env:{{ template "sentry-env" . }}
+{{- end }}
           ports:
             - {name: proxy, containerPort: 3128}
             - {name: health, containerPort: 8080}

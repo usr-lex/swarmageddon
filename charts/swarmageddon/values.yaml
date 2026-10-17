@@ -40,6 +40,21 @@ controlCenter:
   nodeSelector: {}
   tolerations: []
 
+# Error reporting to Sentry (docs/conventions.md): errors, logs and traces
+# from the operator, the control center (and its web UI), messaging, the
+# warden and the egress proxy, redacted. Off unless a DSN is set; rooms never
+# report.
+sentry:
+  # The project's DSN. The chart keeps it in Secret sentry (key dsn).
+  dsn: ""
+  # Or the name of an existing Secret in this namespace with key dsn. Restart
+  # the operator and control center after changing its value.
+  existingSecret: ""
+  # Sentry's environment, e.g. production.
+  environment: ""
+  # Share of requests traced, 0 to 1; 0 turns tracing off.
+  tracesSampleRate: 0.1
+
 welcome:
   # The Job that prints the URL and setup token for `kubectl apply` users.
   enabled: true

@@ -55,6 +55,7 @@ Change them here first.
 | `ntfy-auth` | platform | `users` (`swarm-admin:<bcrypt>:admin`, ntfy's `NTFY_AUTH_USERS`), `tokens` (`swarm-admin:tk_…:control-center`, `NTFY_AUTH_TOKENS`), `username`, `password`, `token`; made once by the operator when ntfy is enabled |
 | `ntfy-publisher` | system | `token`, `username`, `password`, `url` (`http://ntfy.swarmageddon-platform.svc`): what the control center publishes to ntfy with |
 | `forgejo-tls` | platform | `tls.crt`, `tls.key`, `ca.crt` for `forge.<hostname>` |
+| `sentry` | system, platform | `dsn`, only when error reporting is on (below). System: made by the chart from `sentry.dsn` (or the admin's own, named by `sentry.existingSecret`); platform: the operator's copy of its `SENTRY_DSN`, owned by the Platform and deleted when the DSN is unset |
 | repository credentials | `ws-<ws>` | named by `RepositorySpec.mirrorSecretName` (push mirror) and `importSecretName` (import): `token`, optional `username` (default `oauth2`). Read only by the operator and handed to Forgejo; never mounted in a room. The control center creates each as a new Secret `repo-<repo>-<kind>-<random>` (kind `import` or `mirror`) (label `swarmageddon.dev/component=repo-credential`) and can't read it back |
 | `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
 
@@ -144,6 +145,22 @@ the supervisor sets for the CLI process only, from `gateway_key`.
 | `swarm` | `swarm mcp`, `swarm hook <event>`, `swarm send <to> <msg>`, `swarm agents`, `swarm whoami`, `swarm status <text>`, `swarm post`, `swarm read`, `swarm get`, `swarm mark-read`, `swarm unread`, `swarm channels`, `swarm delivery`, `swarm advise` (see `swarm help`) |
 | `devices` | `--dir /var/lib/kubelet/device-plugins/`, `--host-root` (where the host's `/dev` is mounted as `<root>/dev`), `--units 250`. Runs as root (writes its sockets in kubelet's directory), no capabilities |
 | `mockmodel` | `--listen :9999`, `--script <file>`; serves Anthropic `/v1/messages`, OpenAI `/v1/responses` and `/v1/chat/completions` |
+
+## Error reporting (Sentry)
+
+Off unless a DSN is configured; `internal/telemetry` is the one integration.
+
+| What | Value |
+|---|---|
+| Chart values | `sentry.dsn` (the chart makes Secret `sentry`, key `dsn`), or `sentry.existingSecret` (a Secret in the system namespace with key `dsn`); `sentry.environment`; `sentry.tracesSampleRate` (default 0.1; 0 turns tracing off) |
+| Environment | `SENTRY_DSN` (`secretKeyRef` to Secret `sentry` or the existing one, key `dsn`, `optional: true`), `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`. The chart sets them on the operator and the control center; the operator sets them, with its own values, on messaging, the warden and egress. `devices` and `mockmodel` read them too, but nothing sets them yet. Unset, the manifests are as before |
+| Pod annotation | `swarmageddon.dev/sentry`: a short hash of the DSN, so a new DSN rolls the pods (chart-made Secret and operator-deployed services) |
+| What is sent | errors and panics; slog (the operator: zap) records at Error and above as events, Info and Warn as breadcrumbs, Info and above as Sentry Logs; HTTP and Connect server transactions and outgoing `http.DefaultTransport` spans. Release `swarmageddon@<version>`, server name the pod name (`POD_NAME` or the hostname), tag and log attribute `component` (the binary's name) |
+| Never sent | request bodies, cookies, users, and the headers `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `x-swarm-*`. Everything else passes through the redact registry first (design §11.4) |
+| Sampling | a fixed rate per service: incoming `sentry-trace` headers don't decide it, and only traces whose baggage carries our Sentry organization are continued. Outgoing trace headers go only to `messaging`, `gateway` and `control-center` |
+| Web UI | `GET /client-config.json` on the control center (no sign-in): `{"sentry": {"dsn", "environment", "release", "tracesSampleRate"}}`, or `{}` when off. The UI then loads the SDK; no session replay. The control center sends no Content-Security-Policy, so there is no `connect-src` to extend |
+| Network | the reporting pods already reach port 443 outside the cluster: the system and devices namespaces have no egress policies, and in the platform namespace only egress has one, which allows 443 (`netpoltest` `TestSentryReachable`) |
+| Rooms | never: the supervisor and `swarm` don't use `internal/telemetry`. A room holds only its own identity (design §11.4), and usually has no internet |
 
 ## Images
 

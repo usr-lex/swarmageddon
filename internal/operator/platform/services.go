@@ -97,6 +97,7 @@ func (r *Reconciler) values(ctx context.Context, p *v1alpha1.Platform) (manifest
 	if p.Spec.Hostname != "" {
 		v.Ntfy.BaseURL = "https://ntfy." + p.Spec.Hostname
 	}
+	v.Sentry = sentryValues(r.Deps.Sentry)
 	return v, nil
 }
 

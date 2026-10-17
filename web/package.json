@@ -19,6 +19,7 @@
     "@connectrpc/connect-query": "^2.3.1",
     "@connectrpc/connect-web": "^2.2.0",
     "@novnc/novnc": "1.7",
+    "@sentry/react": "^11.8.0",
     "@tanstack/react-query": "^5.104.3",
     "@tanstack/react-router": "^1.170.44",
     "@xterm/addon-fit": "^0.11.0",

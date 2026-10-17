@@ -43,6 +43,32 @@ Either way, it prints the control center's address and a one-time setup
 token. Everything else happens in the browser. [docs/operations.md](docs/operations.md)
 covers running it.
 
+### Error reporting (Sentry)
+
+Off by default. To send errors, logs and traces to a Sentry project, give the
+chart its DSN:
+
+```sh
+helm upgrade swarmageddon oci://ghcr.io/usr-lex/swarmageddon/charts/swarmageddon \
+  -n swarmageddon-system --reuse-values \
+  --set sentry.dsn=https://<key>@<org>.ingest.sentry.io/<project> \
+  --set sentry.environment=production
+```
+
+Or keep the DSN in your own Secret (key `dsn`) in `swarmageddon-system` and
+set `sentry.existingSecret` to its name; restart the operator and control
+center when you change it. `sentry.tracesSampleRate` (default 0.1) is the
+share of requests traced; 0 turns tracing off. For a `kubectl apply` install,
+render the manifests from the chart with these values (`helm template`, as
+`make install-yaml` does).
+
+The operator, the control center and its web UI, messaging, the warden and
+the egress proxy then report. Rooms never do. Everything sent passes through
+the same redaction as the logs; credential headers and request bodies are
+never sent. The pods reach Sentry on port 443; on an air-gapped cluster, point
+the DSN at a self-hosted Sentry or relay. Details in
+[docs/conventions.md](docs/conventions.md#error-reporting-sentry).
+
 ## Documentation
 
 | | |

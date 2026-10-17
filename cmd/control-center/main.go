@@ -35,6 +35,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/terminal"
 	"github.com/usr-lex/swarmageddon/internal/forgejo"
 	"github.com/usr-lex/swarmageddon/internal/redact"
+	"github.com/usr-lex/swarmageddon/internal/telemetry"
 	"github.com/usr-lex/swarmageddon/internal/version"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -63,15 +64,22 @@ func main() {
 		fmt.Println(version.Version)
 		return
 	}
-	// Secret values the control center reads or writes are redacted (§11.4).
-	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
+	flush, terr := telemetry.Init("control-center")
+	defer flush()
+	// Secret values the control center reads or writes are redacted (§11.4),
+	// in Sentry too.
+	log := slog.New(redact.NewHandler(telemetry.LogHandler(slog.NewJSONHandler(os.Stderr, nil)), nil))
 	slog.SetDefault(log)
+	if terr != nil {
+		log.Warn("error reporting is off", "err", terr)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, log, options{listen: *listen, health: *health, tlsCert: *tlsCert, tlsKey: *tlsKey, msgURL: *msgURL,
 		clientCert: *clientCert, clientKey: *clientKey, ca: *caFile, dev: *dev, publicURL: *publicURL, forgeURL: *forgeURL,
 		gatewayURL: *gatewayURL, ntfyURL: *ntfyURL}); err != nil {
 		log.Error("control center stopped", "err", err)
+		flush()
 		os.Exit(1)
 	}
 }
@@ -117,7 +125,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 	}
 
 	srv := &api.Server{
-		Cfg:      api.Config{PublicURL: o.publicURL, Dev: o.dev, ForgeURL: o.forgeURL},
+		Cfg:      api.Config{PublicURL: o.publicURL, Dev: o.dev, ForgeURL: o.forgeURL, Sentry: telemetry.Browser()},
 		K:        kc,
 		Sessions: sessions,
 		Setup:    auth.NewLimiter(),
@@ -267,7 +275,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 	}
 
 	// HTTP.
-	apiSrv := &http.Server{Addr: o.listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	apiSrv := &http.Server{Addr: o.listen, Handler: telemetry.Handler(srv.Handler()), ReadHeaderTimeout: 10 * time.Second}
 	hs := &http.Server{Addr: o.health, Handler: srv.HealthHandler(), ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 2)
 	go func() { errc <- hs.ListenAndServe() }()
