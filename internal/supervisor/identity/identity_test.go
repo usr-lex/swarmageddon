@@ -75,3 +75,17 @@ func TestInstallAsCurrentUser(t *testing.T) {
 		t.Errorf("tea config:\n%s", tea)
 	}
 }
+
+func TestWriteFileOwnsParentDirs(t *testing.T) {
+	home := t.TempDir()
+	s := Setup{User: &proc.User{Home: home, UID: uint32(os.Getuid()), GID: uint32(os.Getgid())}}
+	path := filepath.Join(home, ".config", "tea", "config.yml")
+	if err := s.writeFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{filepath.Join(home, ".config"), filepath.Join(home, ".config", "tea")} {
+		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+			t.Errorf("%s: %v", d, err)
+		}
+	}
+}

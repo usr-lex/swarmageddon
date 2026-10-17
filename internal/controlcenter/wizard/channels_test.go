@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
 )
 
@@ -48,5 +49,20 @@ func TestDefaultChannels(t *testing.T) {
 	if probs := strings.Join(validateChannels(p), "\n"); !strings.Contains(probs, "selector") || !strings.Contains(probs, "access") ||
 		!strings.Contains(probs, "delivery") || !strings.Contains(probs, "digest interval") || !strings.Contains(probs, "warden") {
 		t.Fatalf("problems:\n%s", probs)
+	}
+}
+
+// A plan with no channels means "the defaults": applying it must not wipe
+// the channels the workspace has (the operator adds the defaults only once).
+func TestApplyChannelsKeepsExistingOnEmptyPlan(t *testing.T) {
+	s := &v1alpha1.WorkspaceSpec{}
+	s.Messaging.Channels = []v1alpha1.ChannelSpec{{Name: "general"}}
+	applyChannels(&ccv1.WorkspacePlan{}, s)
+	if len(s.Messaging.Channels) != 1 || s.Messaging.Channels[0].Name != "general" {
+		t.Fatalf("channels = %+v", s.Messaging.Channels)
+	}
+	applyChannels(&ccv1.WorkspacePlan{Channels: []*ccv1.ChannelPlan{{Name: "ops", Members: []*ccv1.ChannelMemberPlan{{Select: "everyone"}}}}}, s)
+	if len(s.Messaging.Channels) != 1 || s.Messaging.Channels[0].Name != "ops" {
+		t.Fatalf("plan's channels not applied: %+v", s.Messaging.Channels)
 	}
 }

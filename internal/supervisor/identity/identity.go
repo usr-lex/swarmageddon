@@ -127,7 +127,15 @@ func (s Setup) mkdir(dir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	return s.chown(dir)
+	// MkdirAll as root also created the parents (~/.config for
+	// ~/.config/tea): the agent owns everything between home and dir.
+	home := filepath.Clean(s.User.Home)
+	for d := filepath.Clean(dir); d != home && strings.HasPrefix(d, home+string(filepath.Separator)); d = filepath.Dir(d) {
+		if err := s.chown(d); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s Setup) chown(p string) error {

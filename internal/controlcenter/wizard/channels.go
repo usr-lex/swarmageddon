@@ -176,7 +176,12 @@ func AdvisorToPlan(a *v1alpha1.AdvisorSpec) *ccv1.AdvisorPlan {
 
 // applyChannels sets channels, storm and warden settings on a spec.
 func applyChannels(p *ccv1.WorkspacePlan, s *v1alpha1.WorkspaceSpec) {
-	s.Messaging.Channels = nil
+	// A plan without channels means "the defaults" (the proto says so), and
+	// the operator adds those only once: keep what the workspace has rather
+	// than wipe the default channels for good.
+	if len(p.GetChannels()) > 0 {
+		s.Messaging.Channels = nil
+	}
 	for _, c := range p.GetChannels() {
 		cs := v1alpha1.ChannelSpec{Name: c.GetName(), Description: c.GetDescription(), DefaultDelivery: v1alpha1.DeliveryMode(c.GetDefaultDelivery()),
 			PostsPerMinute: c.GetPostsPerMinute()}
