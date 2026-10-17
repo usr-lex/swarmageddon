@@ -187,6 +187,8 @@ func (s workspaceSvc) DefaultChannels(ctx context.Context, req *connect.Request[
 }
 
 func (s workspaceSvc) PreviewWorkspace(ctx context.Context, req *connect.Request[ccv1.PreviewWorkspaceRequest]) (*connect.Response[ccv1.PreviewWorkspaceResponse], error) {
+	// A new credential shows as a new Secret name in the diff.
+	wizard.StageRepoCredentials(req.Msg.GetPlan())
 	_, _, d, changes, problems, err := s.plan(ctx, req.Msg.GetPlan(), req.Msg.GetPruneRooms())
 	if err != nil {
 		return nil, err
@@ -202,6 +204,7 @@ func (s workspaceSvc) PreviewWorkspace(ctx context.Context, req *connect.Request
 }
 
 func (s workspaceSvc) ApplyWorkspace(ctx context.Context, req *connect.Request[ccv1.ApplyWorkspaceRequest]) (*connect.Response[ccv1.ApplyWorkspaceResponse], error) {
+	creds := wizard.StageRepoCredentials(req.Msg.GetPlan())
 	pr, cur, d, changes, problems, err := s.plan(ctx, req.Msg.GetPlan(), req.Msg.GetPruneRooms())
 	if err != nil {
 		return nil, err
@@ -253,8 +256,19 @@ func (s workspaceSvc) ApplyWorkspace(ctx context.Context, req *connect.Request[c
 			_ = db.AddOwner(ctx, pr.UserID, ws)
 		}
 	}
+	// Repository credentials go to the new Secrets the spec now names; the
+	// operator waits for them to import or mirror. Values are never logged
+	// or audited.
+	for _, c := range creds {
+		err := s.K.CreateRepoCredential(ctx, ws, c.SecretName, c.Repo, c.Kind, c.Username, c.Token, 20*time.Second)
+		s.audit(ctx, req, "workspace.repoCredential", "secret/"+c.SecretName, ws, nil, map[string]string{"repository": c.Repo, "kind": c.Kind}, err)
+		if errors.Is(err, k8s.ErrWorkspaceNamespaceMissing) {
+			return nil, connect.NewError(connect.CodeUnavailable, err)
+		}
+		if err != nil {
+			return nil, kerr(err)
+		}
+	}
 	s.Fleet.Kick()
 	return connect.NewResponse(&ccv1.ApplyWorkspaceResponse{Changes: changes}), nil
 }
-
-var _ = k8s.PodName

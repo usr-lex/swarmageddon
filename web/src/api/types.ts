@@ -194,10 +194,11 @@ export interface GroupLink {
 export interface RepositoryDraft {
   name: string;
   importURL: string;
-  /** Used once for the import; never stored in the spec. */
+  /** Write-only, "token" or "user:token"; used once for the import, never stored in the spec. */
   importCredential: string;
   group: string;
   pushMirror: string;
+  /** Write-only, like importCredential; empty keeps the stored one. */
   mirrorToken: string;
 }
 

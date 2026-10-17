@@ -469,7 +469,17 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     groups: d.groups.map((g) => from(pb.GroupPlanSchema, srcGroup.get(g), { name: g })),
     defaultLinks: d.defaultLinks,
     links: d.links.map((l) => create(pb.LinkPlanSchema, { from: l.from, to: l.to, mode: l.mode, senders: l.senders, recipients: l.recipients, requirePrefix: l.requirePrefix })),
-    repositories: d.repositories.map((r) => from(pb.RepositoryPlanSchema, srcRepo.get(r.name), { name: r.name, importUrl: r.importURL, group: r.group, pushMirror: r.pushMirror })),
+    // Credentials are write-only: an empty one keeps the stored Secret.
+    repositories: d.repositories.map((r) =>
+      from(pb.RepositoryPlanSchema, srcRepo.get(r.name), {
+        name: r.name,
+        importUrl: r.importURL,
+        group: r.group,
+        pushMirror: r.pushMirror,
+        importCredential: r.importCredential,
+        mirrorToken: r.mirrorToken,
+      }),
+    ),
     notificationChannels: d.channels.map(channel),
     notificationEvents: d.events,
     channels: d.chatChannels.map(chatChannelTo),

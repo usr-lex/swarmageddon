@@ -107,8 +107,8 @@ type Dispatcher struct {
 	// NtfySecret names the Secret (read through Dir.Secret) whose key token
 	// is sent as Authorization: Bearer on publish; empty: NtfySecretName.
 	NtfySecret string
-	HTTP    *http.Client
-	Log     *slog.Logger
+	HTTP       *http.Client
+	Log        *slog.Logger
 	// Sent records each delivery attempt (tests, metrics).
 	Sent func(channel string, ev Event, err error)
 }

@@ -185,7 +185,7 @@ export function ReposStep({ draft, set }: DraftProps) {
   const setRepo = (i: number, patch: Partial<RepositoryDraft>) => set({ ...draft, repositories: draft.repositories.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
   return (
     <Card title="Repositories" actions={<Button onClick={() => set({ ...draft, repositories: [...draft.repositories, emptyRepo()] })}>Add repository</Button>}>
-      {draft.repositories.length === 0 && <p className="text-sm text-muted">Optional. Agents can also create repositories later.</p>}
+      {draft.repositories.length === 0 && <p className="text-sm text-muted">Optional. Agents can't create repositories themselves; add more later by editing the workspace.</p>}
       {draft.repositories.map((r, i) => (
         <fieldset key={i} className="mb-3 grid gap-3 rounded-xs border border-border p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-medium">
@@ -206,7 +206,7 @@ export function ReposStep({ draft, set }: DraftProps) {
             {(id, d) => <Input id={id} aria-describedby={d} type="url" value={r.importURL} onChange={(e) => setRepo(i, { importURL: e.target.value })} />}
           </Field>
           {r.importURL && (
-            <Field label="Import credential" hint="Used once for the import; not stored.">
+            <Field label="Import credential" hint="A token, or user:token. Only Forgejo uses it, once, for the import.">
               {(id, d) => <Input id={id} aria-describedby={d} type="password" autoComplete="off" value={r.importCredential} onChange={(e) => setRepo(i, { importCredential: e.target.value })} />}
             </Field>
           )}
@@ -214,7 +214,7 @@ export function ReposStep({ draft, set }: DraftProps) {
             {(id, d) => <Input id={id} aria-describedby={d} type="url" value={r.pushMirror} onChange={(e) => setRepo(i, { pushMirror: e.target.value })} />}
           </Field>
           {r.pushMirror && (
-            <Field label="Mirror token" hint="Stored in a Secret.">
+            <Field label="Mirror token" hint="A token, or user:token, stored in a Secret only Forgejo uses. Empty keeps the stored one.">
               {(id, d) => <Input id={id} aria-describedby={d} type="password" autoComplete="off" value={r.mirrorToken} onChange={(e) => setRepo(i, { mirrorToken: e.target.value })} />}
             </Field>
           )}

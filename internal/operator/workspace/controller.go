@@ -280,6 +280,10 @@ func controlCenterRole(ns string) *rbacv1.Role {
 			{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
 			// Only the one Secret people fill in through the control center.
 			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{RoomSecretsName}, Verbs: []string{"get", "update", "patch"}},
+			// Repository credentials from the wizard, each a new Secret
+			// (docs/conventions.md). Create can't be limited by name, and
+			// gives no read access.
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, Verbs: []string{"create"}},
 		},
 	}
 }

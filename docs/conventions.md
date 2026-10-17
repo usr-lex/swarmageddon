@@ -51,7 +51,7 @@ Change them here first.
 | `ntfy-auth` | platform | `users` (`swarm-admin:<bcrypt>:admin`, ntfy's `NTFY_AUTH_USERS`), `tokens` (`swarm-admin:tk_…:control-center`, `NTFY_AUTH_TOKENS`), `username`, `password`, `token`; made once by the operator when ntfy is enabled |
 | `ntfy-publisher` | system | `token`, `username`, `password`, `url` (`http://ntfy.swarmageddon-platform.svc`): what the control center publishes to ntfy with |
 | `forgejo-tls` | platform | `tls.crt`, `tls.key`, `ca.crt` for `forge.<hostname>` |
-| repository credentials | `ws-<ws>` | named by `RepositorySpec.mirrorSecretName` (push mirror) and `importSecretName` (import): `token`, optional `username` (default `oauth2`). Read only by the operator and handed to Forgejo; never mounted in a room. The control center writes them in the workspace namespace |
+| repository credentials | `ws-<ws>` | named by `RepositorySpec.mirrorSecretName` (push mirror) and `importSecretName` (import): `token`, optional `username` (default `oauth2`). Read only by the operator and handed to Forgejo; never mounted in a room. The control center creates each as a new Secret `repo-<repo>-<kind>-<random>` (kind `import` or `mirror`) (label `swarmageddon.dev/component=repo-credential`) and can't read it back |
 | `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
 
 ## Identities (internal CA)

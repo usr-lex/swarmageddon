@@ -103,8 +103,8 @@ func setup(t *testing.T, p *auth.Principal) (*httptest.Server, *echoExec, *audit
 			}
 			return []string{"owner@x"}, nil
 		},
-		Exec: ex,
-		Fwd:  fwd,
+		Exec:  ex,
+		Fwd:   fwd,
 		Audit: func(_ context.Context, ev store.AuditEvent) { audits.add(ev) },
 	}
 	mux := http.NewServeMux()

@@ -29,6 +29,7 @@ function fake() {
           requiredApprovals: 2,
           agents: [{ name: "hermes", role: "implementer", cli: "ore", cpu: "500m", memory: "6Gi", homeVolume: "30Gi", engineVolume: "1Ti", workDir: "work/api" }],
           notificationChannels: [{ kind: "slack", secretName: "notify-acme-slack" }],
+          repositories: [{ name: "api", pushMirror: "https://github.com/acme/api.git", mirrorSecretName: "repo-api-mirror-abc" }],
         },
       }),
       applyWorkspace: (req) => {
@@ -79,6 +80,16 @@ describe("connect api", () => {
     expect(p.agents[0]).toMatchObject({ model: "claude-opus-5-5", workDir: "work/api", cpu: "0.5", engineVolume: "1024Gi" });
     // An empty webhook keeps the stored secret.
     expect(p.notificationChannels[0]).toMatchObject({ secretName: "notify-acme-slack", webhookUrl: "" });
+    // So does an empty mirror token; a new one and an import credential are sent.
+    expect(p.repositories[0]).toMatchObject({ name: "api", mirrorSecretName: "repo-api-mirror-abc", mirrorToken: "" });
+    expect(d.repositories[0].mirrorToken).toBe("");
+    d.repositories[0].mirrorToken = "ghp_new";
+    d.repositories.push({ name: "web", importURL: "https://github.com/acme/web.git", importCredential: "bot:ghp_x", group: "", pushMirror: "", mirrorToken: "" });
+    await f.api.applyWorkspace(d);
+    expect(f.applied()!.repositories).toMatchObject([
+      { name: "api", mirrorSecretName: "repo-api-mirror-abc", mirrorToken: "ghp_new" },
+      { name: "web", importUrl: "https://github.com/acme/web.git", importCredential: "bot:ghp_x" },
+    ]);
   });
 
   it("joins observatory edges with rooms", async () => {

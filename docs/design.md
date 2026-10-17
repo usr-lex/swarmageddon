@@ -935,7 +935,8 @@ once deployed (ADR 0008).
 
 The control center changes things only by writing custom resources. It
 reads pods, logs and metrics, and opens `exec` streams for terminals. It
-never creates pods or Secrets itself (§11.3).
+never creates pods, and in workspace namespaces the only Secrets it creates
+are repository credentials, which it can't read back (§11.3).
 
 ### 8.3 The workspace wizard
 
@@ -1386,7 +1387,9 @@ install if policies aren't enforced, rather than pretending they are.
     `metrics.k8s.io` pods (read), and get, update and patch on the one
     Secret `room-secrets` by name, which the operator creates empty and
     which holds the values people enter for `secretEnv` and MCP `valueFrom`
-    (§6.6).
+    (§6.6). Plus create (only) on Secrets, for the repository import and
+    mirror credentials people enter in the wizard (§9.5): each is a new
+    Secret, since create can't be limited by name.
   - In the system namespace: its own Secrets (session key, VAPID, database
     credentials) by name.
 
