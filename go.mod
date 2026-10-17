@@ -4,6 +4,9 @@ go 1.26.9
 
 require (
 	connectrpc.com/connect v1.21.1
+	github.com/getsentry/sentry-go v0.50.0
+	github.com/getsentry/sentry-go/slog v0.50.0
+	github.com/getsentry/sentry-go/zap v0.50.0
 	google.golang.org/protobuf v1.36.12
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
