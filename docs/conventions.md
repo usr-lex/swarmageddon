@@ -25,7 +25,7 @@ Change them here first.
 | Messaging deny list | ConfigMap `messaging-revoked` in the platform namespace: one key per revoked client certificate, its serial in lowercase hex; value `<notAfter RFC 3339> <CN>`. The room controller adds removed rooms' and rotated certificates and drops expired entries; messaging mounts it at `/etc/swarm/revoked` (`--revoked`) and refuses those certificates at the TLS handshake until they expire |
 | Runner pools | a pool with `spec.group: <g>` serves only repositories team `group-<g>` has (narrowed by `spec.repos`); its runners carry the extra label `group-<g>` (so workflows can ask `runs-on: group-<g>`) and are registered on the job's repository, so Forgejo can't give them another repository's job |
 | Pod labels | platform pods carry `app.kubernetes.io/name` = `messaging`, `forgejo`, `gateway` (the warden's pods), `litellm`, `egress`, `registry-cache`, `control-center`, `postgres`, `ntfy`; room NetworkPolicies select on them |
-| Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080 |
+| Control center | Deployment and Service `control-center` in the system namespace; HTTPS port 8443 (Service port 443); metrics/health on 8080. NetworkPolicy `control-center` admits port 8443 only from Forgejo (webhooks) and the default IngressClass's controller (pods `app.kubernetes.io/name: traefik` or `ingress-nginx` outside workspace and platform namespaces; any pod there for other controllers), or from any address when it's a NodePort. With Traefik's CRDs, TLSStore `default` in the system namespace makes `control-center-tls` the certificate for clients without SNI (`https://<node-ip>/`), unless another namespace already has one |
 | Operator | Deployment `swarmageddon-operator`; health on 8081, metrics 8080 |
 
 ## Secrets (names; keys in parentheses)
@@ -41,6 +41,8 @@ Change them here first.
 | `local-admin` | system | `username`, `passwordHash` (argon2id PHC string), `email` |
 | `control-center-db` | system | `url` (postgres URL), created when PostgreSQL is deployed |
 | `vapid` | system | `publicKey`, `privateKey` |
+| `control-center-gateway` | system | `masterKey`: despite the name, a view-only LiteLLM key (user `control-center`, role `proxy_admin_viewer`) the control center reads spend with; made by the operator once the gateway is up |
+| the control center's other Secrets | system | fixed names and prefixes in `api/v1alpha1/controlcenter_names.go` (`gateway-provider-<p>`, `oidc-<p>`, `notify-<ws>-<kind>`, `forge-webhook-<ws>`, ConfigMaps `saml-<p>`). It may create any Secret or ConfigMap there but read and change only these: the chart's Role `control-center` names the fixed ones; the operator's Role `control-center-owned` lists, one by one, the existing prefixed ones labelled `swarmageddon.dev/component=control-center` (or `forge-webhook`). The control center creates first and retries a few seconds while a new one is still Forbidden. The operator never gives its own Secrets these names |
 | `messaging-tls` | platform | serving cert for messaging (`tls.crt`, `tls.key`, `ca.crt`), SANs for the Service and every pod |
 | `forgejo-admin` | platform | `username`, `password`, `token` |
 | `gateway-master` | platform | `masterKey` |
