@@ -66,8 +66,8 @@ const (
 )
 
 // IdleChecker tells whether a room is idle (presence idle, no turn, no
-// pending approvals), so it may be rolled to a new image. The lead wires it
-// to messaging.
+// pending approvals), so it may be rolled to a new image. PresenceIdle is
+// the one over messaging.
 type IdleChecker interface {
 	Idle(ctx context.Context, workspace, room string) (bool, error)
 }
@@ -99,9 +99,21 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
-// SetupWithManager registers the Room controller.
+// SetupWithManager registers the Room controller. With the internal CA it
+// also runs the idle checker over messaging presence, so whenIdle rooms
+// roll by themselves; a room waiting for a roll is looked at every minute.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps) error {
 	r := &Reconciler{Client: mgr.GetClient(), Deps: d, Idle: NeverIdle{}, ScanHostKey: ScanHostKey}
+	if d.PKI != nil {
+		idle, err := NewPresenceIdle(d.PKI, MessagingURL)
+		if err != nil {
+			return fmt.Errorf("idle checker: %w", err)
+		}
+		if err := mgr.Add(idle); err != nil {
+			return err
+		}
+		r.Idle = idle
+	}
 	return r.SetupWithManager(mgr)
 }
 
