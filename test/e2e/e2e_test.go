@@ -36,6 +36,7 @@ func TestPlatform(t *testing.T) {
 	s.step("rooms run", []string{"workspace wizard"}, s.roomsRun)
 
 	rooms := []string{"rooms run"}
+	s.step("fleet shows presence", rooms, s.presence)
 	s.step("message claude to ore", rooms, s.direct("athena", "hermes"))
 	s.step("message ore to claude", rooms, s.direct("hermes", "athena"))
 	s.step("message claude to claude", rooms, s.direct("athena", "artemis"))

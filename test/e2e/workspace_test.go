@@ -159,39 +159,53 @@ func (s *suite) roomsRun(t *testing.T) {
 	}
 }
 
-// waitRooms waits until the rooms run and report presence.
+// waitRooms waits until the fleet view shows the rooms running.
 func (s *suite) waitRooms(t *testing.T, names ...string) {
 	t.Helper()
-	s.eventually(t, 20*time.Minute, "rooms running", func() error {
+	s.eventually(t, 20*time.Minute, "rooms running", s.roomsMatch(names, func(r *ccv1.RoomSummary) string {
+		if r.GetPhase() == "Running" {
+			return ""
+		}
+		var why []string
+		for _, c := range r.GetConditions() {
+			if c.GetStatus() != "True" && c.GetType() != "Quarantined" {
+				why = append(why, c.GetType()+": "+c.GetMessage())
+			}
+		}
+		return fmt.Sprintf("%s (%s)", r.GetPhase(), strings.Join(why, "; "))
+	}))
+}
+
+// presence: the fleet view shows each room's presence, which its
+// supervisor reports through messaging (§7.3, §8.4).
+func (s *suite) presence(t *testing.T) {
+	s.eventually(t, 3*time.Minute, "presence in the fleet view", s.roomsMatch(planned, func(r *ccv1.RoomSummary) string {
+		if p := r.GetPresence(); p == ccv1.Presence_PRESENCE_UNSPECIFIED || p == ccv1.Presence_PRESENCE_OFFLINE {
+			return "presence " + p.String()
+		}
+		return ""
+	}))
+}
+
+// roomsMatch checks the fleet's rooms by name; bad says what is wrong with one.
+func (s *suite) roomsMatch(names []string, bad func(*ccv1.RoomSummary) string) func() error {
+	return func() error {
 		lr, err := call(s.cc.rooms.ListRooms, &ccv1.ListRoomsRequest{Workspace: ws})
 		if err != nil {
 			return err
 		}
-		var bad []string
+		var probs []string
 		for _, name := range names {
 			i := slices.IndexFunc(lr.GetRooms(), func(r *ccv1.RoomSummary) bool { return r.GetName() == name })
 			if i < 0 {
-				bad = append(bad, name+": not listed")
-				continue
-			}
-			r := lr.GetRooms()[i]
-			if r.GetPhase() != "Running" {
-				var why []string
-				for _, c := range r.GetConditions() {
-					if c.GetStatus() != "True" && c.GetType() != "Quarantined" {
-						why = append(why, c.GetType()+": "+c.GetMessage())
-					}
-				}
-				bad = append(bad, fmt.Sprintf("%s: %s (%s)", name, r.GetPhase(), strings.Join(why, "; ")))
-				continue
-			}
-			if p := r.GetPresence(); p == ccv1.Presence_PRESENCE_UNSPECIFIED || p == ccv1.Presence_PRESENCE_OFFLINE {
-				bad = append(bad, fmt.Sprintf("%s: running, presence %v", name, p))
+				probs = append(probs, name+": not listed")
+			} else if why := bad(lr.GetRooms()[i]); why != "" {
+				probs = append(probs, name+": "+why)
 			}
 		}
-		if len(bad) > 0 {
-			return errors.New(strings.Join(bad, "\n"))
+		if len(probs) > 0 {
+			return errors.New(strings.Join(probs, "\n"))
 		}
 		return nil
-	})
+	}
 }
