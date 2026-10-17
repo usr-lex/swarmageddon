@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -107,5 +108,17 @@ func (e *Env) OperatorClient(t *testing.T) client.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return c
+	// The authorizer sees a new binding a moment later; until then the
+	// operator is forbidden everything and tests fail at random.
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		err := c.List(ctx, &v1alpha1.PlatformList{})
+		if err == nil {
+			return c
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the operator's RBAC never took effect: %v", err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
