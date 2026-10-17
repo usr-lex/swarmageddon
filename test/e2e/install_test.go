@@ -98,19 +98,7 @@ func (s *suite) install(t *testing.T) {
 		}
 		return nil
 	})
-	if out, err := s.kc("-n", v1.SystemNamespace, "logs", "job/welcome"); err == nil {
-		if m := regexp.MustCompile(`Setup token:\s+(\S+)`).FindStringSubmatch(out); m != nil && m[1] != s.token && !reset {
-			t.Errorf("the welcome Job printed a different setup token than Secret setup-token holds")
-		}
-		if !strings.Contains(out, p.Status.CAFingerprint) {
-			t.Errorf("the welcome Job doesn't print the CA fingerprint %s:\n%s", p.Status.CAFingerprint, clip(out))
-		}
-		if m := regexp.MustCompile(`Open:\s+(\S+)`).FindStringSubmatch(out); m == nil || m[1] != p.Status.URL {
-			t.Errorf("the welcome Job printed a URL other than status.url %s:\n%s", p.Status.URL, clip(out))
-		}
-	} else {
-		t.Logf("welcome Job log not available (it may have expired): %s", clip(out))
-	}
+	s.reset = reset
 
 	var bundle corev1.ConfigMap
 	if err := s.kube.Get(ctx, types.NamespacedName{Namespace: v1.SystemNamespace, Name: "platform-ca-bundle"}, &bundle); err != nil {
@@ -153,6 +141,28 @@ func (s *suite) install(t *testing.T) {
 	}
 	if st.GetAdminClaimed() || st.GetUrl() != p.Status.URL {
 		t.Errorf("GetSetupStatus: admin_claimed %v, url %q; want false and %q", st.GetAdminClaimed(), st.GetUrl(), p.Status.URL)
+	}
+}
+
+// welcome checks what `kubectl logs job/welcome` tells a person after the
+// install: the URL, the CA fingerprint and the setup token (§3.1).
+func (s *suite) welcome(t *testing.T) {
+	out, err := s.kc("-n", v1.SystemNamespace, "logs", "job/welcome")
+	if err != nil {
+		t.Skipf("welcome Job log not available (it may have expired): %s", clip(out))
+	}
+	p, err := s.platform()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := regexp.MustCompile(`Setup token:\s+(\S+)`).FindStringSubmatch(out); m == nil || m[1] != s.token && !s.reset {
+		t.Errorf("the welcome Job doesn't print the setup token Secret setup-token holds")
+	}
+	if !strings.Contains(out, p.Status.CAFingerprint) {
+		t.Errorf("the welcome Job doesn't print the CA fingerprint %s:\n%s", p.Status.CAFingerprint, clip(out))
+	}
+	if m := regexp.MustCompile(`Open:\s+(\S+)`).FindStringSubmatch(out); m == nil || m[1] != p.Status.URL {
+		t.Errorf("the welcome Job printed a URL other than status.url %s:\n%s", p.Status.URL, clip(out))
 	}
 }
 

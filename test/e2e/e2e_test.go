@@ -28,6 +28,7 @@ const (
 func TestPlatform(t *testing.T) {
 	s := newSuite(t)
 	s.step("install", nil, s.install)
+	s.step("welcome Job", []string{"install"}, s.welcome)
 	s.step("ingress", []string{"install"}, s.ingress)
 	s.step("claim admin", []string{"install"}, s.claimAdmin)
 	s.step("preflight and isolation", []string{"claim admin"}, s.preflight)

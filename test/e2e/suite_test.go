@@ -37,6 +37,7 @@ type suite struct {
 	cc       *cc    // the control center; signed in as the local admin once claimed
 	lbErr    error  // why the k3d load balancer didn't answer, if it didn't
 	token    string // the setup token, read the way NOTES.txt says
+	reset    bool   // the token was reissued because an earlier run claimed admin
 	password string // the local admin's password
 
 	branch string // the forge steps' branch, head commit and pull request
