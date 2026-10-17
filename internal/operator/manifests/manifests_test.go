@@ -42,7 +42,7 @@ func testValues() Values {
 
 func TestGolden(t *testing.T) {
 	v := testValues()
-	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik, ControlCenterNetworkPolicy, Devices, ForgejoIngress} {
+	for _, name := range []string{Postgres, Forgejo, Messaging, Gateway, Egress, RegistryCache, Ntfy, NetworkPolicies, ControlCenterIngress, ControlCenterTraefik, ControlCenterNetworkPolicy, ControlCenterTLSStore, Devices, ForgejoIngress} {
 		t.Run(name, func(t *testing.T) {
 			v := v
 			if name == ForgejoIngress {

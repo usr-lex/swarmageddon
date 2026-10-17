@@ -2494,6 +2494,7 @@ rules:
   - traefik.io
   resources:
   - serverstransports
+  - tlsstores
   verbs:
   - create
   - delete

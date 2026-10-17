@@ -360,18 +360,11 @@ func runPlatform(t *testing.T, ctx context.Context, env *testenv.Env, op client.
 		ObjectMeta: metav1.ObjectMeta{Name: "traefik", Annotations: map[string]string{networkingv1.AnnotationIsDefaultIngressClass: "true"}},
 		Spec:       networkingv1.IngressClassSpec{Controller: "traefik.io/ingress-controller"},
 	}))
-	// k3s's Traefik, so the operator also writes a ServersTransport.
-	_, err := envtest.InstallCRDs(env.Config, envtest.CRDInstallOptions{CRDs: []*apiextensionsv1.CustomResourceDefinition{{
-		ObjectMeta: metav1.ObjectMeta{Name: "serverstransports.traefik.io"},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "traefik.io", Scope: apiextensionsv1.NamespaceScoped,
-			Names: apiextensionsv1.CustomResourceDefinitionNames{Plural: "serverstransports", Singular: "serverstransport",
-				Kind: "ServersTransport", ListKind: "ServersTransportList"},
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1alpha1", Served: true, Storage: true,
-				Schema: &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-					Type: "object", XPreserveUnknownFields: ptr.To(true)}}}},
-		},
-	}}})
+	// k3s's Traefik, so the operator also writes a ServersTransport and the
+	// default TLSStore.
+	_, err := envtest.InstallCRDs(env.Config, envtest.CRDInstallOptions{CRDs: []*apiextensionsv1.CustomResourceDefinition{
+		traefikCRD("serverstransports", "ServersTransport"), traefikCRD("tlsstores", "TLSStore"),
+	}})
 	must(t, err)
 
 	imgs := images.Defaults("v0.1.0")
@@ -399,15 +392,33 @@ func runPlatform(t *testing.T, ctx context.Context, env *testenv.Env, op client.
 		reconcile()
 		must(t, admin.Get(ctx, types.NamespacedName{Name: v1alpha1.PlatformName}, &p))
 		if meta.IsStatusConditionTrue(p.Status.Conditions, v1alpha1.ConditionReady) {
-			var st unstructured.Unstructured
-			st.SetAPIVersion("traefik.io/v1alpha1")
-			st.SetKind("ServersTransport")
-			must(t, admin.Get(ctx, types.NamespacedName{Namespace: sys, Name: "control-center"}, &st))
+			for kind, name := range map[string]string{"ServersTransport": "control-center", "TLSStore": "default"} {
+				var o unstructured.Unstructured
+				o.SetAPIVersion("traefik.io/v1alpha1")
+				o.SetKind(kind)
+				if err := admin.Get(ctx, types.NamespacedName{Namespace: sys, Name: name}, &o); err != nil {
+					t.Errorf("%s %s: %v", kind, name, err)
+				}
+			}
 			return
 		}
 		playKubelet(t, ctx, admin)
 	}
 	t.Fatalf("platform never ready: %+v", p.Status.Conditions)
+}
+
+// traefikCRD is a schemaless traefik.io/v1alpha1 CRD.
+func traefikCRD(plural, kind string) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: plural + ".traefik.io"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "traefik.io", Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{Plural: plural, Singular: strings.ToLower(kind), Kind: kind, ListKind: kind + "List"},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1alpha1", Served: true, Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					Type: "object", XPreserveUnknownFields: ptr.To(true)}}}},
+		},
+	}
 }
 
 // playKubelet reports every platform workload ready and every Job done.

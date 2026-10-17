@@ -39,6 +39,9 @@ const (
 	// ControlCenterNetworkPolicy limits who reaches the control center; set
 	// Ingress.ClassName and ControllerPods, or neither for a NodePort.
 	ControlCenterNetworkPolicy = "control-center-networkpolicy"
+	// ControlCenterTLSStore makes the control center's certificate
+	// Traefik's default (clients without SNI).
+	ControlCenterTLSStore = "control-center-tlsstore"
 	// Devices is the device plugin DaemonSet and its namespace (userns tier).
 	Devices = "devices"
 	// ForgejoIngress publishes Forgejo at forge.<hostname>; render it with

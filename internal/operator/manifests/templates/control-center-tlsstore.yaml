@@ -1,0 +1,14 @@
+# Traefik serves its default TLSStore's certificate to clients that send no
+# SNI, as a browser opening https://<node-ip>/ does (design §3.2): make it
+# the control center's, so the person sees the CA fingerprint the welcome
+# output printed. Traefik uses only the TLSStore named default, one in the
+# whole cluster, and reads its Secret from the store's namespace.
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: {{ .SystemNamespace }}
+  labels: {swarmageddon.dev/component: control-center, app.kubernetes.io/name: control-center}
+spec:
+  defaultCertificate:
+    secretName: control-center-tls
