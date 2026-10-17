@@ -27,6 +27,9 @@ func TestPlanThresholds(t *testing.T) {
 		t.Errorf("75%%: %s", mid)
 	}
 	high := join(c.Plan(95))
+	if strings.Contains(high, "builder prune") {
+		t.Errorf("builder prune: Podman's API has no build cache: %s", high)
+	}
 	if !strings.Contains(high, "system prune -af --volumes") {
 		t.Errorf("95%%: %s", high)
 	}
@@ -49,7 +52,7 @@ func TestRunOnceReportsUsage(t *testing.T) {
 		run: func(_ context.Context, args ...string) error { ran = append(ran, strings.Join(args, " ")); return nil },
 	}
 	j.RunOnce(context.Background())
-	if len(ran) < 4 || got.Capacity == 0 {
+	if len(ran) < 3 || got.Capacity == 0 {
 		t.Errorf("ran %v usage %+v", ran, got)
 	}
 }

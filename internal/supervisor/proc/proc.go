@@ -49,9 +49,16 @@ func (s *Spec) Command(ctx context.Context) *exec.Cmd {
 	}
 	w := &prefixWriter{prefix: []byte("[" + s.Name + "] "), w: out}
 	cmd.Stdout, cmd.Stderr = w, w
+	// Output goes through a pipe, and Wait waits for every holder of it to
+	// close it: a grandchild that outlives the child (ore's app-server
+	// leaves some) would block Wait, and so the restart, forever.
+	cmd.WaitDelay = waitDelay
 	cmd.SysProcAttr = SysProcAttr(s.User)
 	return cmd
 }
+
+// waitDelay is how long Wait waits for the output pipe after the child exits.
+const waitDelay = 5 * time.Second
 
 // SysProcAttr returns attributes that run a child as u in its own process group.
 func SysProcAttr(u *User) *syscall.SysProcAttr {

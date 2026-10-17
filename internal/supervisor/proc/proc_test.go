@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -57,5 +58,23 @@ func TestRunStopsOnCancel(t *testing.T) {
 	case <-errc:
 	case <-time.After(5 * time.Second):
 		t.Fatal("not stopped")
+	}
+}
+
+// A child that exits but leaves a grandchild holding its output pipe must
+// not hang Wait (ore's app-server did this, and the supervisor stalled).
+func TestWaitReturnsWhenAGrandchildHoldsThePipe(t *testing.T) {
+	s := Spec{Name: "t", Path: "/bin/sh", Args: []string{"-c", "sleep 60 & echo started; exit 3"}, Output: io.Discard}
+	cmd := s.Command(context.Background())
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) })
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(20 * time.Second):
+		t.Fatal("Wait still blocked 20 s after the child exited")
 	}
 }

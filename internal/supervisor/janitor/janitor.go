@@ -61,8 +61,9 @@ func (c Config) Plan(usedPercent int) [][]string {
 	until := "until=" + c.PruneAfter.String()
 	cmds := [][]string{
 		{"container", "prune", "-f", "--filter", until},
+		// No builder prune: Podman's Docker API has no build cache endpoint
+		// (404); its intermediate layers are images, pruned above.
 		{"image", "prune", "-f", "--filter", until},
-		{"builder", "prune", "-af", "--filter", until},
 		{"volume", "prune", "-f"},
 	}
 	if usedPercent >= c.ImagesAbovePercent {

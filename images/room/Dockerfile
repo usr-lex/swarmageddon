@@ -81,7 +81,7 @@ RUN --mount=type=secret,id=build_ca,required=false \
         procps psmisc iproute2 iputils-ping dnsutils lsof strace \
         locales tzdata bash-completion shellcheck \
         podman crun fuse-overlayfs uidmap slirp4netns passt netavark aardvark-dns catatonit nftables \
-        xvfb xauth openbox x11vnc xterm x11-utils dbus-x11 \
+        xvfb xauth x11-xserver-utils openbox x11vnc xterm x11-utils dbus-x11 \
         fonts-dejavu-core fonts-liberation2 fonts-noto-color-emoji \
         libgtk-3-0t64 libasound2t64 libx11-xcb1 libdbus-glib-1-2 libxtst6 libpci3 \
     && (userdel -r ubuntu 2>/dev/null || true)
