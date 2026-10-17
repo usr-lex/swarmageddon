@@ -1,7 +1,9 @@
 // Package msgclient is the control center's client for the messaging service
 // (docs/design.md §7, ADR 0003): Connect's gRPC protocol over HTTP/2 with the
-// control-center client certificate. The certificate files are re-read on
-// every handshake, so a rotated Secret takes effect without a restart.
+// control-center client certificate. The certificate, key and CA files are
+// read on every handshake: the control center starts before the operator has
+// issued them (they are optional volumes), and a rotated Secret takes effect
+// without a restart.
 package msgclient
 
 import (
@@ -30,32 +32,51 @@ type Client struct {
 	messagingv1connect.MessagingServiceClient
 }
 
-// New connects to baseURL with the client certificate and CA from files.
+// New returns a client of the messaging service at baseURL that
+// authenticates with the client certificate in certFile/keyFile and trusts
+// the CA in caFile. Missing files fail the calls made until they appear,
+// not New.
 func New(baseURL, certFile, keyFile, caFile string) (*Client, error) {
 	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	if caFile != "" {
-		pem, err := os.ReadFile(caFile)
-		if err != nil {
-			return nil, err
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, errors.New("no certificates in CA file")
-		}
-		tlsCfg.RootCAs = pool
+		// The default verification with roots read now rather than at
+		// startup (crypto/tls's documented VerifyConnection pattern).
+		tlsCfg.InsecureSkipVerify = true
+		tlsCfg.VerifyConnection = func(cs tls.ConnectionState) error { return verifyPeer(cs, caFile) }
 	}
 	if certFile != "" {
-		if _, err := tls.LoadX509KeyPair(certFile, keyFile); err != nil {
-			return nil, fmt.Errorf("client certificate: %w", err)
-		}
 		tlsCfg.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			c, err := tls.LoadX509KeyPair(certFile, keyFile)
-			return &c, err
+			if err != nil {
+				return nil, fmt.Errorf("client certificate: %w", err)
+			}
+			return &c, nil
 		}
 	}
 	tr := &http.Transport{TLSClientConfig: tlsCfg, ForceAttemptHTTP2: true, IdleConnTimeout: 90 * time.Second}
 	hc := &http.Client{Transport: tr}
 	return &Client{messagingv1connect.NewMessagingServiceClient(hc, baseURL, connect.WithGRPC())}, nil
+}
+
+// verifyPeer checks the server's chain and name against the CA in caFile.
+func verifyPeer(cs tls.ConnectionState, caFile string) error {
+	pem, err := os.ReadFile(caFile)
+	if err != nil {
+		return fmt.Errorf("messaging CA: %w", err)
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pem) {
+		return errors.New("no certificates in CA file")
+	}
+	if len(cs.PeerCertificates) == 0 {
+		return errors.New("messaging presented no certificate")
+	}
+	opts := x509.VerifyOptions{DNSName: cs.ServerName, Roots: roots, Intermediates: x509.NewCertPool()}
+	for _, c := range cs.PeerCertificates[1:] {
+		opts.Intermediates.AddCert(c)
+	}
+	_, err = cs.PeerCertificates[0].Verify(opts)
+	return err
 }
 
 // NewWith wraps an existing client (tests).

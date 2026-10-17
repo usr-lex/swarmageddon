@@ -141,7 +141,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 	if o.msgURL != "" {
 		mc, err := msgclient.New(o.msgURL, o.clientCert, o.clientKey, o.ca)
 		if err != nil {
-			log.Warn("messaging client not available; messaging features are off until restart", "err", err)
+			log.Warn("messaging client not available; messaging features are off", "err", err)
 		} else {
 			srv.Msg = mc
 		}
