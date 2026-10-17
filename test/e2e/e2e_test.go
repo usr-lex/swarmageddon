@@ -48,6 +48,7 @@ func TestPlatform(t *testing.T) {
 	s.step("mention in a channel", rooms, s.mention)
 	s.step("crossing refused", rooms, s.crossingRefused)
 	s.step("crossing over a mediated link", rooms, s.crossingMediated)
+	s.step("message with a token refused", rooms, s.tokenRefused)
 
 	s.step("forge signed push", rooms, s.signedPush)
 	s.step("forge pull request", []string{"forge signed push"}, s.pullRequest)

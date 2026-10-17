@@ -186,6 +186,22 @@ func (s *suite) crossingMediated(t *testing.T) {
 	s.audited(t, "crossing", "hermes", "metis")
 }
 
+// tokenRefused: a message carrying one of the workspace's issued tokens (here
+// athena's own forge token) is refused and never delivered (§11.4).
+func (s *suite) tokenRefused(t *testing.T) {
+	m := s.marker("token-leak")
+	out, err := s.inRoom("athena", `swarm send hermes "`+m+` $(cat /run/swarm/identity/forge_token)"`)
+	if err == nil {
+		t.Fatalf("a message with athena's forge token was accepted: %s", clip(out))
+	}
+	if !strings.Contains(out, "contains a secret token") {
+		t.Errorf("the refusal doesn't say why: %s", clip(out))
+	}
+	if ok, _ := s.transcriptHas("hermes", m, 20*time.Second); ok {
+		t.Error("hermes's CLI shows the message with the token")
+	}
+}
+
 // audited waits for a messaging audit record of kind from one room to another,
 // through the control center's audit view.
 func (s *suite) audited(t *testing.T, kind, from, to string) {
