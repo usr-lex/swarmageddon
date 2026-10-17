@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/version"
 	"github.com/usr-lex/swarmageddon/internal/warden"
 )
@@ -45,7 +46,7 @@ func main() {
 		println(version.Version)
 		return
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
 	if err := run(log, *listen, *health, *upstream, *namespace, *msgURL, *cert, *key, *ca, *reviewKey, *reviewEvery, *maxBody); err != nil {
 		log.Error("warden", "err", err)
 		os.Exit(1)

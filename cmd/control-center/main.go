@@ -33,6 +33,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/spend"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/store"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/terminal"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/version"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -61,7 +62,8 @@ func main() {
 		fmt.Println(version.Version)
 		return
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	// Secret values the control center reads or writes are redacted (§11.4).
+	log := slog.New(redact.NewHandler(slog.NewJSONHandler(os.Stderr, nil), nil))
 	slog.SetDefault(log)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -88,6 +90,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 	if err != nil {
 		return err
 	}
+	kc.C = k8s.RedactSecrets(kc.C)
 
 	// Session signing key: our own Secret, created on first start.
 	key := make([]byte, 32)

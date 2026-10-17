@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/identity"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
@@ -49,7 +50,9 @@ func RoomEnv(room *roomcfg.Room, secretDir string) (env []string, skipped []stri
 			skipped = append(skipped, name)
 			continue
 		}
-		set(name, strings.TrimRight(string(b), "\n"))
+		v := strings.TrimRight(string(b), "\n")
+		redact.Add(v)
+		set(name, v)
 	}
 	for k, v := range vars {
 		env = append(env, k+"="+v)

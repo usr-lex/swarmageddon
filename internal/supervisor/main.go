@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/advisor"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/agent"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/claude"
@@ -77,7 +78,9 @@ const (
 
 func readSecret(name string) string {
 	b, _ := os.ReadFile(filepath.Join(roomcfg.IdentityDir, name))
-	return strings.TrimSpace(string(b))
+	v := strings.TrimSpace(string(b))
+	redact.Add(v)
+	return v
 }
 
 // Main runs a room: PID 1 under tini, as root.
