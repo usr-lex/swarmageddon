@@ -218,6 +218,12 @@ func unavailable(err error) error {
 	return connect.NewError(connect.CodeUnavailable, err)
 }
 
+// secretRefusal refuses a body that carries one of the workspace's issued
+// tokens (design §11.4). It is refused with the body left out of the audit,
+// so the token reaches no record.
+var secretRefusal = &policy.Refusal{Code: policy.Invalid, Rule: "secret",
+	Reason: "this message contains a secret token; it was not sent. Send it again without the token"}
+
 var refusalCodes = map[policy.Code]connect.Code{
 	policy.Denied:    connect.CodePermissionDenied,
 	policy.Invalid:   connect.CodeInvalidArgument,
@@ -252,6 +258,9 @@ func (s *Server) Send(ctx context.Context, req *connect.Request[messagingv1.Send
 	m := req.Msg
 	if m.Id == "" || len(m.Id) > 128 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required (a ULID, at most 128 characters)"))
+	}
+	if from.ws.TokenHashes.Contains(m.Body) {
+		return nil, s.refused(ctx, from, m.To, m.Id, "", secretRefusal)
 	}
 	replyTo := ""
 	if m.ReplyTo != "" {
