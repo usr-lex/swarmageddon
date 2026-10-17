@@ -157,9 +157,13 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 	if retry {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
-	// Periodic resync catches repositories and changes made outside the operator.
-	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	return ctrl.Result{RequeueAfter: resyncEvery}, nil
 }
+
+// resyncEvery is the workspace's periodic resync. It catches changes made
+// outside the operator, and protects repositories people create in
+// Forgejo itself within this long (protectOtherRepos).
+const resyncEvery = 5 * time.Minute
 
 // checkSharedVolumes sets SharedVolumesValid: false, naming the volumes,
 // when a shared volume would be writable on both sides of a wall (design

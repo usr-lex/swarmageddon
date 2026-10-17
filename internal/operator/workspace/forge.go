@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -121,11 +123,12 @@ func (r *Reconciler) reconcileForge(ctx context.Context, w *v1alpha1.Workspace) 
 	}
 	setCond(w, v1alpha1.ConditionForgeOrgReady, true, "Ready", fmt.Sprintf("org %s with %d teams", org, len(ids)))
 
-	if err := r.reconcileRepos(ctx, w, fc, ids); err != nil {
+	others, oerr := r.protectOtherRepos(ctx, w, fc)
+	if err := errors.Join(r.reconcileRepos(ctx, w, fc, ids), oerr); err != nil {
 		_ = fail(ConditionRepositoriesReady, err)
 		// Carry on with the webhook; the repositories retry.
 	} else {
-		setCond(w, ConditionRepositoriesReady, true, "Ready", fmt.Sprintf("%d repositories protected", len(w.Spec.Repositories)))
+		setCond(w, ConditionRepositoriesReady, true, "Ready", fmt.Sprintf("%d repositories protected", len(w.Spec.Repositories)+others))
 	}
 
 	secret, created, err := r.ensureWebhookSecret(ctx, w)
@@ -156,6 +159,56 @@ func (r *Reconciler) reconcileRepos(ctx context.Context, w *v1alpha1.Workspace, 
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+// protectOtherRepos protects the default branch and v* tags of the org's
+// repositories that aren't in spec.repositories: ones people (or Forgejo
+// admins) created in Forgejo itself. Agents can't create repositories
+// (§9.1). It returns how many it covered.
+//
+// This runs on the workspace's periodic resync (resyncEvery) rather than
+// from a system webhook (forgejo.EnsureSystemHook). A webhook would need a
+// new path from Forgejo into the operator (a Service, TLS, a NetworkPolicy)
+// and its deliveries are lost while the operator is down or changing
+// leader, so it would still need this resync to be reliable. The resync
+// alone protects every repository within one period, whatever happened in
+// between. Archived repositories and pull mirrors are left alone.
+func (r *Reconciler) protectOtherRepos(ctx context.Context, w *v1alpha1.Workspace, fc *forgejo.Client) (int, error) {
+	org := w.Spec.Forge.Org
+	repos, err := fc.ListOrgRepos(ctx, org)
+	if err != nil {
+		return 0, fmt.Errorf("list repositories: %w", err)
+	}
+	approvals := int64(w.Spec.Forge.RequiredApprovals)
+	if approvals == 0 {
+		approvals = 1
+	}
+	signed := w.Spec.Forge.SignedCommits == nil || *w.Spec.Forge.SignedCommits
+	var errs []string
+	n := 0
+	for _, repo := range repos {
+		managed := slices.ContainsFunc(w.Spec.Repositories, func(s v1alpha1.RepositorySpec) bool { return strings.EqualFold(s.Name, repo.Name) })
+		if managed || repo.Archived || repo.Mirror {
+			continue
+		}
+		branch := repo.DefaultBranch
+		if branch == "" {
+			branch = "main"
+		}
+		if err := fc.EnsureBaseBranchProtection(ctx, org, repo.Name, forgejo.DefaultBranchProtection(branch, approvals, signed, nil)); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: protection: %v", repo.Name, err))
+			continue
+		}
+		if err := fc.EnsureTagProtection(ctx, org, repo.Name, "v*", []string{TeamMergers}); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: tag protection: %v", repo.Name, err))
+			continue
+		}
+		n++
+	}
+	if len(errs) > 0 {
+		return n, errors.New(strings.Join(errs, "; "))
+	}
+	return n, nil
 }
 
 func (r *Reconciler) reconcileRepo(ctx context.Context, w *v1alpha1.Workspace, fc *forgejo.Client, ids map[string]int64, repo v1alpha1.RepositorySpec, approvals int64, signed bool) error {
