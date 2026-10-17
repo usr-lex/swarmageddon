@@ -222,7 +222,7 @@ func (s *suite) crossingMediated(t *testing.T) {
 // athena's own forge token) is refused and never delivered (§11.4).
 func (s *suite) tokenRefused(t *testing.T) {
 	m := s.marker("token-leak")
-	out, err := s.inRoom("athena", `swarm send hermes "`+m+` $(cat /run/swarm/identity/forge_token)"`)
+	out, err := s.inRoomAsRoot("athena", `swarm send hermes "`+m+` $(cat /run/swarm/identity/forge_token)"`)
 	if err == nil {
 		t.Fatalf("a message with athena's forge token was accepted: %s", clip(out))
 	}

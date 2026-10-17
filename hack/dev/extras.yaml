@@ -90,3 +90,23 @@ spec:
   selector: {app.kubernetes.io/name: mockmodel}
   ports:
     - {name: http, port: 9999, targetPort: http}
+---
+# The operator denies ingress to the platform namespace by default
+# (NetworkPolicy default-deny-ingress); let the gateway's LiteLLM reach the
+# mock model.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dev-mockmodel
+  namespace: swarmageddon-platform
+  labels: {app.kubernetes.io/part-of: swarmageddon-dev}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: mockmodel}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {swarmageddon.dev/component: litellm}
+      ports:
+        - {port: 9999, protocol: TCP}

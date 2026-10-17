@@ -40,6 +40,8 @@ func TestPlatform(t *testing.T) {
 
 	rooms := []string{"rooms run"}
 	s.step("fleet shows presence", rooms, s.presence)
+	s.step("agent reads its identity", rooms, s.identityReadable)
+	s.step("model replies through the gateway", rooms, s.modelReplies)
 	s.step("message claude to ore", rooms, s.direct("athena", "hermes"))
 	s.step("message ore to claude", rooms, s.direct("hermes", "athena"))
 	s.step("message claude to claude", rooms, s.direct("athena", "artemis"))
@@ -62,7 +64,8 @@ func TestPlatform(t *testing.T) {
 
 	s.step("add and remove a room", rooms, s.addRemoveRoom)
 	s.step("quarantine and release", rooms, s.quarantine)
-	s.step("observatory edges", []string{"message claude to ore", "message person to agent", "crossing over a mediated link"}, s.observatory)
+	// The edges come from what was sent, delivered or not.
+	s.step("observatory edges", rooms, s.observatory)
 
 	// Last, since rooms don't need it and it's slowest to come up.
 	s.step("registry cache", []string{"platform services"}, s.registryCache)

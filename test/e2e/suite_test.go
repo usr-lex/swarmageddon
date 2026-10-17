@@ -137,6 +137,13 @@ func (s *suite) inRoom(room, script string) (string, error) {
 	return s.kc("-n", wsNS, "exec", podOf(room), "-c", "room", "--", "runuser", "-l", room, "-c", script)
 }
 
+// inRoomAsRoot runs a script in a room as root, for the suite's own checks
+// that need the room's credentials (from its identity Secret) without
+// depending on what the agent user may read.
+func (s *suite) inRoomAsRoot(room, script string) (string, error) {
+	return s.kc("-n", wsNS, "exec", podOf(room), "-c", "room", "--", "sh", "-c", script)
+}
+
 func podOf(room string) string { return "room-" + room + "-0" }
 
 // portForward keeps `kubectl port-forward svc/control-center` running on a

@@ -20,7 +20,7 @@ import (
 // forgeAPI calls Forgejo's API from inside a room with that room's own token
 // (what `tea api` does) and filters the JSON with jq.
 func (s *suite) forgeAPI(room, path, jq string) (string, error) {
-	out, err := s.inRoom(room, fmt.Sprintf(`curl -sS -f -H "Authorization: token $(cat /run/swarm/identity/forge_token)" `+
+	out, err := s.inRoomAsRoot(room, fmt.Sprintf(`curl -sS -f -H "Authorization: token $(cat /run/swarm/identity/forge_token)" `+
 		`"$(jq -r .forgeURL /etc/swarm/room.json | sed 's|/*$||')/api/v1/%s" | jq -r '%s'`, path, jq))
 	return strings.TrimSpace(out), err
 }
@@ -38,6 +38,16 @@ func (s *suite) cloned(t *testing.T) {
 				}
 			}
 			t.Errorf("%s: acme/api not cloned into ~/work/api (%s); supervisor: %s", r, clip(out), clip(strings.Join(why, "\n")))
+		}
+	}
+}
+
+// identityReadable: the agent user can read its own identity Secret, which
+// the room mounts for it (design §6.2; conventions: mode 0440, group agent).
+func (s *suite) identityReadable(t *testing.T) {
+	for _, r := range planned {
+		if out, err := s.inRoom(r, "for k in forge_token gateway_key id_ed25519; do cat /run/swarm/identity/$k > /dev/null || exit 1; done"); err != nil {
+			t.Errorf("%s: the agent can't read its identity: %v: %s", r, err, clip(out))
 		}
 	}
 }
