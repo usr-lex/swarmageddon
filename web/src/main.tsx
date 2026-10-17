@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import "./index.css";
-import { initApi } from "./api";
+import { apiMode, initApi } from "./api";
+import { initSentry, reportCaughtError } from "./lib/sentry";
 import { applyTheme, initialTheme } from "./lib/theme";
 import { queryClient, router } from "./router";
 
@@ -15,9 +16,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
+// Error reporting, if the control center has it on; it loads alongside the app.
+if (apiMode() === "real") void initSentry(router);
+
 await initApi();
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById("root")!, { onCaughtError: reportCaughtError }).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
