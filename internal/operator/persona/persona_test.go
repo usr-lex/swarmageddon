@@ -3,6 +3,7 @@ package persona
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -159,6 +160,12 @@ func TestOreBypass(t *testing.T) {
 	_, _ = toml.Decode(data[KeyOreConfig], &cfg)
 	if cfg["approval_policy"] != "never" || cfg["sandbox_mode"] != "danger-full-access" {
 		t.Errorf("cfg = %v", cfg)
+	}
+	// ore refuses to start unless read-only is in the allowed set.
+	var req map[string]any
+	_, _ = toml.Decode(data[KeyOreRequirements], &req)
+	if got := fmt.Sprint(req["allowed_sandbox_modes"]); got != "[read-only danger-full-access]" {
+		t.Errorf("allowed_sandbox_modes = %s", got)
 	}
 }
 

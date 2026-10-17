@@ -569,7 +569,12 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 		MCPServers: map[string]oreMCPRequirement{"swarm": {Identity: oreMCPIdentity{Command: "swarm"}}},
 	}
 	if sandbox != "" {
+		// ore 1.161 refuses an allowed set without read-only ("must include
+		// 'read-only' to allow any PermissionProfile") and doesn't start.
 		req.AllowedSandboxModes = []string{sandbox}
+		if sandbox != "read-only" {
+			req.AllowedSandboxModes = []string{"read-only", sandbox}
+		}
 	}
 	swarm := oreMCPServer{Command: "swarm", Args: []string{"mcp"}, Required: true}
 	if tools, ok := o.MCPTools["swarm"]; ok && len(tools) > 0 && (len(tools) != 1 || tools[0] != "*") {
