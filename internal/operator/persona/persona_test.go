@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -13,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -171,6 +173,51 @@ func TestRoomJSONDefaults(t *testing.T) {
 	}
 	if rj.Model != "claude-opus-5-5" || rj.WorkDir != "work" || !rj.Sudo || rj.Email != "athena@agents.acme.invalid" || rj.Address != "athena@acme" {
 		t.Errorf("room.json = %+v", rj)
+	}
+}
+
+// TestRoomJSONTunables: storm, janitor and the warden's review cadence reach
+// the supervisor's room.json, and stay out of it when unset.
+func TestRoomJSONTunables(t *testing.T) {
+	in := fixture(v1.CLIClaude)
+	data, _ := Render(in)
+	for _, k := range []string{`"storm"`, `"janitor"`, `"reviewEveryToolCalls"`} {
+		if strings.Contains(data[KeyRoomJSON], k) {
+			t.Errorf("unset %s rendered:\n%s", k, data[KeyRoomJSON])
+		}
+	}
+
+	in.Workspace.Spec.Messaging.Storm.CoalesceBytes = 2048
+	in.Workspace.Spec.Warden.ReviewEveryToolCalls = 7
+	in.Room.Spec.Janitor = &v1.JanitorSpec{IntervalMinutes: 30, PruneAfterHours: 12, ImagesAbovePercent: 60, WarnPercent: 75, AggressivePercent: 85}
+	data, err := Render(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(t.TempDir(), "room.json")
+	if err := os.WriteFile(f, []byte(data[KeyRoomJSON]), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := roomcfg.Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := roomcfg.JanitorSettings{IntervalMinutes: 30, PruneAfterHours: 12, ImagesAbovePercent: 60, WarnPercent: 75, AggressivePercent: 85}
+	if r.Janitor != want {
+		t.Errorf("janitor = %+v, want %+v", r.Janitor, want)
+	}
+	if r.Storm.CoalesceLimit() != 2048 || r.Warden.ReviewEveryToolCalls != 7 {
+		t.Errorf("storm %+v, warden %+v", r.Storm, r.Warden)
+	}
+
+	in.Room.Spec.Janitor = &v1.JanitorSpec{Disabled: true}
+	data, _ = Render(in)
+	var rj RoomJSON
+	if err := json.Unmarshal([]byte(data[KeyRoomJSON]), &rj); err != nil {
+		t.Fatal(err)
+	}
+	if !rj.Janitor.Disabled {
+		t.Error("janitor not disabled")
 	}
 }
 

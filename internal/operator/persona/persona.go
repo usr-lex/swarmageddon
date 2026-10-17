@@ -74,11 +74,30 @@ type AdvisorJSON struct {
 // Its gateway key is /run/swarm/identity/warden_key. Rules are the role's;
 // the supervisor runs them after rules.Builtin (internal/warden/rules).
 type WardenJSON struct {
-	Mode             string          `json:"mode"`
-	Model            string          `json:"model,omitempty"`
-	InterruptOnHigh  bool            `json:"interruptOnHigh"`
-	QuarantineOnHigh bool            `json:"quarantineOnHigh,omitempty"`
-	Rules            []v1.WardenRule `json:"rules,omitempty"`
+	Mode             string `json:"mode"`
+	Model            string `json:"model,omitempty"`
+	InterruptOnHigh  bool   `json:"interruptOnHigh"`
+	QuarantineOnHigh bool   `json:"quarantineOnHigh,omitempty"`
+	// ReviewEveryToolCalls: 0 leaves the supervisor's default (20).
+	ReviewEveryToolCalls int32           `json:"reviewEveryToolCalls,omitempty"`
+	Rules                []v1.WardenRule `json:"rules,omitempty"`
+}
+
+// StormJSON is how pushed messages are injected (design §7.8). Zero values
+// leave the supervisor's defaults.
+type StormJSON struct {
+	CoalesceBytes int32 `json:"coalesceBytes,omitempty"`
+}
+
+// JanitorJSON tunes the disk janitor (design §12): the room's
+// spec.janitor. Zero values leave the supervisor's defaults.
+type JanitorJSON struct {
+	Disabled           bool  `json:"disabled,omitempty"`
+	IntervalMinutes    int32 `json:"intervalMinutes,omitempty"`
+	PruneAfterHours    int32 `json:"pruneAfterHours,omitempty"`
+	ImagesAbovePercent int32 `json:"imagesAbovePercent,omitempty"`
+	WarnPercent        int32 `json:"warnPercent,omitempty"`
+	AggressivePercent  int32 `json:"aggressivePercent,omitempty"`
 }
 
 // RoomJSON is /etc/swarm/room.json.
@@ -115,6 +134,8 @@ type RoomJSON struct {
 	Network    Network      `json:"network"`
 	Advisor    *AdvisorJSON `json:"advisor,omitempty"`
 	Warden     WardenJSON   `json:"warden"`
+	Storm      StormJSON    `json:"storm,omitzero"`
+	Janitor    JanitorJSON  `json:"janitor,omitzero"`
 }
 
 // Advisor is the room's advisor with defaults applied (the room's spec
@@ -153,10 +174,21 @@ func Warden(r *v1.Room, role *v1.RoleTemplate, ws *v1.Workspace) WardenJSON {
 	w := ws.Spec.Warden
 	return WardenJSON{
 		Mode: string(WardenMode(r, ws)), Model: w.Model,
-		InterruptOnHigh:  w.InterruptOnHigh == nil || *w.InterruptOnHigh,
-		QuarantineOnHigh: w.QuarantineOnHigh,
-		Rules:            role.Spec.WardenRules,
+		InterruptOnHigh:      w.InterruptOnHigh == nil || *w.InterruptOnHigh,
+		QuarantineOnHigh:     w.QuarantineOnHigh,
+		ReviewEveryToolCalls: w.ReviewEveryToolCalls,
+		Rules:                role.Spec.WardenRules,
 	}
+}
+
+// Janitor is the room's janitor settings.
+func Janitor(r *v1.Room) JanitorJSON {
+	j := r.Spec.Janitor
+	if j == nil {
+		return JanitorJSON{}
+	}
+	return JanitorJSON{Disabled: j.Disabled, IntervalMinutes: j.IntervalMinutes, PruneAfterHours: j.PruneAfterHours,
+		ImagesAbovePercent: j.ImagesAbovePercent, WarnPercent: j.WarnPercent, AggressivePercent: j.AggressivePercent}
 }
 
 func (in Input) settings() Settings {
@@ -268,6 +300,8 @@ func roomJSON(in Input) RoomJSON {
 		Network:                set.Network,
 		Advisor:                Advisor(r, role),
 		Warden:                 Warden(r, role, ws),
+		Storm:                  StormJSON{CoalesceBytes: ws.Spec.Messaging.Storm.CoalesceBytes},
+		Janitor:                Janitor(r),
 	}
 }
 
