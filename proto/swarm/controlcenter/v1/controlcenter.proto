@@ -537,9 +537,20 @@ message RepositoryPlan {
   string import_url = 2;
   string group = 3;
   string push_mirror = 4;
-  // Secret in the workspace namespace holding the mirror token (key token).
+  // Secret in the workspace namespace holding the mirror token (keys token
+  // and, optionally, username).
   string mirror_secret_name = 5;
   repeated string status_checks = 6;
+  // Write-only: the credential for import_url ("token" or "username:token"),
+  // used once for the import. Applying stores it in a new Secret in the
+  // workspace namespace and points import_secret_name at it; never returned.
+  string import_credential = 7;
+  // Write-only: the push mirror's credential ("token" or "username:token"),
+  // stored like import_credential, in mirror_secret_name; never returned.
+  string mirror_token = 8;
+  // Secret in the workspace namespace holding the import credential (keys
+  // token and, optionally, username).
+  string import_secret_name = 9;
 }
 
 message GroupPlan {
@@ -626,6 +637,9 @@ message WorkspacePlan {
   // Workspace.spec.warden. Set: replaces warden_mode and warden_model;
   // unset: those two apply and the rest is kept.
   WardenPlan warden = 30;
+  // Workspace.spec.recordKeystrokes: what people type in room terminals goes
+  // to the audit log (docs/design.md §8.4). Off by default.
+  bool record_keystrokes = 31;
 }
 
 message ChannelMemberPlan {

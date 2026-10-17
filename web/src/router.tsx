@@ -15,7 +15,7 @@ import { SpendPage } from "./pages/Spend";
 import { UsersPage } from "./pages/Users";
 import { NotificationsPage } from "./pages/Notifications";
 import { WorkspacesPage } from "./pages/Workspaces";
-import { ChannelsPage, ChannelView, type FeedScope } from "./pages/messages/ChannelsPage";
+import { ChannelsPage, ChannelView, MessageView, type FeedScope } from "./pages/messages/ChannelsPage";
 import { HomeRedirect, ObservatoryPage } from "./pages/observatory/ObservatoryPage";
 
 export const queryClient = new QueryClient({
@@ -98,6 +98,7 @@ const channelsRoute = createRoute({
 });
 
 const channelRoute = createRoute({ getParentRoute: () => rootRoute, path: "/channels/$workspace/$channel", component: ChannelView });
+const messageRoute = createRoute({ getParentRoute: () => rootRoute, path: "/channels/$workspace/message/$id", component: MessageView });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -115,6 +116,7 @@ const routeTree = rootRoute.addChildren([
   r("/inbox", () => <InboxPage />),
   channelsRoute,
   channelRoute,
+  messageRoute,
   conversationRoute,
   r("/audit", AuditPage),
   r("/spend", SpendPage),

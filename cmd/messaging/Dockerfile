@@ -2,8 +2,11 @@
 #   docker build -f cmd/messaging/Dockerfile -t ghcr.io/usr-lex/swarmageddon/messaging:dev .
 FROM golang:1.26 AS build
 WORKDIR /src
+# BUILD_CA (Makefile): a TLS-intercepting proxy's CA, for downloads only.
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
+    go mod download
 COPY . .
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath \

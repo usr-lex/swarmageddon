@@ -65,7 +65,13 @@ func main() {
 
 func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage string) error {
 	log := ctrl.Log.WithName("setup")
-	imgs, err := images.Load(imagesFrom, version.Version)
+	base := images.Defaults(version.Version)
+	// Our own images come from the chart's image.registry and image.tag;
+	// --images-from and --room-image still win.
+	if reg, tag := os.Getenv("IMAGE_REGISTRY"), os.Getenv("IMAGE_TAG"); reg != "" && tag != "" {
+		base.Own(reg, tag)
+	}
+	imgs, err := images.LoadOnto(base, imagesFrom)
 	if err != nil {
 		return fmt.Errorf("images: %w", err)
 	}
@@ -125,6 +131,9 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs}
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {
 		return fmt.Errorf("platform controller: %w", err)
+	}
+	if err := platform.SetupControlCenterAccess(mgr, d); err != nil {
+		return fmt.Errorf("control center access controller: %w", err)
 	}
 	if err := workspace.SetupWithManager(mgr, d); err != nil {
 		return fmt.Errorf("workspace controller: %w", err)

@@ -23,6 +23,9 @@ const (
 	ControlCenterCN = "control-center"
 	// WardenCN is the gateway guard's certificate CN (ADR 0011).
 	WardenCN = "warden"
+	// OperatorCN is the operator's certificate CN. It may only watch
+	// presence and approvals (read-only), to roll idle rooms (design §3.5).
+	OperatorCN = "operator"
 	// HeaderOperatorPost ("1") marks a post the control center makes for a
 	// workspace operator, who may post to any channel of the workspace
 	// (design §7.8). Honored only from the control center acting for a
@@ -36,6 +39,9 @@ type Caller struct {
 	ControlCenter bool
 	// Warden is the gateway guard's principal; it may only report verdicts.
 	Warden bool
+	// Operator is the operator's principal; it may only watch presence
+	// and approvals.
+	Operator bool
 	// Workspace and Name are the room, or the party the control center acts
 	// for; empty for the control center acting as itself.
 	Workspace, Name string
@@ -49,6 +55,9 @@ type Caller struct {
 func (c Caller) Address() string {
 	if c.Warden {
 		return WardenCN
+	}
+	if c.Operator {
+		return OperatorCN
 	}
 	if c.Name == "" {
 		return ControlCenterCN
@@ -111,6 +120,9 @@ func parseCaller(cn, onBehalf string) (Caller, error) {
 	}
 	if cn == WardenCN {
 		return Caller{Warden: true}, nil
+	}
+	if cn == OperatorCN {
+		return Caller{Operator: true}, nil
 	}
 	name, ws, err := policy.SplitAddress(cn)
 	if err != nil || policy.IsSystem(name) {

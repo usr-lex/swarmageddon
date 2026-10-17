@@ -13,6 +13,7 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
   const ref = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("connecting");
   const [reason, setReason] = useState("");
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     const el = ref.current!;
@@ -49,6 +50,7 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
     }
 
     setStatus("connecting");
+    setRecording(false);
     const ws = new WebSocket(terminalURL(workspace, room, mode, readOnly));
     ws.binaryType = "arraybuffer";
     const enc = new TextEncoder();
@@ -65,6 +67,7 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
       if (typeof ev.data === "string") {
         const c = parseControl(ev.data);
         if (c?.type === "exit") exitError = c.error ?? "";
+        else if (c?.type === "recording") setRecording(true);
         else if (!c) term.write(ev.data);
       } else term.write(new Uint8Array(ev.data as ArrayBuffer));
     };
@@ -90,6 +93,7 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
       <div className="flex items-center gap-2 text-xs" aria-live="polite">
         <Badge tone={status === "open" ? "ok" : status === "connecting" ? "info" : "bad"}>{status}</Badge>
         {readOnly && <Badge>read-only</Badge>}
+        {recording && <Badge tone="warn">input recorded</Badge>}
         {status === "closed" && <span className="text-muted">{reason}</span>}
       </div>
       <div

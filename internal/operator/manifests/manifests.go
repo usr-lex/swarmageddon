@@ -36,6 +36,12 @@ const (
 	Egress               = "egress"
 	ControlCenterIngress = "control-center-ingress"
 	ControlCenterTraefik = "control-center-traefik"
+	// ControlCenterNetworkPolicy limits who reaches the control center; set
+	// Ingress.ClassName and ControllerPods, or neither for a NodePort.
+	ControlCenterNetworkPolicy = "control-center-networkpolicy"
+	// ControlCenterTLSStore makes the control center's certificate
+	// Traefik's default (clients without SNI).
+	ControlCenterTLSStore = "control-center-tlsstore"
 	// Devices is the device plugin DaemonSet and its namespace (userns tier).
 	Devices = "devices"
 	// ForgejoIngress publishes Forgejo at forge.<hostname>; render it with
@@ -142,6 +148,24 @@ type NtfyValues struct {
 type IngressValues struct {
 	ClassName string
 	Hostname  string
+	// ControllerPods are the pod labels of the IngressClass's controller
+	// (IngressControllerPods); nil when it isn't one we know.
+	ControllerPods map[string]string
+}
+
+// IngressControllerPods returns the pod labels of the ingress controllers we
+// know, by IngressClass spec.controller, or nil. k3s packages Traefik's Helm
+// chart in kube-system, whose pods carry app.kubernetes.io/name: traefik
+// (traefik-helm-chart, _helpers.tpl traefik.labelselector); ingress-nginx's
+// chart labels its pods app.kubernetes.io/name: ingress-nginx.
+func IngressControllerPods(controller string) map[string]string {
+	switch controller {
+	case "traefik.io/ingress-controller":
+		return map[string]string{"app.kubernetes.io/name": "traefik"}
+	case "k8s.io/ingress-nginx":
+		return map[string]string{"app.kubernetes.io/name": "ingress-nginx"}
+	}
+	return nil
 }
 
 // Render executes template name and returns its objects.

@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { api } from "@/api";
 import { consume } from "@/api/stream";
 import type { ChannelInfo } from "@/api/channels";
+import { useUnread } from "@/components/Shell";
 import { cx, ErrorText } from "@/components/ui";
 
 /** Keeps channel lists, pages and conversations fresh while the messages area is open. */
@@ -16,6 +17,7 @@ function useItemsFeed() {
       () => {
         void qc.invalidateQueries({ queryKey: ["channels"] });
         void qc.invalidateQueries({ queryKey: ["items"] });
+        void qc.invalidateQueries({ queryKey: ["unread"] });
       },
       ctl.signal,
     );
@@ -42,6 +44,7 @@ export function MessagesLayout({ selected, children }: { selected: Selected; chi
   useItemsFeed();
   const channels = useQuery({ queryKey: ["channels"], queryFn: () => api().listChannels() });
   const convs = useQuery({ queryKey: ["conversations"], queryFn: () => api().listConversations() });
+  const summary = useUnread();
   const byWs = new Map<string, ChannelInfo[]>();
   for (const c of channels.data ?? []) byWs.set(c.workspace, [...(byWs.get(c.workspace) ?? []), c]);
   const unread = (channels.data ?? []).reduce((a, c) => a + c.unread, 0) + (convs.data ?? []).reduce((a, c) => a + c.unread, 0);
@@ -58,7 +61,7 @@ export function MessagesLayout({ selected, children }: { selected: Selected; chi
           </li>
           <li>
             <Link to="/channels" search={{ scope: "mentions" }} className={itemClass(is("mentions"))} aria-current={is("mentions") ? "page" : undefined}>
-              Mentions
+              Mentions <Count n={summary.data?.mentions ?? 0} on={is("mentions")} />
             </Link>
           </li>
           <li>

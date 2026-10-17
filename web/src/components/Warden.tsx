@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/api";
+import { consume } from "@/api/stream";
 import type { Severity, Verdict } from "@/api/channels";
 import type { RoomSummary } from "@/api/types";
 import { ago } from "@/lib/format";
@@ -109,6 +110,18 @@ const layerLabel: Record<Verdict["layer"], string> = { rules: "Rules", judge: "J
 export function WardenPanel({ workspace, room, canOperate }: { workspace: string; room: string; canOperate: boolean }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["verdicts", workspace, room], queryFn: () => api().listVerdicts(workspace, room) });
+  // New and decided verdicts arrive live (WatchVerdicts).
+  useEffect(() => {
+    const ctl = new AbortController();
+    void consume(
+      (s) => api().watchVerdicts([workspace], s),
+      (v) => {
+        if (v.room === room) void qc.invalidateQueries({ queryKey: ["verdicts", workspace, room] });
+      },
+      ctl.signal,
+    );
+    return () => ctl.abort();
+  }, [workspace, room, qc]);
   const decide = useMutation({
     mutationFn: (v: { id: string; d: "confirmed" | "dismissed" }) => api().decideVerdict(v.id, v.d),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["verdicts", workspace, room] }),

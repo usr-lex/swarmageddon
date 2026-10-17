@@ -241,6 +241,37 @@ func TestEnsureOrgAndTeam(t *testing.T) {
 	f.mustFind("PUT", "/teams/9/members/athena")
 }
 
+// TestBaseBranchProtection: a repository the operator doesn't manage gets
+// the rule; an existing rule is tightened but keeps people's status checks
+// and a higher approval count; a rule that holds is left alone.
+func TestBaseBranchProtection(t *testing.T) {
+	weak := BranchProtection{RuleName: "main", EnablePush: true, RequiredApprovals: 3, EnableStatusCheck: true,
+		StatusCheckContexts: []string{"ci/build"}, MergeWhitelistTeams: []string{"mergers"}}
+	held := DefaultBranchProtection("main", 1, true, []string{"ci/x"})
+	f, c := newFake(t, map[string]func(http.ResponseWriter){
+		"GET /repos/acme/weak/branch_protections/main": jsonResp(200, weak),
+		"GET /repos/acme/held/branch_protections/main": jsonResp(200, held),
+	})
+	ctx := context.Background()
+	bp := DefaultBranchProtection("main", 1, true, nil)
+	for _, repo := range []string{"new", "weak", "held"} {
+		if err := c.EnsureBaseBranchProtection(ctx, "acme", repo, bp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if b := f.mustFind("POST", "/repos/acme/new/branch_protections").Body; b["enable_push"] != false || b["require_signed_commits"] != true {
+		t.Errorf("new rule = %v", b)
+	}
+	b := f.mustFind("PATCH", "/repos/acme/weak/branch_protections/main").Body
+	if b["enable_push"] != false || b["apply_to_admins"] != true || b["required_approvals"] != float64(3) ||
+		b["enable_status_check"] != true || !reflect.DeepEqual(b["status_check_contexts"], []any{"ci/build"}) {
+		t.Errorf("tightened rule = %v", b)
+	}
+	if f.find("PATCH", "/repos/acme/held/branch_protections/main") != nil {
+		t.Error("patched a rule that already holds")
+	}
+}
+
 func TestReposAndProtection(t *testing.T) {
 	f, c := newFake(t, map[string]func(http.ResponseWriter){
 		"GET /repos/acme/web/branch_protections/main": jsonResp(200, BranchProtection{RuleName: "main"}),

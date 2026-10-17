@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/messaging/tokenhash"
 )
 
 // Defaults for unset policy fields (the CRD defaults, for data that skipped
@@ -45,6 +46,9 @@ type Workspace struct {
 	// for validating channel selectors.
 	Roles map[string]bool
 	Teams map[string]bool
+	// TokenHashes are the digests of the tokens issued for the workspace's
+	// rooms; messages containing one are refused (design §11.4).
+	TokenHashes tokenhash.Set
 }
 
 // MaxBytes is the largest message body allowed.

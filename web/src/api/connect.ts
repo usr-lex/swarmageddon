@@ -419,6 +419,7 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     roomDefaults: settingsFrom(p.roomDefaults),
     roleDefaults: mapValues(p.roleDefaults, settingsFrom),
     sharedVolumes: p.sharedVolumes.map(sharedVolumeFrom),
+    recordKeystrokes: p.recordKeystrokes,
     source: p,
   };
 }
@@ -469,7 +470,17 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     groups: d.groups.map((g) => from(pb.GroupPlanSchema, srcGroup.get(g), { name: g })),
     defaultLinks: d.defaultLinks,
     links: d.links.map((l) => create(pb.LinkPlanSchema, { from: l.from, to: l.to, mode: l.mode, senders: l.senders, recipients: l.recipients, requirePrefix: l.requirePrefix })),
-    repositories: d.repositories.map((r) => from(pb.RepositoryPlanSchema, srcRepo.get(r.name), { name: r.name, importUrl: r.importURL, group: r.group, pushMirror: r.pushMirror })),
+    // Credentials are write-only: an empty one keeps the stored Secret.
+    repositories: d.repositories.map((r) =>
+      from(pb.RepositoryPlanSchema, srcRepo.get(r.name), {
+        name: r.name,
+        importUrl: r.importURL,
+        group: r.group,
+        pushMirror: r.pushMirror,
+        importCredential: r.importCredential,
+        mirrorToken: r.mirrorToken,
+      }),
+    ),
     notificationChannels: d.channels.map(channel),
     notificationEvents: d.events,
     channels: d.chatChannels.map(chatChannelTo),
@@ -488,6 +499,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     roomDefaults: settingsTo(d.roomDefaults),
     roleDefaults: mapValues(d.roleDefaults, settingsTo),
     sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
+    recordKeystrokes: d.recordKeystrokes ?? false,
   });
 }
 
@@ -1136,6 +1148,21 @@ export function createConnectApi(transport: Transport = createConnectTransport({
       const r = await channels.readChannelMessages({ workspace, scope: scopeTo(scope), unreadOnly: opts.unreadOnly, limit: opts.limit, cursor: opts.cursor ?? "", full: true, markRead: false });
       return { items: r.items.map((i) => itemFrom(workspace, i)), nextCursor: r.nextCursor, unreadRemaining: r.unreadRemaining };
     },
+    async getMessage(workspace, id) {
+      const r = await channels.getChannelMessage({ workspace, id });
+      if (!r.item) throw new ApiError("not_found", "No such message.");
+      return itemFrom(workspace, r.item);
+    },
+    async unreadSummary() {
+      const out = { direct: 0, mentions: 0, channels: 0 };
+      const per = await Promise.all((await myWorkspaces()).map((workspace) => channels.getUnreadSummary({ workspace }).catch(() => null)));
+      for (const c of per.flatMap((r) => r?.counts ?? [])) {
+        if (c.scope === "direct") out.direct += c.unread;
+        else if (c.scope === "mentions") out.mentions += c.unread;
+        else out.channels += c.unread;
+      }
+      return out;
+    },
     async post(workspace, channel, body) {
       const r = await channels.postToChannel({ workspace, channel: channel.replace(/^#/, ""), body });
       return { id: r.id, mentioned: r.mentioned };
@@ -1172,6 +1199,9 @@ export function createConnectApi(transport: Transport = createConnectTransport({
     },
     async decideVerdict(id, decision) {
       await warden.decideVerdict({ id, decision: decision === "dismissed" ? "dismiss" : "confirm" });
+    },
+    async *watchVerdicts(workspaces, signal) {
+      for await (const r of warden.watchVerdicts({ workspaces }, { signal })) if (r.verdict) yield verdictFrom(r.verdict);
     },
   };
   return withErrors({ ...api, observatory } as Api);

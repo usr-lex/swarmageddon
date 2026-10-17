@@ -47,6 +47,8 @@ type Driver struct {
 	MinBackoff time.Duration
 
 	mu         sync.Mutex
+	stop       context.CancelFunc // ends the running app-server; nil between runs
+	restart    bool               // the app-server was stopped by Restart
 	client     *Client
 	thread     string
 	activeTurn string
@@ -91,7 +93,20 @@ func (d *Driver) init() {
 }
 
 func (d *Driver) env() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	return append([]string{"CODEX_HOME=" + d.CodexHome}, d.Env...)
+}
+
+// Restart implements agent.Restarter.
+func (d *Driver) Restart(vars map[string]string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.Env = agent.SetEnv(d.Env, vars)
+	if d.stop != nil {
+		d.restart = true
+		d.stop()
+	}
 }
 
 func (d *Driver) ids() (int, int) {
@@ -115,6 +130,14 @@ func (d *Driver) Run(ctx context.Context) error {
 		d.reset()
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		d.mu.Lock()
+		restarted := d.restart
+		d.restart = false
+		d.mu.Unlock()
+		if restarted {
+			d.Log.Info("restarting ore with new settings")
+			continue
 		}
 		d.Log.Warn("ore app-server ended", "err", err)
 		d.Events.Exited(err)
@@ -170,7 +193,15 @@ func (d *Driver) runOnce(ctx context.Context) error {
 	_ = os.Remove(d.Socket)
 
 	runCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	d.mu.Lock()
+	d.stop = cancel
+	d.mu.Unlock()
+	defer func() {
+		d.mu.Lock()
+		d.stop = nil
+		d.mu.Unlock()
+		cancel()
+	}()
 	spec := proc.Spec{
 		Name: "ore-app-server", Path: d.Binary,
 		Args: []string{"app-server", "--listen", "unix://" + d.Socket},

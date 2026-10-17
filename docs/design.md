@@ -185,7 +185,9 @@ know the cluster:
    `kubectl port-forward svc/control-center 8443:443` fallback.
 
 TLS from the first request: the operator creates a self-signed CA and a
-serving certificate (CA in a Secret in the system namespace). The welcome
+serving certificate (CA in a Secret in the system namespace). With Traefik,
+a TLSStore `default` serves that certificate to clients that connect by IP
+and send no SNI (unless another installation already set one). The welcome
 output prints the CA's fingerprint, so the person can tell they reached the
 right server before typing the token.
 
@@ -935,7 +937,8 @@ once deployed (ADR 0008).
 
 The control center changes things only by writing custom resources. It
 reads pods, logs and metrics, and opens `exec` streams for terminals. It
-never creates pods or Secrets itself (§11.3).
+never creates pods, and in workspace namespaces the only Secrets it creates
+are repository credentials, which it can't read back (§11.3).
 
 ### 8.3 The workspace wizard
 
@@ -1252,8 +1255,9 @@ Provider keys never enter rooms.
 
 ### 10.2 Spend
 
-Read from LiteLLM per key (`/key/info`, `/spend/logs`), aggregated per room,
-workspace and model. Budgets come from the Workspace:
+Read from LiteLLM per key (`/key/info`, `/spend/logs`) with a view-only
+key (Secret `control-center-gateway`), aggregated per room, workspace and
+model. Budgets come from the Workspace:
 
 - 80% of a budget raises `budget`.
 - 100% makes LiteLLM refuse further calls, and the room shows "budget
@@ -1386,9 +1390,15 @@ install if policies aren't enforced, rather than pretending they are.
     `metrics.k8s.io` pods (read), and get, update and patch on the one
     Secret `room-secrets` by name, which the operator creates empty and
     which holds the values people enter for `secretEnv` and MCP `valueFrom`
-    (§6.6).
+    (§6.6). Plus create (only) on Secrets, for the repository import and
+    mirror credentials people enter in the wizard (§9.5): each is a new
+    Secret, since create can't be limited by name.
   - In the system namespace: its own Secrets (session key, VAPID, database
-    credentials) by name.
+    credentials) by name. The fixed names are in the chart's Role; Secrets
+    and ConfigMaps it creates per provider, channel or workspace
+    (`oidc-<p>`, `notify-<ws>-<kind>`, ...) the operator grants one by one
+    in Role `control-center-owned`, since RBAC can't match a prefix. It may
+    create any Secret there, but never read one it wasn't granted.
 
   No Secrets anywhere else, no cluster-wide pods.
 - **Messaging:** get, list and watch `workspaces` and `rooms`; its own

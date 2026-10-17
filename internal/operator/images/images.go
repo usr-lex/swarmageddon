@@ -55,8 +55,7 @@ func Defaults(v string) Images {
 	if tag == "" || tag == "dev" {
 		tag = "latest"
 	}
-	own := func(name string) string { return Registry + "/" + name + ":" + tag }
-	return Images{
+	i := Images{
 		Postgres:      postgres,
 		Forgejo:       forgejo,
 		LiteLLM:       litellm,
@@ -64,21 +63,35 @@ func Defaults(v string) Images {
 		Ntfy:          ntfy,
 		Busybox:       busybox,
 		ForgejoRunner: forgejoRunner,
-		Operator:      own("operator"),
-		ControlCenter: own("control-center"),
-		Messaging:     own("messaging"),
-		Warden:        own("warden"),
-		Egress:        own("egress"),
-		Room:          own("room"),
-		Runner:        own("runner"),
-		Devices:       own("devices"),
 	}
+	i.Own(Registry, tag)
+	return i
+}
+
+// Own points our own images at registry and tag: the chart's image.registry
+// and image.tag (IMAGE_REGISTRY and IMAGE_TAG), so an install from a mirror
+// or the dev registry deploys the images it was installed with.
+func (i *Images) Own(registry, tag string) {
+	own := func(name string) string { return registry + "/" + name + ":" + tag }
+	i.Operator = own("operator")
+	i.ControlCenter = own("control-center")
+	i.Messaging = own("messaging")
+	i.Warden = own("warden")
+	i.Egress = own("egress")
+	i.Room = own("room")
+	i.Runner = own("runner")
+	i.Devices = own("devices")
 }
 
 // Load returns Defaults(v) with the non-empty entries of the file at path
 // applied. An empty path returns the defaults.
 func Load(path, v string) (Images, error) {
-	imgs := Defaults(v)
+	return LoadOnto(Defaults(v), path)
+}
+
+// LoadOnto returns imgs with the non-empty entries of the file at path
+// applied. An empty path returns imgs.
+func LoadOnto(imgs Images, path string) (Images, error) {
 	if path == "" {
 		return imgs, nil
 	}
@@ -114,6 +127,7 @@ func (i *Images) merge(o Images) {
 	set(&i.Egress, o.Egress)
 	set(&i.Room, o.Room)
 	set(&i.Runner, o.Runner)
+	set(&i.Devices, o.Devices)
 }
 
 // Versions is what Platform status reports under status.versions.

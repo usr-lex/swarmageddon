@@ -66,8 +66,8 @@ const (
 )
 
 // IdleChecker tells whether a room is idle (presence idle, no turn, no
-// pending approvals), so it may be rolled to a new image. The lead wires it
-// to messaging.
+// pending approvals), so it may be rolled to a new image. PresenceIdle is
+// the one over messaging.
 type IdleChecker interface {
 	Idle(ctx context.Context, workspace, room string) (bool, error)
 }
@@ -99,9 +99,21 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
-// SetupWithManager registers the Room controller.
+// SetupWithManager registers the Room controller. With the internal CA it
+// also runs the idle checker over messaging presence, so whenIdle rooms
+// roll by themselves; a room waiting for a roll is looked at every minute.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps) error {
 	r := &Reconciler{Client: mgr.GetClient(), Deps: d, Idle: NeverIdle{}, ScanHostKey: ScanHostKey}
+	if d.PKI != nil {
+		idle, err := NewPresenceIdle(d.PKI, MessagingURL)
+		if err != nil {
+			return fmt.Errorf("idle checker: %w", err)
+		}
+		if err := mgr.Add(idle); err != nil {
+			return err
+		}
+		r.Idle = idle
+	}
 	return r.SetupWithManager(mgr)
 }
 
@@ -157,6 +169,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var room v1.Room
 	if err := r.Get(ctx, req.NamespacedName, &room); err != nil {
 		if apierrors.IsNotFound(err) {
+			// Its identity Secret may have just gone: drop its tokens.
+			if err := r.syncTokenHashes(ctx, req.Namespace, nil, req.Name); err != nil {
+				log.FromContext(ctx).Error(err, "token hashes")
+			}
 			return r.cleanupVolumes(ctx, req.Namespace, req.Name)
 		}
 		return ctrl.Result{}, err
@@ -249,6 +265,9 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 	sec, ready, err := r.reconcileIdentity(ctx, room, &ws, &role, st, secretValues)
 	if err != nil {
 		return retry, err
+	}
+	if err := r.syncTokenHashes(ctx, room.Namespace, sec, ""); err != nil {
+		return retry, fmt.Errorf("token hashes: %w", err)
 	}
 
 	data, err := persona.Render(persona.Input{Room: room, Role: &role, Workspace: &ws, Settings: &set, Endpoints: persona.Endpoints{
@@ -970,6 +989,9 @@ func (r *Reconciler) finalize(ctx context.Context, room *v1.Room, wsName string)
 
 	if err := r.removeTables(ctx, wsName, room.Name); err != nil {
 		return ctrl.Result{}, err
+	}
+	if err := r.syncTokenHashes(ctx, room.Namespace, nil, room.Name); err != nil {
+		log.FromContext(ctx).Error(err, "token hashes") // its tokens are revoked anyway
 	}
 	retention := defaultDeletedRetention
 	var ws v1.Workspace

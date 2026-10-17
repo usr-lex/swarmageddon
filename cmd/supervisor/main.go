@@ -9,12 +9,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/supervisor"
 	"github.com/usr-lex/swarmageddon/internal/version"
 )
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	// The room's keys and tokens are redacted as the supervisor reads them (§11.4).
+	log := slog.New(redact.NewHandler(slog.NewTextHandler(os.Stderr, nil), nil))
+	slog.SetDefault(log)
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "version") {
 		_, _ = os.Stdout.WriteString(version.Version + "\n")
 		return

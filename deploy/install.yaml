@@ -950,6 +950,45 @@ spec:
               image:
                 description: Image overrides the room image (for development).
                 type: string
+              janitor:
+                description: Janitor tunes the room's disk janitor (docs/design.md
+                  §12).
+                properties:
+                  aggressivePercent:
+                    description: AggressivePercent of a volume prunes everything unused.
+                      Default 90.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                  disabled:
+                    description: Disabled turns the janitor off.
+                    type: boolean
+                  imagesAbovePercent:
+                    description: ImagesAbovePercent of the engine volume also removes
+                      unused tagged images. Default 70.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                  intervalMinutes:
+                    description: IntervalMinutes between runs. Default 60.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  pruneAfterHours:
+                    description: 'PruneAfterHours: stopped containers and dangling
+                      images older than this are removed. Default 24.'
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  warnPercent:
+                    description: WarnPercent of a volume raises diskLow. Default 80.
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                type: object
               mcpServers:
                 additionalProperties:
                   description: MCPServer is one MCP server, as in .mcp.json.
@@ -1816,6 +1855,12 @@ spec:
                 items:
                   type: string
                 type: array
+              recordKeystrokes:
+                description: |-
+                  RecordKeystrokes records what people type in room terminals (the
+                  agent's TUI and shells) in the control center's audit log. Off by
+                  default (docs/design.md §8.4).
+                type: boolean
               repositories:
                 items:
                   properties:
@@ -2074,6 +2119,13 @@ spec:
                     description: QuarantineOnHigh quarantines on high verdicts from
                       the gateway guard, not only critical ones.
                     type: boolean
+                  reviewEveryToolCalls:
+                    description: |-
+                      ReviewEveryToolCalls also reviews a room's trajectory every N tool
+                      calls, besides after each turn (ADR 0011, layer 3). Default 20.
+                    format: int32
+                    minimum: 1
+                    type: integer
                 type: object
             required:
             - forge
@@ -2494,6 +2546,7 @@ rules:
   - traefik.io
   resources:
   - serverstransports
+  - tlsstores
   verbs:
   - create
   - delete
@@ -2577,8 +2630,12 @@ subjects:
     namespace: swarmageddon-system
 ---
 # Source: swarmageddon/templates/control-center-rbac.yaml
-# Its own Secrets in the system namespace, by name. `create` can't be limited
-# by name in RBAC, so it may create Secrets here but read and change only these.
+# Its own Secrets and ConfigMaps in the system namespace, by name (the
+# fixed names of api/v1alpha1/controlcenter_names.go). `create` can't be
+# limited by name in RBAC, so it may create Secrets and ConfigMaps here but
+# read and change only these; the operator's Role control-center-owned adds
+# the ones it created with a per-provider, per-channel or per-workspace
+# name. Its certificates are mounted, not read through the API.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -2594,20 +2651,22 @@ rules:
     resources: [secrets]
     resourceNames:
       - setup-token
-      - control-center-tls
-      - control-center-client
+      - local-admin
       - control-center-session
       - control-center-db
-      - local-admin
       - vapid
-    verbs: [get, list, watch, update, patch]
+      - control-center-saml
+      - control-center-gateway
+      - forge-reader
+      - ntfy-publisher
+    verbs: [get, update, patch]
   - apiGroups: [""]
-    resources: [secrets]
+    resources: [secrets, configmaps]
     verbs: [create]
   - apiGroups: [""]
     resources: [configmaps]
     resourceNames: [platform-ca-bundle]
-    verbs: [get, list, watch]
+    verbs: [get]
 ---
 # Source: swarmageddon/templates/welcome.yaml
 apiVersion: rbac.authorization.k8s.io/v1

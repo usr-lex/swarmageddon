@@ -47,6 +47,8 @@ type Driver struct {
 	MinBackoff time.Duration
 
 	mu      sync.Mutex
+	stop    context.CancelFunc // ends the running CLI; nil between runs
+	restart bool               // the CLI was stopped by Restart
 	socket  string
 	token   string
 	ready   chan struct{} // closed when the inbox socket is known
@@ -106,6 +108,8 @@ func (d *Driver) Args() []string {
 }
 
 func (d *Driver) env() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	env := []string{
 		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
 		"DISABLE_AUTOUPDATER=1",
@@ -142,18 +146,29 @@ func (d *Driver) Run(ctx context.Context) error {
 		if trust != d.WorkDir {
 			_ = PrepareDialogs(d.Home, d.WorkDir, d.bypass(), uid, gid)
 		}
+		runCtx, stop := context.WithCancel(ctx)
 		d.mu.Lock()
 		d.runSeq++
+		d.stop = stop
 		d.mu.Unlock()
 		sess := d.Session
 		sess.Env = d.env()
 		argv := d.Args()
 		d.Log.Info("starting claude", "args", strings.Join(argv, " "))
 		start := time.Now()
-		err := sess.Run(ctx, argv)
+		err := sess.Run(runCtx, argv)
+		stop()
 		d.resetSocket()
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		d.mu.Lock()
+		restarted := d.restart
+		d.stop, d.restart = nil, false
+		d.mu.Unlock()
+		if restarted {
+			d.Log.Info("restarting claude with new settings")
+			continue
 		}
 		if err == nil {
 			err = errors.New("claude exited")
@@ -171,6 +186,17 @@ func (d *Driver) Run(ctx context.Context) error {
 		case <-time.After(backoff):
 		}
 		backoff = min(backoff*2, time.Minute)
+	}
+}
+
+// Restart implements agent.Restarter.
+func (d *Driver) Restart(vars map[string]string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.Env = agent.SetEnv(d.Env, vars)
+	if d.stop != nil {
+		d.restart = true
+		d.stop()
 	}
 }
 

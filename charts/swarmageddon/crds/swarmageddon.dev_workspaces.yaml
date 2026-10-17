@@ -378,6 +378,12 @@ spec:
                 items:
                   type: string
                 type: array
+              recordKeystrokes:
+                description: |-
+                  RecordKeystrokes records what people type in room terminals (the
+                  agent's TUI and shells) in the control center's audit log. Off by
+                  default (docs/design.md §8.4).
+                type: boolean
               repositories:
                 items:
                   properties:
@@ -636,6 +642,13 @@ spec:
                     description: QuarantineOnHigh quarantines on high verdicts from
                       the gateway guard, not only critical ones.
                     type: boolean
+                  reviewEveryToolCalls:
+                    description: |-
+                      ReviewEveryToolCalls also reviews a room's trajectory every N tool
+                      calls, besides after each turn (ADR 0011, layer 3). Default 20.
+                    format: int32
+                    minimum: 1
+                    type: integer
                 type: object
             required:
             - forge

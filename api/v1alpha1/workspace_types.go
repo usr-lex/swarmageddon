@@ -54,6 +54,11 @@ type WorkspaceSpec struct {
 	// DeletedRoomRetention keeps a removed room's volumes this long. Default 168h.
 	// +optional
 	DeletedRoomRetention *metav1.Duration `json:"deletedRoomRetention,omitempty"`
+	// RecordKeystrokes records what people type in room terminals (the
+	// agent's TUI and shells) in the control center's audit log. Off by
+	// default (docs/design.md §8.4).
+	// +optional
+	RecordKeystrokes bool `json:"recordKeystrokes,omitempty"`
 }
 
 type ForgeSpec struct {
@@ -339,6 +344,11 @@ type WardenSpec struct {
 	// Monthly budget of each room's warden key in USD. Default 20.
 	// +optional
 	MonthlyUSD int32 `json:"monthlyUSD,omitempty"`
+	// ReviewEveryToolCalls also reviews a room's trajectory every N tool
+	// calls, besides after each turn (ADR 0011, layer 3). Default 20.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	ReviewEveryToolCalls int32 `json:"reviewEveryToolCalls,omitempty"`
 }
 
 // ForgeEvent is a kind of forge activity delivered to agents.

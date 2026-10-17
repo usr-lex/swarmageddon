@@ -48,9 +48,11 @@ function Item({ it, me, showChannel }: { it: InboxItem; me?: string; showChannel
           ) : (
             <span className="text-muted">direct · {it.workspace}</span>
           ))}
-        <time className="text-muted" dateTime={it.at} title={new Date(it.at).toLocaleString()}>
-          {ago(it.at)}
-        </time>
+        <Link to="/channels/$workspace/message/$id" params={{ workspace: it.workspace, id: it.id }} className="text-muted hover:underline" title="Link to this message">
+          <time dateTime={it.at} title={new Date(it.at).toLocaleString()}>
+            {ago(it.at)}
+          </time>
+        </Link>
         {!it.read && <span className="sr-only">unread</span>}
       </div>
       <div className="text-sm">
@@ -121,6 +123,40 @@ function Feed({ workspace, scope, me, multi }: { workspace: string; scope: FeedS
         </Button>
       )}
     </section>
+  );
+}
+
+/** One message in full, at its permalink (§7.8 get_message). */
+export function MessageView() {
+  const { workspace, id } = useParams({ from: "/channels/$workspace/message/$id" });
+  const me = useMe();
+  const q = useQuery({ queryKey: ["message", workspace, id], queryFn: () => api().getMessage(workspace, id) });
+  const it = q.data;
+  return (
+    <MessagesLayout selected={it?.channel ? { kind: "channel", workspace, channel: it.channel } : { kind: "all" }}>
+      <section className="panel p-3" aria-label="Message">
+        <header className="mb-2">
+          <Link to="/channels" search={{ scope: "unread" }} className="label md:hidden">
+            ← Messages
+          </Link>
+          <h1 className="font-semibold">
+            Message <span className="label">· {workspace}</span>
+          </h1>
+          {it?.channel && (
+            <Link to="/channels/$workspace/$channel" params={{ workspace, channel: it.channel }} className="text-xs text-muted hover:underline">
+              in #{it.channel}
+            </Link>
+          )}
+        </header>
+        {q.isPending && <Spinner label="Loading" />}
+        <ErrorText error={q.error} />
+        {it && (
+          <ol>
+            <Item it={it} me={me.data?.handle} />
+          </ol>
+        )}
+      </section>
+    </MessagesLayout>
   );
 }
 

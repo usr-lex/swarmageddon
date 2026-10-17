@@ -95,14 +95,20 @@ type VAPID struct {
 	Subscriber            string // mailto: or https: contact
 }
 
+// NtfySecretName is the system-namespace Secret with the ntfy publisher token.
+const NtfySecretName = "ntfy-publisher"
+
 // Dispatcher sends events.
 type Dispatcher struct {
 	Dedup   Dedup
 	Dir     Directory
 	VAPID   func() *VAPID
 	NtfyURL string // base URL of ntfy
-	HTTP    *http.Client
-	Log     *slog.Logger
+	// NtfySecret names the Secret (read through Dir.Secret) whose key token
+	// is sent as Authorization: Bearer on publish; empty: NtfySecretName.
+	NtfySecret string
+	HTTP       *http.Client
+	Log        *slog.Logger
 	// Sent records each delivery attempt (tests, metrics).
 	Sent func(channel string, ev Event, err error)
 }
@@ -245,6 +251,18 @@ func (d *Dispatcher) ntfy(ctx context.Context, topic string, ev Event) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(d.NtfyURL, "/")+"/"+topic, strings.NewReader(ev.Body))
 	if err != nil {
 		return err
+	}
+	// ntfy denies anonymous publishing (docs/conventions.md).
+	name := d.NtfySecret
+	if name == "" {
+		name = NtfySecretName
+	}
+	sec, err := d.Dir.Secret(ctx, name)
+	if err != nil {
+		return fmt.Errorf("ntfy token (Secret %s): %w", name, err)
+	}
+	if tok := strings.TrimSpace(string(sec["token"])); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	req.Header.Set("Title", ev.Title)
 	req.Header.Set("Tags", string(ev.Kind))

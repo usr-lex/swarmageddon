@@ -157,9 +157,13 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 	if retry {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
-	// Periodic resync catches repositories and changes made outside the operator.
-	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	return ctrl.Result{RequeueAfter: resyncEvery}, nil
 }
+
+// resyncEvery is the workspace's periodic resync. It catches changes made
+// outside the operator, and protects repositories people create in
+// Forgejo itself within this long (protectOtherRepos).
+const resyncEvery = 5 * time.Minute
 
 // checkSharedVolumes sets SharedVolumesValid: false, naming the volumes,
 // when a shared volume would be writable on both sides of a wall (design
@@ -255,7 +259,7 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 			}},
 			Type: corev1.SecretTypeOpaque,
 		},
-		controlCenterRole(ns),
+		ControlCenterRole(ns),
 		&rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "control-center", Namespace: ns},
 			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "control-center"},
@@ -265,8 +269,8 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 	return a.ApplyAll(ctx, w, objs)
 }
 
-// controlCenterRole is the control center's access in a workspace (design §11.3).
-func controlCenterRole(ns string) *rbacv1.Role {
+// ControlCenterRole is the control center's access in a workspace (design §11.3).
+func ControlCenterRole(ns string) *rbacv1.Role {
 	rw := []string{"get", "list", "watch", "create", "update", "patch", "delete"}
 	read := []string{"get", "list", "watch"}
 	return &rbacv1.Role{
@@ -280,6 +284,10 @@ func controlCenterRole(ns string) *rbacv1.Role {
 			{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
 			// Only the one Secret people fill in through the control center.
 			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{RoomSecretsName}, Verbs: []string{"get", "update", "patch"}},
+			// Repository credentials from the wizard, each a new Secret
+			// (docs/conventions.md). Create can't be limited by name, and
+			// gives no read access.
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, Verbs: []string{"create"}},
 		},
 	}
 }

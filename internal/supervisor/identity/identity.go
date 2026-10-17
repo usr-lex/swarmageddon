@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/usr-lex/swarmageddon/internal/redact"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
 )
 
@@ -280,6 +281,7 @@ func (s Setup) tea() error {
 	if host == "" {
 		host = strings.TrimPrefix(strings.TrimPrefix(s.ForgeURL, "https://"), "http://")
 	}
+	redact.Add(string(tok))
 	cfg := TeaConfig(s.ForgeURL, strings.TrimSpace(string(tok)), s.ForgeUser, host)
 	return s.writeFile(s.home(".config", "tea", "config.yml"), []byte(cfg), 0o600)
 }

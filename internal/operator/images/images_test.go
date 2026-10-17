@@ -42,3 +42,27 @@ func TestLoadOverrides(t *testing.T) {
 		t.Fatal("unknown key accepted")
 	}
 }
+
+func TestOwnFromChart(t *testing.T) {
+	i := Defaults("v1")
+	i.Own("k3d-swarm-registry.localhost:5005", "dev")
+	for name, got := range map[string]string{"messaging": i.Messaging, "devices": i.Devices, "runner": i.Runner, "warden": i.Warden} {
+		if want := "k3d-swarm-registry.localhost:5005/" + name + ":dev"; got != want {
+			t.Errorf("%s = %q, want %q", name, got, want)
+		}
+	}
+	if i.Postgres != Defaults("v1").Postgres {
+		t.Errorf("Own changed a third-party image: %q", i.Postgres)
+	}
+	p := filepath.Join(t.TempDir(), "images.yaml")
+	if err := os.WriteFile(p, []byte("devices: example.com/devices:x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadOnto(i, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Devices != "example.com/devices:x" || got.Messaging != i.Messaging {
+		t.Errorf("override file: devices %q, messaging %q", got.Devices, got.Messaging)
+	}
+}

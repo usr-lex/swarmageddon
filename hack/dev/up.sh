@@ -62,6 +62,25 @@ if ! "$K3D" cluster list -o json | grep -q "\"name\":\"$CLUSTER\""; then
 		--k3s-arg="--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%@server:*" \
 		--k3s-arg="--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%@server:*" \
 		$cgroup_args $preload_args ${DEV_K3D_ARGS:-}
+
+	# Some sandboxes refuse to lower oom_score_adj even for privileged
+	# containers, so runc fails every pod ("failed to update
+	# /proc/self/oom_score_adj"). containerd can clamp the value instead.
+	if ! docker run --rm --privileged --entrypoint sh "$K3S_IMAGE" -c 'echo -1 > /proc/self/oom_score_adj' 2>/dev/null; then
+		info "This host can't lower oom_score_adj: containerd will clamp it (restrict_oom_score_adj)"
+		conf=/var/lib/rancher/k3s/agent/etc/containerd
+		for node in $(docker ps --filter "label=k3d.cluster=$CLUSTER" --filter label=k3d.role=server --format '{{.Names}}'); do
+			docker exec "$node" sh -c "sed \"/^\\[plugins.'io.containerd.cri.v1.runtime'\\]\$/a\\  restrict_oom_score_adj = true\" $conf/config.toml > $conf/config-v3.toml.tmpl"
+			docker restart "$node" >/dev/null
+		done
+		i=0
+		until kc get --raw /readyz >/dev/null 2>&1; do
+			i=$((i + 1))
+			[ "$i" -le 90 ] || { info "The API server didn't come back after the restart"; exit 1; }
+			sleep 2
+		done
+		kc wait --for=condition=Ready node --all --timeout=180s
+	fi
 fi
 
 if [ "${SKIP_IMAGES:-}" != 1 ]; then

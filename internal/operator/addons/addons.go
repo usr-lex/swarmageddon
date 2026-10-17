@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -92,9 +93,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if !p.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
-	err := errors.Join(r.devices(ctx, &p), r.ntfy(ctx, &p), r.forgeIngress(ctx, &p))
+	errs := []error{r.devices(ctx, &p), r.ntfy(ctx, &p), r.forgeIngress(ctx, &p)}
+	// An add-on waiting for a platform service (or the tier) isn't an
+	// error: look again soon instead of retrying in a tight backoff.
+	waiting := false
+	for i, err := range errs {
+		if errors.Is(err, deps.ErrNotReady) {
+			log.FromContext(ctx).V(1).Info("add-on waiting", "reason", err.Error())
+			errs[i], waiting = nil, true
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return ctrl.Result{}, err
+	}
+	if waiting {
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
 	// Certificates renew well before they expire; look again daily.
-	return ctrl.Result{RequeueAfter: 24 * time.Hour}, err
+	return ctrl.Result{RequeueAfter: 24 * time.Hour}, nil
 }
 
 func (r *Reconciler) images() images.Images {
