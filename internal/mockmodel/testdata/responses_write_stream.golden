@@ -1,9 +1,9 @@
 event: response.created
-data: {"response":{"id":"resp_mock_2","model":"m","object":"response","output":[],"status":"in_progress"},"type":"response.created"}
+data: {"response":{"created_at":1700000000,"id":"resp_mock_2","model":"m","object":"response","output":[],"status":"in_progress"},"type":"response.created"}
 
 event: response.output_item.done
 data: {"item":{"call_id":"call_mock_2","id":"fc_mock_2","input":"*** Begin Patch\n*** Add File: notes.txt\n+a\n+b\n*** End Patch\n","name":"apply_patch","status":"completed","type":"custom_tool_call"},"output_index":0,"type":"response.output_item.done"}
 
 event: response.completed
-data: {"response":{"id":"resp_mock_2","model":"m","object":"response","output":[{"call_id":"call_mock_2","id":"fc_mock_2","input":"*** Begin Patch\n*** Add File: notes.txt\n+a\n+b\n*** End Patch\n","name":"apply_patch","status":"completed","type":"custom_tool_call"}],"status":"completed","usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}},"type":"response.completed"}
+data: {"response":{"created_at":1700000000,"id":"resp_mock_2","model":"m","object":"response","output":[{"call_id":"call_mock_2","id":"fc_mock_2","input":"*** Begin Patch\n*** Add File: notes.txt\n+a\n+b\n*** End Patch\n","name":"apply_patch","status":"completed","type":"custom_tool_call"}],"status":"completed","usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}},"type":"response.completed"}
 

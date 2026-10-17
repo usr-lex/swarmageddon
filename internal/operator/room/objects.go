@@ -85,6 +85,12 @@ func objectLabels(r *v1.Room, ws string) map[string]string {
 // userns tier the container also gets /dev/fuse and /dev/net/tun from our
 // device plugin (cmd/devices). Call it after setting c.Resources.
 func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
+	// The mounted identity Secret is mode 0440, group = fsGroup: the agent
+	// user (uid and gid roomcfg.AgentUID) can read its own credentials.
+	if spec.SecurityContext == nil {
+		spec.SecurityContext = &corev1.PodSecurityContext{}
+	}
+	spec.SecurityContext.FSGroup = ptr.To(int64(1000))
 	switch v1.IsolationTier(tier) {
 	case v1.TierPrivileged:
 		c.SecurityContext = &corev1.SecurityContext{Privileged: ptr.To(true)}

@@ -177,6 +177,10 @@ func responsesOutput(r reply) []any {
 	return out
 }
 
+// mockCreatedAt is a fixed created_at: LiteLLM requires the field, and the
+// golden files need it stable.
+const mockCreatedAt = 1700000000
+
 var responsesUsage = map[string]any{
 	"input_tokens": 10, "input_tokens_details": map[string]int{"cached_tokens": 0},
 	"output_tokens": 5, "output_tokens_details": map[string]int{"reasoning_tokens": 0}, "total_tokens": 15,
@@ -184,7 +188,7 @@ var responsesUsage = map[string]any{
 
 func responsesObject(r reply, model string) map[string]any {
 	return map[string]any{
-		"id": fmt.Sprintf("resp_mock_%d", r.n), "object": "response", "status": "completed", "model": model,
+		"id": fmt.Sprintf("resp_mock_%d", r.n), "object": "response", "created_at": mockCreatedAt, "status": "completed", "model": model,
 		"output": responsesOutput(r), "usage": responsesUsage,
 	}
 }
@@ -192,7 +196,7 @@ func responsesObject(r reply, model string) map[string]any {
 func responsesEvents(r reply, model string) []event {
 	id := fmt.Sprintf("resp_mock_%d", r.n)
 	evs := []event{{"response.created", map[string]any{"type": "response.created", "response": map[string]any{
-		"id": id, "object": "response", "status": "in_progress", "model": model, "output": []any{}}}}}
+		"id": id, "object": "response", "created_at": mockCreatedAt, "status": "in_progress", "model": model, "output": []any{}}}}}
 	for i, item := range responsesOutput(r) {
 		evs = append(evs, event{"response.output_item.done", map[string]any{"type": "response.output_item.done", "output_index": i, "item": item}})
 	}
