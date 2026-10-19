@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { setApi } from "@/api";
 import { createMockApi, MOCK_SETUP_TOKEN } from "@/api/mock";
 import { defaultRoom, emptyDraft } from "@/lib/workspace";
+import { EditRoom } from "@/pages/room/EditRoom";
 import { PreflightStep } from "@/pages/wizard/PreflightStep";
 import { ReachDiagram } from "@/pages/workspace/ReachDiagram";
 
@@ -104,5 +105,33 @@ describe("mock API", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("EditRoom", () => {
+  it("changes one room's CLI through the workspace plan, without the wizard", async () => {
+    sessionStorage.clear();
+    const api = createMockApi("demo");
+    setApi(api);
+    const [ws] = await api.listWorkspaces();
+    const draft = await api.getWorkspaceDraft(ws.name);
+    const target = draft.rooms[0];
+    const room = (await api.getRoom(ws.name, target.name)).summary;
+    const cli = target.cli === "claude" ? "ore" : "claude";
+    const updateNow = vi.spyOn(api, "roomAction");
+    wrap(<EditRoom room={room} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.selectOptions(await screen.findByLabelText("CLI"), cli);
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    expect(await screen.findByTestId("edit-preview")).toHaveTextContent(`cli: "${target.cli}" -> "${cli}"`);
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    await vi.waitFor(async () => {
+      const after = await api.getWorkspaceDraft(ws.name);
+      expect(after.rooms.find((r) => r.name === target.name)?.cli).toBe(cli);
+    });
+    expect(updateNow).toHaveBeenCalledWith(ws.name, target.name, { kind: "updateNow" });
+    const after = await api.getWorkspaceDraft(ws.name);
+    expect(after.rooms.filter((r) => r.name !== target.name)).toEqual(draft.rooms.filter((r) => r.name !== target.name));
   });
 });
