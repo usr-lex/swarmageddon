@@ -170,4 +170,9 @@ describe("connect: helpers", () => {
     expect(r).toMatchObject({ quarantined: true, quarantineReason: "why", verdict: "critical" });
     expect(roomFrom(create(pb.RoomSummarySchema, { name: "m", wardenSeverity: pb.Severity.HIGH })).verdict).toBeUndefined();
   });
+
+  it("reads a room's model access, gateway when unset", () => {
+    expect(roomFrom(create(pb.RoomSummarySchema, { name: "m", modelAccess: "direct" })).modelAccess).toBe("direct");
+    expect(roomFrom(create(pb.RoomSummarySchema, { name: "m" })).modelAccess).toBe("gateway");
+  });
 });

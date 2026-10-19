@@ -663,6 +663,20 @@ func (r *Reconciler) syncGatewayKey(ctx context.Context, room *v1.Room, ws *v1.W
 	budget := ws.Spec.Models.Budgets.PerRoomMonthlyUSD
 	want := fmt.Sprintf("%d/%s", budget, roomModel(room, ws))
 	old := string(sec.Data[KeyGatewayKey])
+	if v1.EffectiveModelAccess(room, ws) == v1.ModelAccessDirect {
+		// The CLI talks to its provider itself; a key left from gateway
+		// access is revoked.
+		if old != "" && r.Deps.Gateway != nil {
+			if gc, err := r.Deps.Gateway(ctx); err == nil {
+				*revoke = append(*revoke, func() error { return gc.DeleteKeys(ctx, old) })
+				delete(sec.Data, KeyGatewayKey)
+				delete(sec.Annotations, annGatewayKeySpec)
+				delete(sec.Annotations, annGatewayAlias)
+			}
+		}
+		setCond(st, gen, v1.ConditionGatewayKeyReady, true, "NotUsed", "model access is direct: the CLI uses its own provider key or login")
+		return true
+	}
 	if !rotating && old != "" && sec.Annotations[annGatewayKeySpec] == want {
 		setCond(st, gen, v1.ConditionGatewayKeyReady, true, "Issued", "alias "+sec.Annotations[annGatewayAlias])
 		return true

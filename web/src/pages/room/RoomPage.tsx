@@ -62,9 +62,17 @@ export function RoomPage() {
             {s.group && ` · group ${s.group}`}
           </p>
           {s.currentTask && <p className="mt-1 text-sm">{s.currentTask}</p>}
+          {s.modelAccess === "direct" && (
+            <p className="mt-1 text-sm text-muted" data-testid="direct-access">
+              Direct model access: {s.cli === "claude" ? "Claude Code" : "ore"} uses its own {s.cli === "claude" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"} (a room secret) or
+              its own login. Without either, log in once: {s.cli === "claude" ? <>take control in the Agent tab and type <code>/login</code></> : <>run <code>ore login</code> in the Shell tab</>}. The
+              login is kept in the room's home.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-1">
           {s.updateAvailable && <Badge tone="info">Update available</Badge>}
+          {s.modelAccess === "direct" && <Badge>Direct model access</Badge>}
           {s.budgetUSD > 0 && s.spendUSD >= s.budgetUSD && <Badge tone="bad">Budget exhausted</Badge>}
           {s.quarantined && <QuarantineBadge />}
           {s.verdict && (

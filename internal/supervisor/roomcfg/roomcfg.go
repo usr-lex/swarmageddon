@@ -66,6 +66,9 @@ type Room struct {
 	MessagingURL string `json:"messagingURL,omitempty"`
 	// GatewayURL is LiteLLM's base URL without /v1.
 	GatewayURL string `json:"gatewayURL,omitempty"`
+	// ModelAccess "direct": the CLI uses its own provider key or login; no
+	// gateway key is set for it.
+	ModelAccess string `json:"modelAccess,omitempty"`
 	// WorkDir is relative to the home directory, e.g. work/api.
 	WorkDir string `json:"workDir,omitempty"`
 	// Repos are owner/name, cloned into ~/work/<name>.
@@ -344,3 +347,6 @@ func (r *Room) OreBaseURL() string {
 	}
 	return strings.TrimRight(r.GatewayURL, "/") + "/v1"
 }
+
+// Direct reports whether the room's CLI talks to its provider itself.
+func (r *Room) Direct() bool { return r.ModelAccess == "direct" }

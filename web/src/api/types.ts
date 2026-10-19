@@ -154,6 +154,9 @@ export interface PlatformSecrets {
 // Workspaces
 
 export type CLI = "claude" | "ore";
+
+/** gateway: LiteLLM with spend limits and the warden's guard. direct: the CLI's own API key (room secret) or login. */
+export type ModelAccess = "gateway" | "direct";
 export type LinkMode = "open" | "mediated" | "none";
 
 export interface RoleTemplate {
@@ -178,6 +181,8 @@ export interface RoomDraft {
   advisor?: AdvisorDraft | null;
   /** Overrides the workspace's warden mode; "" inherits. */
   wardenMode?: WardenMode | "";
+  /** Overrides the workspace's model access; "" inherits. */
+  modelAccess?: ModelAccess | "";
   /** The room's own level of layered settings (§6.6). */
   settings?: RoomSettings;
 }
@@ -253,6 +258,8 @@ export interface WorkspaceDraft {
   sharedVolumes: SharedVolumeDraft[];
   /** Record what people type in room terminals in the audit log (§8.4). Off by default. */
   recordKeystrokes?: boolean;
+  /** How rooms reach their model: through the gateway (default), or each CLI directly with its own key or login. */
+  modelAccess?: ModelAccess;
   /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
   source?: unknown;
 }
@@ -316,6 +323,8 @@ export interface RoomSummary {
   verdict?: Severity;
   quarantined?: boolean;
   quarantineReason?: string;
+  /** "direct": the CLI uses its own key or login, not the gateway. */
+  modelAccess?: ModelAccess;
 }
 
 export type FleetEvent =

@@ -26,6 +26,9 @@ type RoomSpec struct {
 	// Model, as the gateway names it. Empty: the workspace default.
 	// +optional
 	Model string `json:"model,omitempty"`
+	// ModelAccess overrides the workspace's models.access. Empty inherits.
+	// +optional
+	ModelAccess ModelAccess `json:"modelAccess,omitempty"`
 	// Effort, e.g. low, medium, high, xhigh, max.
 	// +optional
 	Effort string `json:"effort,omitempty"`
@@ -207,4 +210,16 @@ type RoomList struct {
 
 func init() {
 	SchemeBuilder.Register(&Room{}, &RoomList{})
+}
+
+// EffectiveModelAccess is the room's model access: its own, else the
+// workspace's, else gateway.
+func EffectiveModelAccess(room *Room, ws *Workspace) ModelAccess {
+	if room != nil && room.Spec.ModelAccess != "" {
+		return room.Spec.ModelAccess
+	}
+	if ws != nil && ws.Spec.Models.Access != "" {
+		return ws.Spec.Models.Access
+	}
+	return ModelAccessGateway
 }

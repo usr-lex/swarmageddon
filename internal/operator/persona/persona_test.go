@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -253,5 +254,70 @@ func TestRenderIsDeterministic(t *testing.T) {
 				t.Fatalf("%s not deterministic", k)
 			}
 		}
+	}
+}
+
+// Direct model access (OpenShift report, feature 8): the CLI talks to its
+// provider itself. Claude Code gets no gateway base URL, ore no forced
+// gateway provider, and room.json says so, so the supervisor issues no key.
+func TestDirectModelAccess(t *testing.T) {
+	for _, cli := range []v1.CLI{v1.CLIClaude, v1.CLIOre} {
+		in := fixture(cli)
+		in.Workspace.Spec.Models.Access = v1.ModelAccessDirect
+		data, err := Render(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rj RoomJSON
+		if err := json.Unmarshal([]byte(data[KeyRoomJSON]), &rj); err != nil {
+			t.Fatal(err)
+		}
+		if rj.ModelAccess != "direct" || rj.GatewayURL == "" {
+			t.Errorf("%s room.json: access %q gateway %q", cli, rj.ModelAccess, rj.GatewayURL)
+		}
+		switch cli {
+		case v1.CLIClaude:
+			if strings.Contains(data[KeyClaudeManagedSettings], "ANTHROPIC_BASE_URL") {
+				t.Error("claude: managed settings still point at the gateway")
+			}
+		case v1.CLIOre:
+			for _, k := range []string{KeyOreRequirements, KeyOreConfig} {
+				var m map[string]any
+				if _, err := toml.Decode(data[k], &m); err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := m["model_provider"]; ok {
+					t.Errorf("ore %s still forces a provider: %v", k, m["model_provider"])
+				}
+				if _, ok := m["model_providers"]; ok {
+					t.Errorf("ore %s still defines the gateway provider", k)
+				}
+			}
+		}
+		// A room may go back to the gateway.
+		in.Room.Spec.ModelAccess = v1.ModelAccessGateway
+		data, _ = Render(in)
+		if strings.Contains(data[KeyRoomJSON], `"modelAccess"`) {
+			t.Errorf("%s: room override to gateway ignored", cli)
+		}
+	}
+}
+
+func TestDirectAccessNetwork(t *testing.T) {
+	none := v1.RoomDefaults{Network: &v1.NetworkAccess{Mode: v1.NetworkNone}}
+	got := DirectAccessNetwork(none, v1.CLIClaude)
+	if got.Network.Mode != v1.NetworkLimited || !slices.Contains(got.Network.Domains, "api.anthropic.com") || len(got.Network.Domains) != len(ProviderDomains(v1.CLIClaude)) {
+		t.Errorf("none: %+v", got.Network)
+	}
+	limited := v1.RoomDefaults{Network: &v1.NetworkAccess{Mode: v1.NetworkLimited, Domains: []string{"example.com"}}}
+	got = DirectAccessNetwork(limited, v1.CLIOre)
+	if got.Network.Mode != v1.NetworkLimited || !slices.Contains(got.Network.Domains, "example.com") || !slices.Contains(got.Network.Domains, "api.openai.com") {
+		t.Errorf("limited: %+v", got.Network)
+	}
+	if limited.Network.Domains[0] != "example.com" || len(limited.Network.Domains) != 1 {
+		t.Error("input modified")
+	}
+	if got := DirectAccessNetwork(v1.RoomDefaults{}, v1.CLIClaude); got.Network != nil && got.Network.Mode != v1.NetworkFull && got.Network.Mode != "" {
+		t.Errorf("full: %+v", got.Network)
 	}
 }

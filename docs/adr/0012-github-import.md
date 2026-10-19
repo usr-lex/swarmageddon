@@ -1,6 +1,6 @@
 # 0012. Importing a GitHub organization
 
-- Status: Proposed (needs the owner's answers to the questions at the end)
+- Status: Accepted (the owner's answers are under Decisions)
 - Date: 2026-10-19
 
 ## Context
@@ -72,7 +72,17 @@ and discussions are not migrated; commit authorship stays the git author
   don't own their history (mentions, assignments and "my open PRs" don't
   find it).
 
-## Questions for the owner
+## Decisions (2026-10-19)
+
+1. **One-time import.** No sync with GitHub afterwards.
+2. **Write the account link** into Forgejo's database, so `bot-<room>` posts
+   become the room's own.
+3. **People's accounts stay "originally by"**; only `bot-` accounts are mapped.
+4. **The import creates rooms** for `bot-<name>` accounts (CLI, model and role
+   set in the wizard; any can be skipped).
+5. **A read-only fine-grained token**, used for the import and not stored.
+
+## Questions that were asked
 
 1. One-time import, or keep GitHub and Forgejo in sync for a while (pull
    mirrors for code; issues and PRs can't be synced both ways)?

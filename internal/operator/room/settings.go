@@ -48,6 +48,10 @@ func NoProxy(allowed []string) []string {
 // settings merges and resolves the room's layered settings (§6.6).
 func (r *Reconciler) settings(ctx context.Context, room *v1.Room, ws *v1.Workspace, role *v1.RoleTemplate) (v1.RoomDefaults, persona.Settings, map[string]string, []error) {
 	merged := persona.MergeFor(ws, role, room)
+	if v1.EffectiveModelAccess(room, ws) == v1.ModelAccessDirect {
+		// The CLI reaches its provider itself: open those domains.
+		merged = persona.DirectAccessNetwork(merged, room.Spec.CLI)
+	}
 	cache := map[string]*corev1.Secret{}
 	get := func(ref v1.SecretKeyRef) (string, error) {
 		s, ok := cache[ref.Name]

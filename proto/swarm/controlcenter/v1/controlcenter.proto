@@ -505,6 +505,8 @@ message AgentPlan {
   AdvisorPlan advisor = 16;
   // Room.spec.wardenMode: off, monitor or gate; empty inherits the workspace's.
   string warden_mode = 17;
+  // Room.spec.modelAccess: gateway or direct; empty inherits the workspace's.
+  string model_access = 18;
 }
 
 // AdvisorPlan is an AdvisorSpec (ADR 0010).
@@ -640,6 +642,10 @@ message WorkspacePlan {
   // Workspace.spec.recordKeystrokes: what people type in room terminals goes
   // to the audit log (docs/design.md §8.4). Off by default.
   bool record_keystrokes = 31;
+  // Workspace.spec.models.access: gateway (default) or direct, where each
+  // room's CLI uses its own provider key or login (no spend limits, no
+  // gateway guard).
+  string model_access = 32;
 }
 
 message ChannelMemberPlan {
@@ -825,6 +831,8 @@ message RoomSummary {
   // Highest severity among undecided warden verdicts of the last 24 h.
   Severity warden_severity = 23;
   int32 undecided_verdicts = 24;
+  // Effective model access: gateway or direct (the CLI's own key or login).
+  string model_access = 25;
 }
 
 service RoomService {

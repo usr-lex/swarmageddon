@@ -1,9 +1,11 @@
 package wizard
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
 )
 
@@ -75,5 +77,41 @@ func TestValidateRepos(t *testing.T) {
 	}
 	if strings.Contains(got, `"ok"`) {
 		t.Errorf("valid repository refused:\n%s", got)
+	}
+}
+
+// Model access (OpenShift report, feature 8): a workspace default and a
+// per-room override, both ways through the plan; unknown values refused.
+func TestModelAccess(t *testing.T) {
+	p := &ccv1.WorkspacePlan{Name: "acme", Org: "acme", ModelAccess: "direct", Agents: []*ccv1.AgentPlan{
+		{Name: "athena", Role: "implementer", Cli: "claude"},
+		{Name: "hermes", Role: "implementer", Cli: "ore", ModelAccess: "gateway"},
+	}}
+	d := Build(p, Current{})
+	if d.Workspace.Spec.Models.Access != "direct" {
+		t.Fatalf("workspace access %q", d.Workspace.Spec.Models.Access)
+	}
+	got := map[string]string{}
+	for _, r := range d.Rooms {
+		got[r.Name] = string(r.Spec.ModelAccess)
+	}
+	if got["athena"] != "" || got["hermes"] != "gateway" {
+		t.Fatalf("rooms %v", got)
+	}
+	var rooms []v1alpha1.Room
+	for _, r := range d.Rooms {
+		rooms = append(rooms, *r)
+	}
+	back := FromCluster(Current{Workspace: d.Workspace, Rooms: rooms})
+	access := map[string]string{}
+	for _, a := range back.Agents {
+		access[a.GetName()] = a.GetModelAccess()
+	}
+	if back.ModelAccess != "direct" || access["hermes"] != "gateway" || access["athena"] != "" {
+		t.Fatalf("round trip: %q %v", back.ModelAccess, access)
+	}
+	p.ModelAccess = "proxy"
+	if probs := Validate(p, map[string]bool{}); !slices.ContainsFunc(probs, func(s string) bool { return strings.Contains(s, "model access") }) {
+		t.Fatalf("bad access accepted: %v", probs)
 	}
 }

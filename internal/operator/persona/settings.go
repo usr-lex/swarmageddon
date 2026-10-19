@@ -167,3 +167,35 @@ var reservedEnv = []string{"SWARM_ROOM", "SWARM_WORKSPACE", "ANTHROPIC_BASE_URL"
 func Reserved(name string) bool {
 	return slices.Contains(reservedEnv, name) || strings.HasPrefix(name, "SWARM_")
 }
+
+// ProviderDomains are what a CLI reaches with direct model access: its
+// provider's API and, for the CLI's own login, its sign-in hosts.
+func ProviderDomains(cli v1.CLI) []string {
+	if cli == v1.CLIOre {
+		return []string{"api.openai.com", "auth.openai.com", "chatgpt.com"}
+	}
+	return []string{"api.anthropic.com", "claude.ai", "console.anthropic.com", "platform.claude.com"}
+}
+
+// DirectAccessNetwork opens the provider's domains for a room with direct
+// model access: a room with no network gets limited access to exactly those,
+// a limited room gets them added, a full room needs nothing. merged is not
+// modified.
+func DirectAccessNetwork(merged v1.RoomDefaults, cli v1.CLI) v1.RoomDefaults {
+	mode := NetworkMode(merged)
+	if mode == v1.NetworkFull {
+		return merged
+	}
+	n := &v1.NetworkAccess{Mode: v1.NetworkLimited}
+	if mode == v1.NetworkLimited && merged.Network != nil {
+		n.Domains = slices.Clone(merged.Network.Domains)
+		n.PackageManagers = merged.Network.PackageManagers
+	}
+	for _, d := range ProviderDomains(cli) {
+		if !slices.Contains(n.Domains, d) {
+			n.Domains = append(n.Domains, d)
+		}
+	}
+	merged.Network = n
+	return merged
+}

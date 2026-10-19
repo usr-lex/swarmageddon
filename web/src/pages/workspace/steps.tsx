@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import { notificationEvents, type ChannelKind, type CLI, type RepositoryDraft, type RoomDraft } from "@/api/types";
+import { notificationEvents, type ChannelKind, type CLI, type ModelAccess, type RepositoryDraft, type RoomDraft } from "@/api/types";
 import { Badge, Button, Card, Checkbox, Field, Input, Select } from "@/components/ui";
 import { resizeRooms, roomNamePattern } from "@/lib/workspace";
 import type { DraftProps } from "./WorkspaceWizard";
@@ -34,6 +34,21 @@ export function BasicsStep({ draft, set, existing, models }: DraftProps & { mode
               {models.map((m) => (
                 <option key={m}>{m}</option>
               ))}
+            </Select>
+          )}
+        </Field>
+        <Field
+          label="Model access"
+          hint={
+            draft.modelAccess === "direct"
+              ? "Each CLI uses its own provider: give rooms ANTHROPIC_API_KEY or OPENAI_API_KEY as a room secret, or log in once in a room's terminal. No spend limits, Spend page or gateway guard for these rooms."
+              : "Through the platform's gateway: per-room keys, spend limits and the warden's gateway guard."
+          }
+        >
+          {(id, d) => (
+            <Select id={id} aria-describedby={d} value={draft.modelAccess ?? "gateway"} onChange={(e) => set({ ...draft, modelAccess: e.target.value as ModelAccess })}>
+              <option value="gateway">Gateway (LiteLLM)</option>
+              <option value="direct">Direct: each CLI's own key or login</option>
             </Select>
           )}
         </Field>

@@ -102,23 +102,27 @@ type JanitorJSON struct {
 
 // RoomJSON is /etc/swarm/room.json.
 type RoomJSON struct {
-	Room                   string            `json:"room"`
-	Workspace              string            `json:"workspace"`
-	Address                string            `json:"address"`
-	DisplayName            string            `json:"displayName,omitempty"`
-	Email                  string            `json:"email"`
-	Group                  string            `json:"group,omitempty"`
-	Role                   string            `json:"role"`
-	RoleTitle              string            `json:"roleTitle"`
-	RoleSummary            string            `json:"roleSummary,omitempty"`
-	CLI                    string            `json:"cli"`
-	Model                  string            `json:"model,omitempty"`
-	Effort                 string            `json:"effort,omitempty"`
-	ForgeURL               string            `json:"forgeURL"`
-	ForgeSSHHost           string            `json:"forgeSSHHost,omitempty"`
-	ForgeOrg               string            `json:"forgeOrg"`
-	MessagingURL           string            `json:"messagingURL"`
-	GatewayURL             string            `json:"gatewayURL"`
+	Room         string `json:"room"`
+	Workspace    string `json:"workspace"`
+	Address      string `json:"address"`
+	DisplayName  string `json:"displayName,omitempty"`
+	Email        string `json:"email"`
+	Group        string `json:"group,omitempty"`
+	Role         string `json:"role"`
+	RoleTitle    string `json:"roleTitle"`
+	RoleSummary  string `json:"roleSummary,omitempty"`
+	CLI          string `json:"cli"`
+	Model        string `json:"model,omitempty"`
+	Effort       string `json:"effort,omitempty"`
+	ForgeURL     string `json:"forgeURL"`
+	ForgeSSHHost string `json:"forgeSSHHost,omitempty"`
+	ForgeOrg     string `json:"forgeOrg"`
+	MessagingURL string `json:"messagingURL"`
+	GatewayURL   string `json:"gatewayURL"`
+	// ModelAccess is "direct" when the CLI talks to its provider itself
+	// (no gateway key for it; GatewayURL stays for the advisor and warden);
+	// empty means through the gateway.
+	ModelAccess            string            `json:"modelAccess,omitempty"`
 	WorkDir                string            `json:"workDir"`
 	Repos                  []string          `json:"repos"`
 	FirstTurn              string            `json:"firstTurn"`
@@ -283,13 +287,18 @@ func roomJSON(in Input) RoomJSON {
 		cli = string(v1.CLIClaude)
 	}
 	set := in.settings()
+	// The advisor and the warden still use the gateway in direct mode.
+	gateway, access := in.Endpoints.GatewayURL, ""
+	if v1.EffectiveModelAccess(r, ws) == v1.ModelAccessDirect {
+		access = string(v1.ModelAccessDirect)
+	}
 	return RoomJSON{
 		Room: r.Name, Workspace: ws.Name, Address: r.Name + "@" + ws.Name,
 		DisplayName: r.Spec.DisplayName, Email: Email(r.Name, ws.Name), Group: r.Spec.Group,
 		Role: r.Spec.Role, RoleTitle: role.Spec.Title, RoleSummary: role.Spec.Summary,
 		CLI: cli, Model: Model(r, ws), Effort: r.Spec.Effort,
 		ForgeURL: in.Endpoints.ForgeURL, ForgeSSHHost: in.Endpoints.ForgeSSHHost, ForgeOrg: ws.Spec.Forge.Org,
-		MessagingURL: in.Endpoints.MessagingURL, GatewayURL: in.Endpoints.GatewayURL,
+		MessagingURL: in.Endpoints.MessagingURL, GatewayURL: gateway, ModelAccess: access,
 		WorkDir: wd, Repos: repos, FirstTurn: first,
 		Sudo:                   r.Spec.Sudo == nil || *r.Spec.Sudo,
 		PermissionMode:         string(role.Spec.ClaudeCode.PermissionMode),
@@ -405,6 +414,10 @@ func claudeSettings(in Input) (string, error) {
 		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
 		"DISABLE_AUTOUPDATER":                      "1",
 	}
+	if v1.EffectiveModelAccess(in.Room, in.Workspace) == v1.ModelAccessDirect {
+		// Its own endpoint, with ANTHROPIC_API_KEY or its own login.
+		delete(env, "ANTHROPIC_BASE_URL")
+	}
 	if a := Advisor(in.Room, in.Role); a != nil && a.Native {
 		env["CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL"] = "1"
 	}
@@ -508,8 +521,8 @@ type oreRequirements struct {
 	AllowedApprovalsReviewers []string                     `toml:"allowed_approvals_reviewers"`
 	AllowedSandboxModes       []string                     `toml:"allowed_sandbox_modes,omitempty"`
 	AllowManagedHooksOnly     bool                         `toml:"allow_managed_hooks_only"`
-	ModelProvider             string                       `toml:"model_provider"`
-	ModelProviders            map[string]oreProvider       `toml:"model_providers"`
+	ModelProvider             string                       `toml:"model_provider,omitempty"`
+	ModelProviders            map[string]oreProvider       `toml:"model_providers,omitempty"`
 	MCPServers                map[string]oreMCPRequirement `toml:"mcp_servers"`
 }
 
@@ -529,7 +542,7 @@ type oreMCPServer struct {
 
 type oreConfig struct {
 	Model                string                  `toml:"model,omitempty"`
-	ModelProvider        string                  `toml:"model_provider"`
+	ModelProvider        string                  `toml:"model_provider,omitempty"`
 	ModelReasoningEffort string                  `toml:"model_reasoning_effort,omitempty"`
 	ApprovalPolicy       string                  `toml:"approval_policy"`
 	ApprovalsReviewer    string                  `toml:"approvals_reviewer"`
@@ -571,6 +584,11 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 		}},
 		MCPServers: map[string]oreMCPRequirement{"swarm": {Identity: oreMCPIdentity{Command: "swarm"}}},
 	}
+	direct := rj.ModelAccess == string(v1.ModelAccessDirect)
+	if direct {
+		// ore's own provider (OpenAI), with OPENAI_API_KEY or its login.
+		req.ModelProvider, req.ModelProviders = "", nil
+	}
 	if sandbox != "" {
 		// ore 1.161 refuses an allowed set without read-only ("must include
 		// 'read-only' to allow any PermissionProfile") and doesn't start.
@@ -589,6 +607,9 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 		Model: rj.Model, ModelProvider: "gateway", ModelReasoningEffort: rj.Effort,
 		ApprovalPolicy: policy, ApprovalsReviewer: reviewer, SandboxMode: sandbox,
 		MCPServers: map[string]oreMCPServer{"swarm": swarm},
+	}
+	if direct {
+		cfg.ModelProvider = ""
 	}
 	// Layered MCP servers, with values written in: ore doesn't expand ${VAR}.
 	for name, m := range in.settings().MCPServers {

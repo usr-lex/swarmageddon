@@ -36,6 +36,7 @@ import type {
   User,
   WizardStep,
   WorkspaceDraft,
+  ModelAccess,
 } from "./types";
 
 const iso = (t?: Timestamp) => (t ? timestampDate(t).toISOString() : "");
@@ -108,6 +109,7 @@ export function roomFrom(r: pb.RoomSummary): RoomSummary {
     verdict: r.undecidedVerdicts > 0 ? severityFrom(r.wardenSeverity) : undefined,
     quarantined: r.quarantined,
     quarantineReason: r.quarantineReason,
+    modelAccess: r.modelAccess === "direct" ? "direct" : "gateway",
   };
 }
 
@@ -355,6 +357,7 @@ export function parseSMTP(target: string) {
   }
 }
 
+const modelAccess = (m: string): ModelAccess | undefined => (m === "gateway" || m === "direct" ? m : undefined);
 const wardenMode = (m: string): WardenMode | undefined => (m === "off" || m === "monitor" || m === "gate" ? m : undefined);
 
 const advisorFrom = (a: pb.AdvisorPlan): AdvisorDraft => ({
@@ -397,6 +400,7 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
       settings: settingsFrom(a.settings),
       advisor: a.advisor ? (a.advisor.model ? advisorFrom(a.advisor) : null) : undefined,
       wardenMode: wardenMode(a.wardenMode) ?? "",
+      modelAccess: modelAccess(a.modelAccess) ?? "",
     })),
     groups: p.groups.map((g) => g.name),
     defaultLinks: p.defaultLinks === "none" ? "none" : "withinGroup",
@@ -420,6 +424,7 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
     roleDefaults: mapValues(p.roleDefaults, settingsFrom),
     sharedVolumes: p.sharedVolumes.map(sharedVolumeFrom),
     recordKeystrokes: p.recordKeystrokes,
+    modelAccess: modelAccess(p.modelAccess) ?? "gateway",
     source: p,
   };
 }
@@ -465,6 +470,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
         // undefined inherits the role's advisor; null turns it off (an empty model).
         advisor: r.advisor === undefined ? undefined : advisorTo(r.advisor ?? { model: "", effort: "", maxCallsPerHour: 0, monthlyUSD: 0, native: false }),
         wardenMode: r.wardenMode ?? "",
+        modelAccess: r.modelAccess ?? "",
       }),
     ),
     groups: d.groups.map((g) => from(pb.GroupPlanSchema, srcGroup.get(g), { name: g })),
@@ -500,6 +506,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     roleDefaults: mapValues(d.roleDefaults, settingsTo),
     sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
     recordKeystrokes: d.recordKeystrokes ?? false,
+    modelAccess: d.modelAccess === "direct" ? "direct" : "",
   });
 }
 

@@ -166,6 +166,15 @@ func Validate(p *ccv1.WorkspacePlan, reserved map[string]bool) []string {
 	} else if !regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`).MatchString(p.GetOrg()) {
 		probs = append(probs, "the Forgejo organization name is not valid")
 	}
+	validAccess := func(a string) bool { return a == "" || a == "gateway" || a == "direct" }
+	if !validAccess(p.GetModelAccess()) {
+		probs = append(probs, fmt.Sprintf("model access %q: gateway or direct", p.GetModelAccess()))
+	}
+	for _, a := range p.GetAgents() {
+		if !validAccess(a.GetModelAccess()) {
+			probs = append(probs, fmt.Sprintf("agent %s: model access %q: gateway or direct", a.GetName(), a.GetModelAccess()))
+		}
+	}
 	groups := map[string]bool{"": true}
 	for _, g := range p.GetGroups() {
 		if !nameRE.MatchString(g.GetName()) {
@@ -293,6 +302,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 			Senders: l.GetSenders(), Recipients: l.GetRecipients(), RequirePrefix: l.GetRequirePrefix()})
 	}
 	s.Models.Default = p.GetDefaultModel()
+	s.Models.Access = v1alpha1.ModelAccess(p.GetModelAccess())
 	s.Models.Budgets.PerRoomMonthlyUSD = p.GetBudgetPerRoomMonthlyUsd()
 	s.Notifications.Channels = nil
 	for _, c := range p.GetNotificationChannels() {
@@ -369,6 +379,7 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 		}
 		rs.Advisor = AdvisorFromPlan(a.GetAdvisor(), true)
 		rs.WardenMode = v1alpha1.WardenMode(a.GetWardenMode())
+		rs.ModelAccess = v1alpha1.ModelAccess(a.GetModelAccess())
 		rooms = append(rooms, r)
 	}
 	var templates []*v1alpha1.RoleTemplate
@@ -419,7 +430,7 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 	s := w.Spec
 	p := &ccv1.WorkspacePlan{
 		Name: w.Name, DisplayName: s.DisplayName, Org: s.Forge.Org, DefaultLinks: string(s.Messaging.DefaultLinks),
-		Owners: s.Owners, DefaultModel: s.Models.Default, BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
+		Owners: s.Owners, DefaultModel: s.Models.Default, ModelAccess: string(s.Models.Access), BudgetPerRoomMonthlyUsd: s.Models.Budgets.PerRoomMonthlyUSD,
 		UpdateMode: string(s.UpdatePolicy.Mode), UpdateWindow: s.UpdatePolicy.Window, RequiredApprovals: s.Forge.RequiredApprovals,
 		Internet:     s.Internet == nil || *s.Internet, //nolint:staticcheck // still read for workspaces written before roomDefaults.network
 		RoomDefaults: SettingsToPlan(WorkspaceDefaults(w)), SharedVolumes: volumesToPlan(s.SharedVolumes),
@@ -464,7 +475,8 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 		p.Agents = append(p.Agents, &ccv1.AgentPlan{Name: r.Name, DisplayName: rs.DisplayName, Role: rs.Role, Cli: string(rs.CLI),
 			Model: rs.Model, Effort: rs.Effort, Group: rs.Group, Cpu: qstr(rs.Resources.CPU), Memory: qstr(rs.Resources.Memory),
 			HomeVolume: qstr(rs.Volumes.Home), EngineVolume: qstr(rs.Volumes.Engine), Repos: rs.Repos, WorkDir: rs.WorkDir, Paused: rs.Paused,
-			Settings: SettingsToPlan(RoomSettings(rs)), Advisor: AdvisorToPlan(rs.Advisor), WardenMode: string(rs.WardenMode)})
+			Settings: SettingsToPlan(RoomSettings(rs)), Advisor: AdvisorToPlan(rs.Advisor), WardenMode: string(rs.WardenMode),
+			ModelAccess: string(rs.ModelAccess)})
 	}
 	if cur.Pool != nil {
 		p.RunnerLabels = cur.Pool.Spec.Labels

@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/egress"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/room/roomtest"
 )
@@ -483,5 +484,45 @@ func TestDevOvercommit(t *testing.T) {
 	plain := desiredStatefulSet(r, "acme", "room:1", "privileged", podExtras{}).Spec.Template.Spec.Containers[0].Resources
 	if !plain.Requests.Cpu().Equal(cpu) || !plain.Requests.Memory().Equal(mem) {
 		t.Errorf("without overcommit, requests %v", plain.Requests)
+	}
+}
+
+// Direct model access (OpenShift report, feature 8): no gateway key, the
+// provider's domains in the room's egress allowlist (a room with no network
+// gets exactly those), and a gateway room switched to direct loses its key.
+func TestDirectModelAccessRoom(t *testing.T) {
+	e := newEnv(t)
+	e.addRoom("athena", func(r *v1.Room) {
+		r.Spec.ModelAccess = v1.ModelAccessDirect
+		r.Spec.Network = &v1.NetworkAccess{Mode: v1.NetworkNone}
+	})
+	e.reconcile("athena")
+	if k := e.secret("athena").Data[KeyGatewayKey]; len(k) != 0 {
+		t.Error("gateway key issued for a direct room")
+	}
+	c := meta.FindStatusCondition(e.room("athena").Status.Conditions, v1.ConditionGatewayKeyReady)
+	if c == nil || c.Status != metav1.ConditionTrue || c.Reason != "NotUsed" {
+		t.Errorf("GatewayKeyReady = %+v", c)
+	}
+	var cm corev1.ConfigMap
+	if err := e.c.Get(context.Background(), types.NamespacedName{Namespace: v1.PlatformNamespace, Name: egress.ConfigMapName}, &cm); err != nil {
+		t.Fatal(err)
+	}
+	row := cm.Data[egress.DataKey("acme", "athena")]
+	if !strings.Contains(row, "api.anthropic.com") || !strings.Contains(row, "limited") {
+		t.Errorf("egress row %s", row)
+	}
+
+	e.addRoom("hermes", nil)
+	e.reconcile("hermes")
+	old := string(e.secret("hermes").Data[KeyGatewayKey])
+	if old == "" {
+		t.Fatal("gateway room has no key")
+	}
+	deletes := len(e.gw.Calls("POST", "/key/delete"))
+	e.update("hermes", func(r *v1.Room) { r.Spec.ModelAccess = v1.ModelAccessDirect })
+	e.reconcile("hermes")
+	if len(e.secret("hermes").Data[KeyGatewayKey]) != 0 || len(e.gw.Calls("POST", "/key/delete")) != deletes+1 {
+		t.Error("switching to direct kept the gateway key")
 	}
 }

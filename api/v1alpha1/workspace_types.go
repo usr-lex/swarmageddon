@@ -242,9 +242,28 @@ type RetentionSettings struct {
 	AuditBodies *bool `json:"auditBodies,omitempty"`
 }
 
+// ModelAccess is how rooms reach their model provider.
+// +kubebuilder:validation:Enum=gateway;direct
+type ModelAccess string
+
+const (
+	// ModelAccessGateway: through the platform's LiteLLM gateway, with a
+	// per-room virtual key (spend limits, the warden's gateway guard).
+	ModelAccessGateway ModelAccess = "gateway"
+	// ModelAccessDirect: the CLI talks to its provider itself, with an API
+	// key from the room's secretEnv (ANTHROPIC_API_KEY, OPENAI_API_KEY) or
+	// the CLI's own login done once in the room's terminal. No gateway key,
+	// no spend tracking, no gateway guard; the provider's domains are
+	// opened in the room's egress.
+	ModelAccessDirect ModelAccess = "direct"
+)
+
 type ModelSettings struct {
 	// +optional
 	Default string `json:"default,omitempty"`
+	// Access for the workspace's rooms; a room may override it. Default gateway.
+	// +optional
+	Access ModelAccess `json:"access,omitempty"`
 	// +optional
 	Budgets BudgetSettings `json:"budgets,omitempty"`
 }

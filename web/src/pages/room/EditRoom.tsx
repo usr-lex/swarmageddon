@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/api";
-import type { CLI, PlanResult, RoomDraft, RoomSummary, WorkspaceDraft } from "@/api/types";
+import type { CLI, ModelAccess, PlanResult, RoomDraft, RoomSummary, WorkspaceDraft } from "@/api/types";
 import { Badge, Button, Checkbox, Dialog, ErrorText, Field, Input, Select, Spinner } from "@/components/ui";
 
-type Edit = Pick<RoomDraft, "cli" | "model" | "role" | "cpu" | "memoryGi">;
+type Edit = Pick<RoomDraft, "cli" | "model" | "role" | "cpu" | "memoryGi" | "modelAccess">;
 
 /**
  * Change one room's CLI, model, role or size without the workspace wizard
@@ -30,7 +30,7 @@ function EditDialog({ room, onClose }: { room: RoomSummary; onClose: () => void 
   const [edit, setEdit] = useState<Edit | null>(null);
   const [now, setNow] = useState(true);
   const [preview, setPreview] = useState<PlanResult | null>(null);
-  const value: Edit | undefined = edit ?? (current && { cli: current.cli, model: current.model, role: current.role, cpu: current.cpu, memoryGi: current.memoryGi });
+  const value: Edit | undefined = edit ?? (current && { cli: current.cli, model: current.model, role: current.role, cpu: current.cpu, memoryGi: current.memoryGi, modelAccess: current.modelAccess ?? "" });
   const set = (p: Partial<Edit>) => {
     setPreview(null);
     setEdit({ ...value!, ...p });
@@ -87,6 +87,15 @@ function EditDialog({ room, onClose }: { room: RoomSummary; onClose: () => void 
                     {r}
                   </option>
                 ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Model access">
+            {(id) => (
+              <Select id={id} value={value.modelAccess ?? ""} onChange={(e) => set({ modelAccess: e.target.value as ModelAccess | "" })}>
+                <option value="">Workspace default ({draft.data?.modelAccess === "direct" ? "direct" : "gateway"})</option>
+                <option value="gateway">Gateway</option>
+                <option value="direct">Direct: the CLI's own key or login</option>
               </Select>
             )}
           </Field>

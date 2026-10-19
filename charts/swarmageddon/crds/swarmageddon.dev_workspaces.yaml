@@ -322,6 +322,13 @@ spec:
                 type: object
               models:
                 properties:
+                  access:
+                    description: Access for the workspace's rooms; a room may override
+                      it. Default gateway.
+                    enum:
+                    - gateway
+                    - direct
+                    type: string
                   budgets:
                     properties:
                       perRoomMonthlyUSD:

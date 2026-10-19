@@ -184,6 +184,9 @@ type UserSettings struct {
 	TrustDirs []string
 	// Provider is the gateway provider (from Policy.Provider); nil leaves it.
 	Provider map[string]any
+	// Direct removes the gateway provider: ore uses its own (direct model
+	// access, with OPENAI_API_KEY or its login).
+	Direct bool
 	Model    string
 	Effort   string
 }
@@ -217,6 +220,17 @@ func UpdateUserConfig(path string, s UserSettings, uid, gid int) error {
 		providers["gateway"] = s.Provider
 		cfg["model_providers"] = providers
 		cfg["model_provider"] = "gateway"
+	}
+	if s.Direct {
+		if cfg["model_provider"] == "gateway" {
+			delete(cfg, "model_provider")
+		}
+		if providers, _ := cfg["model_providers"].(map[string]any); providers != nil {
+			delete(providers, "gateway")
+			if len(providers) == 0 {
+				delete(cfg, "model_providers")
+			}
+		}
 	}
 	if s.Model != "" {
 		cfg["model"] = s.Model

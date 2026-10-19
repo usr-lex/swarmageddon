@@ -67,6 +67,32 @@ func TestUpdateUserConfig(t *testing.T) {
 	}
 }
 
+// Switching a room to direct model access drops the gateway provider a
+// gateway room left in the user config; the user's own settings stay.
+func TestUpdateUserConfigDirect(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "config.toml")
+	if err := UpdateUserConfig(f, UserSettings{Provider: Policy{GatewayURL: "http://gw"}.Provider(), Model: "m"}, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	if err := UpdateUserConfig(f, UserSettings{Direct: true, Model: "gpt-5"}, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]any
+	b, _ := os.ReadFile(f)
+	if _, err := toml.Decode(string(b), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg["model_provider"]; ok {
+		t.Errorf("model_provider kept:\n%s", b)
+	}
+	if prov, _ := cfg["model_providers"].(map[string]any); prov["gateway"] != nil {
+		t.Errorf("gateway provider kept:\n%s", b)
+	}
+	if cfg["model"] != "gpt-5" {
+		t.Errorf("model:\n%s", b)
+	}
+}
+
 func TestIsNoActiveTurn(t *testing.T) {
 	if !isNoActiveTurn(&RPCError{Code: -32600, Message: "no active turn to steer"}) {
 		t.Error("no active turn")

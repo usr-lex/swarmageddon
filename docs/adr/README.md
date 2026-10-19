@@ -16,4 +16,5 @@ A record is never edited after it is accepted; a later record supersedes it.
 | [0009](0009-forgejo-cli-for-agents.md) | Forgejo CLI for agents: `tea` | Accepted |
 | [0010](0010-advisors.md) | Advisors: a `swarm advise` tool for both CLIs | Accepted |
 | [0011](0011-warden.md) | The warden: a small model that keeps agents from going rogue | Accepted |
-| [0012](0012-github-import.md) | Importing a GitHub organization | Proposed |
+| [0012](0012-github-import.md) | Importing a GitHub organization | Accepted |
+| [0013](0013-direct-model-access.md) | Direct model access: rooms without the gateway | Accepted |

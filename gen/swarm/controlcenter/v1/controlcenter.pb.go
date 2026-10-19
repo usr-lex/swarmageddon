@@ -3869,7 +3869,9 @@ type AgentPlan struct {
 	// role template's; an empty model turns the advisor off for this room.
 	Advisor *AdvisorPlan `protobuf:"bytes,16,opt,name=advisor,proto3" json:"advisor,omitempty"`
 	// Room.spec.wardenMode: off, monitor or gate; empty inherits the workspace's.
-	WardenMode    string `protobuf:"bytes,17,opt,name=warden_mode,json=wardenMode,proto3" json:"warden_mode,omitempty"`
+	WardenMode string `protobuf:"bytes,17,opt,name=warden_mode,json=wardenMode,proto3" json:"warden_mode,omitempty"`
+	// Room.spec.modelAccess: gateway or direct; empty inherits the workspace's.
+	ModelAccess   string `protobuf:"bytes,18,opt,name=model_access,json=modelAccess,proto3" json:"model_access,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4019,6 +4021,13 @@ func (x *AgentPlan) GetAdvisor() *AdvisorPlan {
 func (x *AgentPlan) GetWardenMode() string {
 	if x != nil {
 		return x.WardenMode
+	}
+	return ""
+}
+
+func (x *AgentPlan) GetModelAccess() string {
+	if x != nil {
+		return x.ModelAccess
 	}
 	return ""
 }
@@ -4614,8 +4623,12 @@ type WorkspacePlan struct {
 	// Workspace.spec.recordKeystrokes: what people type in room terminals goes
 	// to the audit log (docs/design.md §8.4). Off by default.
 	RecordKeystrokes bool `protobuf:"varint,31,opt,name=record_keystrokes,json=recordKeystrokes,proto3" json:"record_keystrokes,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Workspace.spec.models.access: gateway (default) or direct, where each
+	// room's CLI uses its own provider key or login (no spend limits, no
+	// gateway guard).
+	ModelAccess   string `protobuf:"bytes,32,opt,name=model_access,json=modelAccess,proto3" json:"model_access,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *WorkspacePlan) Reset() {
@@ -4863,6 +4876,13 @@ func (x *WorkspacePlan) GetRecordKeystrokes() bool {
 		return x.RecordKeystrokes
 	}
 	return false
+}
+
+func (x *WorkspacePlan) GetModelAccess() string {
+	if x != nil {
+		return x.ModelAccess
+	}
+	return ""
 }
 
 type ChannelMemberPlan struct {
@@ -6199,8 +6219,10 @@ type RoomSummary struct {
 	// Highest severity among undecided warden verdicts of the last 24 h.
 	WardenSeverity    Severity `protobuf:"varint,23,opt,name=warden_severity,json=wardenSeverity,proto3,enum=swarm.controlcenter.v1.Severity" json:"warden_severity,omitempty"`
 	UndecidedVerdicts int32    `protobuf:"varint,24,opt,name=undecided_verdicts,json=undecidedVerdicts,proto3" json:"undecided_verdicts,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Effective model access: gateway or direct (the CLI's own key or login).
+	ModelAccess   string `protobuf:"bytes,25,opt,name=model_access,json=modelAccess,proto3" json:"model_access,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RoomSummary) Reset() {
@@ -6399,6 +6421,13 @@ func (x *RoomSummary) GetUndecidedVerdicts() int32 {
 		return x.UndecidedVerdicts
 	}
 	return 0
+}
+
+func (x *RoomSummary) GetModelAccess() string {
+	if x != nil {
+		return x.ModelAccess
+	}
+	return ""
 }
 
 type WatchTranscriptRequest struct {
@@ -14777,7 +14806,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x17DeleteRoomSecretRequest\x12\x1c\n" +
 	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\"\x1a\n" +
-	"\x18DeleteRoomSecretResponse\"\x8b\x04\n" +
+	"\x18DeleteRoomSecretResponse\"\xae\x04\n" +
 	"\tAgentPlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x12\n" +
@@ -14798,7 +14827,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\bsettings\x18\x0f \x01(\v2(.swarm.controlcenter.v1.RoomSettingsPlanR\bsettings\x12=\n" +
 	"\aadvisor\x18\x10 \x01(\v2#.swarm.controlcenter.v1.AdvisorPlanR\aadvisor\x12\x1f\n" +
 	"\vwarden_mode\x18\x11 \x01(\tR\n" +
-	"wardenMode\"\xa1\x01\n" +
+	"wardenMode\x12!\n" +
+	"\fmodel_access\x18\x12 \x01(\tR\vmodelAccess\"\xa1\x01\n" +
 	"\vAdvisorPlan\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12\x16\n" +
 	"\x06effort\x18\x02 \x01(\tR\x06effort\x12+\n" +
@@ -14852,7 +14882,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\n" +
 	"email_from\x18\t \x01(\tR\temailFrom\x12\x19\n" +
 	"\bemail_to\x18\n" +
-	" \x01(\tR\aemailTo\"\xa3\x0e\n" +
+	" \x01(\tR\aemailTo\"\xc6\x0e\n" +
 	"\rWorkspacePlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -14887,7 +14917,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x0eshared_volumes\x18\x1c \x03(\v2(.swarm.controlcenter.v1.SharedVolumePlanR\rsharedVolumes\x12\\\n" +
 	"\rrole_advisors\x18\x1d \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntryR\froleAdvisors\x12:\n" +
 	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x12+\n" +
-	"\x11record_keystrokes\x18\x1f \x01(\bR\x10recordKeystrokes\x1ai\n" +
+	"\x11record_keystrokes\x18\x1f \x01(\bR\x10recordKeystrokes\x12!\n" +
+	"\fmodel_access\x18  \x01(\tR\vmodelAccess\x1ai\n" +
 	"\x11RoleDefaultsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12>\n" +
 	"\x05value\x18\x02 \x01(\v2(.swarm.controlcenter.v1.RoomSettingsPlanR\x05value:\x028\x01\x1ad\n" +
@@ -14980,7 +15011,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
 	"used_bytes\x18\x02 \x01(\x03R\tusedBytes\x12%\n" +
-	"\x0ecapacity_bytes\x18\x03 \x01(\x03R\rcapacityBytes\"\xa4\a\n" +
+	"\x0ecapacity_bytes\x18\x03 \x01(\x03R\rcapacityBytes\"\xc7\a\n" +
 	"\vRoomSummary\x12\x1c\n" +
 	"\tworkspace\x18\x01 \x01(\tR\tworkspace\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -15009,7 +15040,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\vquarantined\x18\x15 \x01(\bR\vquarantined\x12+\n" +
 	"\x11quarantine_reason\x18\x16 \x01(\tR\x10quarantineReason\x12I\n" +
 	"\x0fwarden_severity\x18\x17 \x01(\x0e2 .swarm.controlcenter.v1.SeverityR\x0ewardenSeverity\x12-\n" +
-	"\x12undecided_verdicts\x18\x18 \x01(\x05R\x11undecidedVerdicts\"l\n" +
+	"\x12undecided_verdicts\x18\x18 \x01(\x05R\x11undecidedVerdicts\x12!\n" +
+	"\fmodel_access\x18\x19 \x01(\tR\vmodelAccess\"l\n" +
 	"\x16WatchTranscriptRequest\x123\n" +
 	"\x04room\x18\x01 \x01(\v2\x1f.swarm.controlcenter.v1.RoomRefR\x04room\x12\x1d\n" +
 	"\n" +

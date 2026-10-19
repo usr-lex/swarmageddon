@@ -1075,6 +1075,13 @@ spec:
                 description: 'Model, as the gateway names it. Empty: the workspace
                   default.'
                 type: string
+              modelAccess:
+                description: ModelAccess overrides the workspace's models.access.
+                  Empty inherits.
+                enum:
+                - gateway
+                - direct
+                type: string
               network:
                 description: Network access for this room, over the role's and workspace's.
                 properties:
@@ -1808,6 +1815,13 @@ spec:
                 type: object
               models:
                 properties:
+                  access:
+                    description: Access for the workspace's rooms; a room may override
+                      it. Default gateway.
+                    enum:
+                    - gateway
+                    - direct
+                    type: string
                   budgets:
                     properties:
                       perRoomMonthlyUSD:

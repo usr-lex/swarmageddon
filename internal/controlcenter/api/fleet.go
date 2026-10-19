@@ -111,7 +111,7 @@ func (f *Fleet) Refresh(ctx context.Context) error {
 			s := &ccv1.RoomSummary{Workspace: w.Name, Name: r.Name, DisplayName: r.Spec.DisplayName, Role: r.Spec.Role, Cli: string(r.Spec.CLI),
 				Model: r.Spec.Model, Group: r.Spec.Group, Phase: string(r.Status.Phase), UpdateAvailable: r.Status.UpdateAvailable,
 				Paused: r.Spec.Paused, Conditions: conditions(r.Status.Conditions), Address: r.Status.Address,
-				Quarantined: r.Spec.Quarantined}
+				Quarantined: r.Spec.Quarantined, ModelAccess: string(v1alpha1.EffectiveModelAccess(&r, &w))}
 			if r.Spec.Quarantined {
 				s.QuarantineReason = quarantineReason(&r)
 			}

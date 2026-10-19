@@ -192,6 +192,9 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	}
 	core.Dedup = dedup
 	gatewayKey := readSecret(KeyGateway)
+	if room.Direct() {
+		gatewayKey = "" // the CLI uses its own provider key or login
+	}
 	core.Agent = newAgent(room, user, work, roleText, roomEnv, gatewayKey, core, log)
 	core.Warden = NewWarden(room, core, readSecret(KeyWarden), roleText, work)
 	if room.Advisor.Model != "" {
@@ -209,7 +212,9 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
-		watchGatewayKey(ctx, func() string { return readSecret(KeyGateway) }, gatewayKey, core.Agent, gatewayKeyEnv(room), GatewayKeyEvery, log)
+		if !room.Direct() {
+			watchGatewayKey(ctx, func() string { return readSecret(KeyGateway) }, gatewayKey, core.Agent, gatewayKeyEnv(room), GatewayKeyEvery, log)
+		}
 	}()
 	go func() {
 		defer wg.Done()
@@ -330,21 +335,34 @@ func gatewayKeyEnv(room *roomcfg.Room) string {
 // proxy settings; key is the gateway key.
 func newAgent(room *roomcfg.Room, u *proc.User, work, roleText string, roomEnv []string, key string, ev agent.Events, log *slog.Logger) agent.Agent {
 	roomEnv = slices.Clip(roomEnv)
+	direct := room.Direct()
 	if room.CLI == roomcfg.CLIOre {
 		p := ore.Policy{GatewayURL: room.OreBaseURL(), WireAPI: room.OreWireAPI()}
-		return &ore.Driver{
+		d := &ore.Driver{
 			Home: u.Home, WorkDir: work, User: u, Socket: roomcfg.OreSock,
 			Env:                   append(roomEnv, gatewayKeyEnv(room)+"="+key),
 			Settings:              ore.UserSettings{Provider: p.Provider(), Model: room.Model, Effort: room.Effort},
 			DeveloperInstructions: roleText, FirstTurn: room.FirstTurnPrompt(),
 			Events: ev, Log: log,
 		}
+		if direct {
+			// ore's own provider, with OPENAI_API_KEY (room secretEnv) or its login.
+			d.Env, d.Settings.Provider, d.Settings.Direct = roomEnv, nil, true
+		}
+		return d
 	}
-	env := append(roomEnv, gatewayKeyEnv(room)+"="+key)
-	if base := room.GatewayURL; base != "" {
-		env = append(env, "ANTHROPIC_BASE_URL="+base)
-	} else if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {
-		env = append(env, "ANTHROPIC_BASE_URL="+base)
+	env := roomEnv
+	switch {
+	case direct:
+		// Claude Code's own endpoint, with ANTHROPIC_API_KEY (room
+		// secretEnv) or its own login (claude /login in the terminal).
+	case room.GatewayURL != "":
+		env = append(env, gatewayKeyEnv(room)+"="+key, "ANTHROPIC_BASE_URL="+room.GatewayURL)
+	default:
+		env = append(env, gatewayKeyEnv(room)+"="+key)
+		if base := os.Getenv("ANTHROPIC_BASE_URL"); base != "" {
+			env = append(env, "ANTHROPIC_BASE_URL="+base)
+		}
 	}
 	var extra []string
 	if room.Advisor.Native && room.Advisor.Model != "" {
