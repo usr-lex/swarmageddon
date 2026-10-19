@@ -13,6 +13,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -226,5 +227,30 @@ func TestAdmissionRefusal(t *testing.T) {
 	// Other errors stay warnings.
 	if c := probeErr(CheckIdmap, errors.New("connection refused")); c.Result != v1alpha1.CheckWarn {
 		t.Fatalf("plain error: %+v", c)
+	}
+}
+
+// OVN-Kubernetes leaves nodes' podCIDR empty; OpenShift's Network "cluster"
+// has the ranges (OpenShift report 5.7).
+func TestOpenShiftNetworks(t *testing.T) {
+	u := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "config.openshift.io/v1", "kind": "Network", "metadata": map[string]any{"name": "cluster"},
+		"status": map[string]any{
+			"clusterNetwork": []any{map[string]any{"cidr": "10.217.0.0/22", "hostPrefix": int64(23)}},
+			"serviceNetwork": []any{"10.217.4.0/23"},
+		},
+	}}
+	c := fake.NewClientBuilder().WithObjects(u).Build()
+	pods, services := openShiftNetworks(context.Background(), c)
+	if len(pods) != 1 || pods[0] != "10.217.0.0/22" || len(services) != 1 || services[0] != "10.217.4.0/23" {
+		t.Fatalf("pods %v services %v", pods, services)
+	}
+	cl := &cluster{nodes: []corev1.Node{node("n1", "arm64", "12", "32Gi")}, podCIDRs: pods, serviceCIDRs: services}
+	cl.nodes[0].Spec.PodCIDRs = nil
+	if _, chk := clusterCIDRs(&v1alpha1.PlatformSpec{}, cl); chk.Result != v1alpha1.CheckPass {
+		t.Fatalf("check %+v", chk)
+	}
+	if c := ingressCheck(nil, true); !strings.Contains(c.Fix, "create route passthrough") {
+		t.Fatalf("ingress fix %q", c.Fix)
 	}
 }

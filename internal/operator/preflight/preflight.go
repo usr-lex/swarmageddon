@@ -116,7 +116,7 @@ func (r *Runner) Run(ctx context.Context, spec *v1alpha1.PlatformSpec) (Result, 
 	est, capCheck := capacity(cluster.nodes, cluster.pods)
 	st.RoomEstimate = est
 	add(capCheck)
-	add(ingressCheck(cluster.ingressClasses))
+	add(ingressCheck(cluster.ingressClasses, cluster.openshift))
 	add(r.dns(ctx))
 	cidrs, cidrCheck := clusterCIDRs(spec, cluster)
 	st.ClusterCIDRs = cidrs
@@ -230,7 +230,7 @@ func sysboxCheck(found bool) v1alpha1.PreflightCheck {
 	return v1alpha1.PreflightCheck{Name: CheckSysbox, Result: v1alpha1.CheckPass, Message: "no sysbox-runc RuntimeClass (optional)"}
 }
 
-func ingressCheck(classes []ingressClass) v1alpha1.PreflightCheck {
+func ingressCheck(classes []ingressClass, openshift bool) v1alpha1.PreflightCheck {
 	c := v1alpha1.PreflightCheck{Name: CheckIngress}
 	for _, ic := range classes {
 		if ic.isDefault {
@@ -241,6 +241,9 @@ func ingressCheck(classes []ingressClass) v1alpha1.PreflightCheck {
 	c.Result = v1alpha1.CheckWarn
 	c.Message = "no default IngressClass: the control center is exposed on a NodePort"
 	c.Fix = "Install an ingress controller and mark its IngressClass default (k3s ships Traefik), or use kubectl port-forward svc/control-center 8443:443 -n swarmageddon-system."
+	if openshift {
+		c.Fix = "On OpenShift, expose it through the router with a passthrough Route: oc -n swarmageddon-system create route passthrough control-center --service control-center"
+	}
 	return c
 }
 

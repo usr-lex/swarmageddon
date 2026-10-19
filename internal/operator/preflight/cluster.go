@@ -16,6 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,6 +41,10 @@ type cluster struct {
 	serviceCIDRs   []string
 	kubernetesIP   string
 	apiEndpoints   []string
+	// openshift: the cluster serves security.openshift.io; podCIDRs are its
+	// cluster networks (OVN-Kubernetes leaves nodes' podCIDR empty).
+	openshift bool
+	podCIDRs  []string
 }
 
 func (r *Runner) readCluster(ctx context.Context) (*cluster, error) {
@@ -83,6 +89,12 @@ func (r *Runner) readCluster(ctx context.Context) (*cluster, error) {
 		for _, s := range cidrs.Items {
 			c.serviceCIDRs = append(c.serviceCIDRs, s.Spec.CIDRs...)
 		}
+	}
+	if r.OpenShift {
+		c.openshift = true
+		pods, services := openShiftNetworks(ctx, r.Client)
+		c.podCIDRs = pods
+		c.serviceCIDRs = append(c.serviceCIDRs, services...)
 	}
 	var svc corev1.Service
 	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: "default", Name: "kubernetes"}, &svc); err == nil {
@@ -190,6 +202,28 @@ func capacity(nodes []corev1.Node, pods []corev1.Pod) (int32, v1alpha1.Preflight
 	return int32(rooms), c
 }
 
+// +kubebuilder:rbac:groups=config.openshift.io,resources=networks,verbs=get
+
+// openShiftNetworks reads the pod and service ranges from OpenShift's
+// network configuration (config.openshift.io/v1 Network "cluster").
+func openShiftNetworks(ctx context.Context, r client.Reader) (pods, services []string) {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{Group: "config.openshift.io", Version: "v1", Kind: "Network"})
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, u); err != nil {
+		return nil, nil
+	}
+	nets, _, _ := unstructured.NestedSlice(u.Object, "status", "clusterNetwork")
+	for _, n := range nets {
+		if m, ok := n.(map[string]any); ok {
+			if cidr, ok := m["cidr"].(string); ok && cidr != "" {
+				pods = append(pods, cidr)
+			}
+		}
+	}
+	services, _, _ = unstructured.NestedStringSlice(u.Object, "status", "serviceNetwork")
+	return pods, services
+}
+
 // clusterCIDRs returns the ranges rooms may not reach: pod CIDRs, service
 // CIDRs, node addresses and API server endpoints.
 func clusterCIDRs(spec *v1alpha1.PlatformSpec, c *cluster) ([]string, v1alpha1.PreflightCheck) {
@@ -208,7 +242,8 @@ func clusterCIDRs(spec *v1alpha1.PlatformSpec, c *cluster) ([]string, v1alpha1.P
 			}
 		}
 	}
-	podCIDRs := 0
+	podCIDRs := len(c.podCIDRs)
+	out = append(out, c.podCIDRs...)
 	for _, n := range c.nodes {
 		for _, p := range n.Spec.PodCIDRs {
 			out = append(out, p)
