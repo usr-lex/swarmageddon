@@ -64,6 +64,9 @@ func (r *Reconciler) resizeVolumes(ctx context.Context, room *v1.Room, st *v1.Ro
 				continue
 			}
 		}
+		if pvc.Status.Phase != corev1.ClaimBound {
+			continue // provisioned at its requested size once its pod is scheduled
+		}
 		if got, ok := pvc.Status.Capacity[corev1.ResourceStorage]; !ok || got.Cmp(size) < 0 {
 			pending = append(pending, fmt.Sprintf("%s to %s", vol, size.String()))
 		}

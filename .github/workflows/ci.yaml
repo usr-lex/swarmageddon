@@ -138,6 +138,7 @@ jobs:
           kc get events -A --sort-by=.lastTimestamp | tail -100
           kc describe nodes
           kc -n ws-acme describe pods
+          docker logs k3d-swarm-dev-server-0 2>&1 | grep -iE 'schedul|volume.?bind|local-path' | tail -80 || true
           df -h /
           kc -n swarmageddon-system logs deploy/swarmageddon-operator --tail=300
           kc -n swarmageddon-system logs deploy/control-center --all-containers --tail=200
