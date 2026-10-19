@@ -205,6 +205,23 @@ export interface RepositoryDraft {
   pushMirror: string;
   /** Write-only, like importCredential; empty keeps the stored one. */
   mirrorToken: string;
+  /** Import from GitHub with issues, pull requests, reviews and comments (ADR 0012). */
+  importGitHub?: boolean;
+}
+
+/** An imported GitHub account whose posts become a room's (ADR 0012). */
+export interface GitHubAccount {
+  login: string;
+  id: number;
+  room: string;
+}
+
+/** What a GitHub organization has, for an import. */
+export interface GitHubDiscovery {
+  repos: { name: string; description: string; private: boolean; archived: boolean; hasWiki: boolean; openIssues: number }[];
+  /** bot-<room> accounts; room is "" when the rest isn't a valid room name. */
+  bots: GitHubAccount[];
+  people: number;
 }
 
 export type ChannelKind = "webPush" | "ntfy" | "slack" | "discord" | "email";
@@ -260,6 +277,8 @@ export interface WorkspaceDraft {
   recordKeystrokes?: boolean;
   /** How rooms reach their model: through the gateway (default), or each CLI directly with its own key or login. */
   modelAccess?: ModelAccess;
+  /** Imported GitHub accounts mapped to rooms (ADR 0012). */
+  githubAccounts?: GitHubAccount[];
   /** The server's plan this draft came from, so fields the wizard doesn't edit survive a re-apply. */
   source?: unknown;
 }

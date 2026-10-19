@@ -354,6 +354,10 @@ service WorkspaceService {
   // DefaultChannels returns the channels the operator creates for a plan
   // whose channels are empty, for the wizard to show and edit.
   rpc DefaultChannels(DefaultChannelsRequest) returns (DefaultChannelsResponse);
+  // What a GitHub organization has, for an import (ADR 0012): repositories,
+  // bot-<room> accounts and how many people. The token is used for this call
+  // only; operator or admin.
+  rpc DiscoverGitHub(DiscoverGitHubRequest) returns (DiscoverGitHubResponse);
   // ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
   rpc ApplyWorkspace(ApplyWorkspaceRequest) returns (ApplyWorkspaceResponse);
   // ListRoomSecrets lists the keys (never values) of the workspace's
@@ -553,6 +557,17 @@ message RepositoryPlan {
   // Secret in the workspace namespace holding the import credential (keys
   // token and, optionally, username).
   string import_secret_name = 9;
+  // Import from GitHub with issues, pull requests, reviews, comments,
+  // labels, milestones, releases and the wiki (ADR 0012). The credential is
+  // deleted after the import.
+  bool import_github = 10;
+}
+
+// GitHubAccountPlan maps an imported GitHub account to a room (ADR 0012).
+message GitHubAccountPlan {
+  string login = 1;
+  int64 id = 2;
+  string room = 3;
 }
 
 message GroupPlan {
@@ -646,6 +661,9 @@ message WorkspacePlan {
   // room's CLI uses its own provider key or login (no spend limits, no
   // gateway guard).
   string model_access = 32;
+  // Workspace.spec.githubAccounts: imported GitHub accounts whose posts
+  // become their rooms' (ADR 0012).
+  repeated GitHubAccountPlan github_accounts = 33;
 }
 
 message ChannelMemberPlan {
@@ -759,6 +777,30 @@ message Change {
   string after = 5;
   // Short human description of the fields that change.
   repeated string fields = 6;
+}
+
+message DiscoverGitHubRequest {
+  string org = 1;
+  // A read-only token (fine-grained: the organization's repositories,
+  // metadata, issues and pull requests). Not stored.
+  string token = 2;
+  // Accounts named <prefix><room> become rooms; default "bot-".
+  string account_prefix = 3;
+}
+message DiscoveredRepo {
+  string name = 1;
+  string description = 2;
+  bool private = 3;
+  bool archived = 4;
+  bool has_wiki = 5;
+  int32 open_issues = 6;
+}
+message DiscoverGitHubResponse {
+  repeated DiscoveredRepo repos = 1;
+  // room is empty when the rest of the login isn't a valid room name.
+  repeated GitHubAccountPlan bots = 2;
+  // Other accounts; their posts stay "originally by".
+  int32 people = 3;
 }
 
 message PreviewWorkspaceRequest {

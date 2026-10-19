@@ -31,6 +31,7 @@ import type {
   User,
   WizardStep,
   WorkspaceDraft,
+  GitHubDiscovery,
   WorkspaceSummary,
 } from "./types";
 import type { ObservatoryApi } from "./observatory";
@@ -90,6 +91,8 @@ export interface Api {
   applyWorkspace(draft: WorkspaceDraft): Promise<void>;
   /** The channels the operator would create for this draft when it has none. */
   defaultChannels(draft: WorkspaceDraft): Promise<ChatChannelDraft[]>;
+  /** A GitHub organization's repositories and bot-<room> accounts (ADR 0012); the token is not stored. */
+  discoverGitHub(org: string, token: string, prefix: string): Promise<GitHubDiscovery>;
   /** Keys (never values) of the workspace's room-secrets Secret. */
   listRoomSecrets(workspace: string): Promise<RoomSecrets>;
   setRoomSecret(workspace: string, key: string, value: string): Promise<SecretRef>;

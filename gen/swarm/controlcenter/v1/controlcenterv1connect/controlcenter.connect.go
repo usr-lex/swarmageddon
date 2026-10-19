@@ -140,6 +140,9 @@ const (
 	// WorkspaceServiceDefaultChannelsProcedure is the fully-qualified name of the WorkspaceService's
 	// DefaultChannels RPC.
 	WorkspaceServiceDefaultChannelsProcedure = "/swarm.controlcenter.v1.WorkspaceService/DefaultChannels"
+	// WorkspaceServiceDiscoverGitHubProcedure is the fully-qualified name of the WorkspaceService's
+	// DiscoverGitHub RPC.
+	WorkspaceServiceDiscoverGitHubProcedure = "/swarm.controlcenter.v1.WorkspaceService/DiscoverGitHub"
 	// WorkspaceServiceApplyWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// ApplyWorkspace RPC.
 	WorkspaceServiceApplyWorkspaceProcedure = "/swarm.controlcenter.v1.WorkspaceService/ApplyWorkspace"
@@ -852,6 +855,10 @@ type WorkspaceServiceClient interface {
 	// DefaultChannels returns the channels the operator creates for a plan
 	// whose channels are empty, for the wizard to show and edit.
 	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
+	// What a GitHub organization has, for an import (ADR 0012): repositories,
+	// bot-<room> accounts and how many people. The token is used for this call
+	// only; operator or admin.
+	DiscoverGitHub(context.Context, *connect.Request[v1.DiscoverGitHubRequest]) (*connect.Response[v1.DiscoverGitHubResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
 	// ListRoomSecrets lists the keys (never values) of the workspace's
@@ -915,6 +922,12 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("DefaultChannels")),
 			connect.WithClientOptions(opts...),
 		),
+		discoverGitHub: connect.NewClient[v1.DiscoverGitHubRequest, v1.DiscoverGitHubResponse](
+			httpClient,
+			baseURL+WorkspaceServiceDiscoverGitHubProcedure,
+			connect.WithSchema(workspaceServiceMethods.ByName("DiscoverGitHub")),
+			connect.WithClientOptions(opts...),
+		),
 		applyWorkspace: connect.NewClient[v1.ApplyWorkspaceRequest, v1.ApplyWorkspaceResponse](
 			httpClient,
 			baseURL+WorkspaceServiceApplyWorkspaceProcedure,
@@ -951,6 +964,7 @@ type workspaceServiceClient struct {
 	listModels        *connect.Client[v1.ListModelsRequest, v1.ListModelsResponse]
 	previewWorkspace  *connect.Client[v1.PreviewWorkspaceRequest, v1.PreviewWorkspaceResponse]
 	defaultChannels   *connect.Client[v1.DefaultChannelsRequest, v1.DefaultChannelsResponse]
+	discoverGitHub    *connect.Client[v1.DiscoverGitHubRequest, v1.DiscoverGitHubResponse]
 	applyWorkspace    *connect.Client[v1.ApplyWorkspaceRequest, v1.ApplyWorkspaceResponse]
 	listRoomSecrets   *connect.Client[v1.ListRoomSecretsRequest, v1.ListRoomSecretsResponse]
 	setRoomSecret     *connect.Client[v1.SetRoomSecretRequest, v1.SetRoomSecretResponse]
@@ -992,6 +1006,11 @@ func (c *workspaceServiceClient) DefaultChannels(ctx context.Context, req *conne
 	return c.defaultChannels.CallUnary(ctx, req)
 }
 
+// DiscoverGitHub calls swarm.controlcenter.v1.WorkspaceService.DiscoverGitHub.
+func (c *workspaceServiceClient) DiscoverGitHub(ctx context.Context, req *connect.Request[v1.DiscoverGitHubRequest]) (*connect.Response[v1.DiscoverGitHubResponse], error) {
+	return c.discoverGitHub.CallUnary(ctx, req)
+}
+
 // ApplyWorkspace calls swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace.
 func (c *workspaceServiceClient) ApplyWorkspace(ctx context.Context, req *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error) {
 	return c.applyWorkspace.CallUnary(ctx, req)
@@ -1028,6 +1047,10 @@ type WorkspaceServiceHandler interface {
 	// DefaultChannels returns the channels the operator creates for a plan
 	// whose channels are empty, for the wizard to show and edit.
 	DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error)
+	// What a GitHub organization has, for an import (ADR 0012): repositories,
+	// bot-<room> accounts and how many people. The token is used for this call
+	// only; operator or admin.
+	DiscoverGitHub(context.Context, *connect.Request[v1.DiscoverGitHubRequest]) (*connect.Response[v1.DiscoverGitHubResponse], error)
 	// ApplyWorkspace creates or updates the resources; unchanged ones are left alone.
 	ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error)
 	// ListRoomSecrets lists the keys (never values) of the workspace's
@@ -1087,6 +1110,12 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("DefaultChannels")),
 		connect.WithHandlerOptions(opts...),
 	)
+	workspaceServiceDiscoverGitHubHandler := connect.NewUnaryHandler(
+		WorkspaceServiceDiscoverGitHubProcedure,
+		svc.DiscoverGitHub,
+		connect.WithSchema(workspaceServiceMethods.ByName("DiscoverGitHub")),
+		connect.WithHandlerOptions(opts...),
+	)
 	workspaceServiceApplyWorkspaceHandler := connect.NewUnaryHandler(
 		WorkspaceServiceApplyWorkspaceProcedure,
 		svc.ApplyWorkspace,
@@ -1127,6 +1156,8 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServicePreviewWorkspaceHandler.ServeHTTP(w, r)
 		case WorkspaceServiceDefaultChannelsProcedure:
 			workspaceServiceDefaultChannelsHandler.ServeHTTP(w, r)
+		case WorkspaceServiceDiscoverGitHubProcedure:
+			workspaceServiceDiscoverGitHubHandler.ServeHTTP(w, r)
 		case WorkspaceServiceApplyWorkspaceProcedure:
 			workspaceServiceApplyWorkspaceHandler.ServeHTTP(w, r)
 		case WorkspaceServiceListRoomSecretsProcedure:
@@ -1170,6 +1201,10 @@ func (UnimplementedWorkspaceServiceHandler) PreviewWorkspace(context.Context, *c
 
 func (UnimplementedWorkspaceServiceHandler) DefaultChannels(context.Context, *connect.Request[v1.DefaultChannelsRequest]) (*connect.Response[v1.DefaultChannelsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.DefaultChannels is not implemented"))
+}
+
+func (UnimplementedWorkspaceServiceHandler) DiscoverGitHub(context.Context, *connect.Request[v1.DiscoverGitHubRequest]) (*connect.Response[v1.DiscoverGitHubResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("swarm.controlcenter.v1.WorkspaceService.DiscoverGitHub is not implemented"))
 }
 
 func (UnimplementedWorkspaceServiceHandler) ApplyWorkspace(context.Context, *connect.Request[v1.ApplyWorkspaceRequest]) (*connect.Response[v1.ApplyWorkspaceResponse], error) {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
+import { GitHubImport } from "./GitHubImport";
 import { notificationEvents, type ChannelKind, type CLI, type ModelAccess, type RepositoryDraft, type RoomDraft } from "@/api/types";
 import { Badge, Button, Card, Checkbox, Field, Input, Select } from "@/components/ui";
 import { resizeRooms, roomNamePattern } from "@/lib/workspace";
@@ -206,6 +207,8 @@ const emptyRepo = (): RepositoryDraft => ({ name: "", importURL: "", importCrede
 export function ReposStep({ draft, set }: DraftProps) {
   const setRepo = (i: number, patch: Partial<RepositoryDraft>) => set({ ...draft, repositories: draft.repositories.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
   return (
+    <>
+    <GitHubImport draft={draft} set={set} />
     <Card title="Repositories" actions={<Button onClick={() => set({ ...draft, repositories: [...draft.repositories, emptyRepo()] })}>Add repository</Button>}>
       {draft.repositories.length === 0 && <p className="text-sm text-muted">Optional. Agents can't create repositories themselves; add more later by editing the workspace.</p>}
       {draft.repositories.map((r, i) => (
@@ -248,6 +251,7 @@ export function ReposStep({ draft, set }: DraftProps) {
         </fieldset>
       ))}
     </Card>
+    </>
   );
 }
 

@@ -4213,8 +4213,12 @@ type RepositoryPlan struct {
 	// Secret in the workspace namespace holding the import credential (keys
 	// token and, optionally, username).
 	ImportSecretName string `protobuf:"bytes,9,opt,name=import_secret_name,json=importSecretName,proto3" json:"import_secret_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Import from GitHub with issues, pull requests, reviews, comments,
+	// labels, milestones, releases and the wiki (ADR 0012). The credential is
+	// deleted after the import.
+	ImportGithub  bool `protobuf:"varint,10,opt,name=import_github,json=importGithub,proto3" json:"import_github,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RepositoryPlan) Reset() {
@@ -4310,6 +4314,74 @@ func (x *RepositoryPlan) GetImportSecretName() string {
 	return ""
 }
 
+func (x *RepositoryPlan) GetImportGithub() bool {
+	if x != nil {
+		return x.ImportGithub
+	}
+	return false
+}
+
+// GitHubAccountPlan maps an imported GitHub account to a room (ADR 0012).
+type GitHubAccountPlan struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Login         string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	Id            int64                  `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
+	Room          string                 `protobuf:"bytes,3,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubAccountPlan) Reset() {
+	*x = GitHubAccountPlan{}
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAccountPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAccountPlan) ProtoMessage() {}
+
+func (x *GitHubAccountPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAccountPlan.ProtoReflect.Descriptor instead.
+func (*GitHubAccountPlan) Descriptor() ([]byte, []int) {
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *GitHubAccountPlan) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *GitHubAccountPlan) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *GitHubAccountPlan) GetRoom() string {
+	if x != nil {
+		return x.Room
+	}
+	return ""
+}
+
 type GroupPlan struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -4320,7 +4392,7 @@ type GroupPlan struct {
 
 func (x *GroupPlan) Reset() {
 	*x = GroupPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[61]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4332,7 +4404,7 @@ func (x *GroupPlan) String() string {
 func (*GroupPlan) ProtoMessage() {}
 
 func (x *GroupPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[61]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4345,7 +4417,7 @@ func (x *GroupPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupPlan.ProtoReflect.Descriptor instead.
 func (*GroupPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{61}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *GroupPlan) GetName() string {
@@ -4377,7 +4449,7 @@ type LinkPlan struct {
 
 func (x *LinkPlan) Reset() {
 	*x = LinkPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[62]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4389,7 +4461,7 @@ func (x *LinkPlan) String() string {
 func (*LinkPlan) ProtoMessage() {}
 
 func (x *LinkPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[62]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4402,7 +4474,7 @@ func (x *LinkPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkPlan.ProtoReflect.Descriptor instead.
 func (*LinkPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{62}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *LinkPlan) GetFrom() string {
@@ -4471,7 +4543,7 @@ type NotificationChannelPlan struct {
 
 func (x *NotificationChannelPlan) Reset() {
 	*x = NotificationChannelPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[63]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4483,7 +4555,7 @@ func (x *NotificationChannelPlan) String() string {
 func (*NotificationChannelPlan) ProtoMessage() {}
 
 func (x *NotificationChannelPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[63]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4496,7 +4568,7 @@ func (x *NotificationChannelPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotificationChannelPlan.ProtoReflect.Descriptor instead.
 func (*NotificationChannelPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{63}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *NotificationChannelPlan) GetKind() string {
@@ -4626,14 +4698,17 @@ type WorkspacePlan struct {
 	// Workspace.spec.models.access: gateway (default) or direct, where each
 	// room's CLI uses its own provider key or login (no spend limits, no
 	// gateway guard).
-	ModelAccess   string `protobuf:"bytes,32,opt,name=model_access,json=modelAccess,proto3" json:"model_access,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ModelAccess string `protobuf:"bytes,32,opt,name=model_access,json=modelAccess,proto3" json:"model_access,omitempty"`
+	// Workspace.spec.githubAccounts: imported GitHub accounts whose posts
+	// become their rooms' (ADR 0012).
+	GithubAccounts []*GitHubAccountPlan `protobuf:"bytes,33,rep,name=github_accounts,json=githubAccounts,proto3" json:"github_accounts,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WorkspacePlan) Reset() {
 	*x = WorkspacePlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[64]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4645,7 +4720,7 @@ func (x *WorkspacePlan) String() string {
 func (*WorkspacePlan) ProtoMessage() {}
 
 func (x *WorkspacePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[64]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4658,7 +4733,7 @@ func (x *WorkspacePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspacePlan.ProtoReflect.Descriptor instead.
 func (*WorkspacePlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{64}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *WorkspacePlan) GetName() string {
@@ -4885,6 +4960,13 @@ func (x *WorkspacePlan) GetModelAccess() string {
 	return ""
 }
 
+func (x *WorkspacePlan) GetGithubAccounts() []*GitHubAccountPlan {
+	if x != nil {
+		return x.GithubAccounts
+	}
+	return nil
+}
+
 type ChannelMemberPlan struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// everyone, people, role:<template>, team:<team>, group:<group>,
@@ -4898,7 +4980,7 @@ type ChannelMemberPlan struct {
 
 func (x *ChannelMemberPlan) Reset() {
 	*x = ChannelMemberPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[65]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4910,7 +4992,7 @@ func (x *ChannelMemberPlan) String() string {
 func (*ChannelMemberPlan) ProtoMessage() {}
 
 func (x *ChannelMemberPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[65]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4923,7 +5005,7 @@ func (x *ChannelMemberPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelMemberPlan.ProtoReflect.Descriptor instead.
 func (*ChannelMemberPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{65}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ChannelMemberPlan) GetSelect() string {
@@ -4956,7 +5038,7 @@ type ChannelPlan struct {
 
 func (x *ChannelPlan) Reset() {
 	*x = ChannelPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[66]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4968,7 +5050,7 @@ func (x *ChannelPlan) String() string {
 func (*ChannelPlan) ProtoMessage() {}
 
 func (x *ChannelPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[66]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4981,7 +5063,7 @@ func (x *ChannelPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelPlan.ProtoReflect.Descriptor instead.
 func (*ChannelPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{66}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *ChannelPlan) GetName() string {
@@ -5039,7 +5121,7 @@ type StormPlan struct {
 
 func (x *StormPlan) Reset() {
 	*x = StormPlan{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[67]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5051,7 +5133,7 @@ func (x *StormPlan) String() string {
 func (*StormPlan) ProtoMessage() {}
 
 func (x *StormPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[67]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5064,7 +5146,7 @@ func (x *StormPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StormPlan.ProtoReflect.Descriptor instead.
 func (*StormPlan) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{67}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *StormPlan) GetPushPerMinute() int32 {
@@ -5110,7 +5192,7 @@ type WorkspaceSummary struct {
 
 func (x *WorkspaceSummary) Reset() {
 	*x = WorkspaceSummary{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[68]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5122,7 +5204,7 @@ func (x *WorkspaceSummary) String() string {
 func (*WorkspaceSummary) ProtoMessage() {}
 
 func (x *WorkspaceSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[68]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5135,7 +5217,7 @@ func (x *WorkspaceSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceSummary.ProtoReflect.Descriptor instead.
 func (*WorkspaceSummary) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{68}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *WorkspaceSummary) GetName() string {
@@ -5196,7 +5278,7 @@ type DefaultChannelsRequest struct {
 
 func (x *DefaultChannelsRequest) Reset() {
 	*x = DefaultChannelsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[69]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5208,7 +5290,7 @@ func (x *DefaultChannelsRequest) String() string {
 func (*DefaultChannelsRequest) ProtoMessage() {}
 
 func (x *DefaultChannelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[69]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5221,7 +5303,7 @@ func (x *DefaultChannelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefaultChannelsRequest.ProtoReflect.Descriptor instead.
 func (*DefaultChannelsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{69}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *DefaultChannelsRequest) GetPlan() *WorkspacePlan {
@@ -5240,7 +5322,7 @@ type DefaultChannelsResponse struct {
 
 func (x *DefaultChannelsResponse) Reset() {
 	*x = DefaultChannelsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[70]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5252,7 +5334,7 @@ func (x *DefaultChannelsResponse) String() string {
 func (*DefaultChannelsResponse) ProtoMessage() {}
 
 func (x *DefaultChannelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[70]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5265,7 +5347,7 @@ func (x *DefaultChannelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefaultChannelsResponse.ProtoReflect.Descriptor instead.
 func (*DefaultChannelsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{70}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *DefaultChannelsResponse) GetChannels() []*ChannelPlan {
@@ -5283,7 +5365,7 @@ type ListWorkspacesRequest struct {
 
 func (x *ListWorkspacesRequest) Reset() {
 	*x = ListWorkspacesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[71]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5295,7 +5377,7 @@ func (x *ListWorkspacesRequest) String() string {
 func (*ListWorkspacesRequest) ProtoMessage() {}
 
 func (x *ListWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[71]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5308,7 +5390,7 @@ func (x *ListWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{71}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{72}
 }
 
 type ListWorkspacesResponse struct {
@@ -5320,7 +5402,7 @@ type ListWorkspacesResponse struct {
 
 func (x *ListWorkspacesResponse) Reset() {
 	*x = ListWorkspacesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[72]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5332,7 +5414,7 @@ func (x *ListWorkspacesResponse) String() string {
 func (*ListWorkspacesResponse) ProtoMessage() {}
 
 func (x *ListWorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[72]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5345,7 +5427,7 @@ func (x *ListWorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{72}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *ListWorkspacesResponse) GetWorkspaces() []*WorkspaceSummary {
@@ -5364,7 +5446,7 @@ type GetWorkspaceRequest struct {
 
 func (x *GetWorkspaceRequest) Reset() {
 	*x = GetWorkspaceRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[73]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5376,7 +5458,7 @@ func (x *GetWorkspaceRequest) String() string {
 func (*GetWorkspaceRequest) ProtoMessage() {}
 
 func (x *GetWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[73]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5389,7 +5471,7 @@ func (x *GetWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{73}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *GetWorkspaceRequest) GetName() string {
@@ -5413,7 +5495,7 @@ type GetWorkspaceResponse struct {
 
 func (x *GetWorkspaceResponse) Reset() {
 	*x = GetWorkspaceResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[74]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5425,7 +5507,7 @@ func (x *GetWorkspaceResponse) String() string {
 func (*GetWorkspaceResponse) ProtoMessage() {}
 
 func (x *GetWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[74]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5438,7 +5520,7 @@ func (x *GetWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*GetWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{74}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *GetWorkspaceResponse) GetPlan() *WorkspacePlan {
@@ -5480,7 +5562,7 @@ type SuggestAgentNamesRequest struct {
 
 func (x *SuggestAgentNamesRequest) Reset() {
 	*x = SuggestAgentNamesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[75]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5492,7 +5574,7 @@ func (x *SuggestAgentNamesRequest) String() string {
 func (*SuggestAgentNamesRequest) ProtoMessage() {}
 
 func (x *SuggestAgentNamesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[75]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5505,7 +5587,7 @@ func (x *SuggestAgentNamesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestAgentNamesRequest.ProtoReflect.Descriptor instead.
 func (*SuggestAgentNamesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{75}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *SuggestAgentNamesRequest) GetCount() int32 {
@@ -5533,7 +5615,7 @@ type SuggestAgentNamesResponse struct {
 
 func (x *SuggestAgentNamesResponse) Reset() {
 	*x = SuggestAgentNamesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[76]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5545,7 +5627,7 @@ func (x *SuggestAgentNamesResponse) String() string {
 func (*SuggestAgentNamesResponse) ProtoMessage() {}
 
 func (x *SuggestAgentNamesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[76]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5558,7 +5640,7 @@ func (x *SuggestAgentNamesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestAgentNamesResponse.ProtoReflect.Descriptor instead.
 func (*SuggestAgentNamesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{76}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *SuggestAgentNamesResponse) GetNames() []string {
@@ -5587,7 +5669,7 @@ type RoleTemplateSummary struct {
 
 func (x *RoleTemplateSummary) Reset() {
 	*x = RoleTemplateSummary{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[77]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5599,7 +5681,7 @@ func (x *RoleTemplateSummary) String() string {
 func (*RoleTemplateSummary) ProtoMessage() {}
 
 func (x *RoleTemplateSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[77]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5612,7 +5694,7 @@ func (x *RoleTemplateSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleTemplateSummary.ProtoReflect.Descriptor instead.
 func (*RoleTemplateSummary) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{77}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *RoleTemplateSummary) GetName() string {
@@ -5653,7 +5735,7 @@ type ListRoleTemplatesRequest struct {
 
 func (x *ListRoleTemplatesRequest) Reset() {
 	*x = ListRoleTemplatesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[78]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5665,7 +5747,7 @@ func (x *ListRoleTemplatesRequest) String() string {
 func (*ListRoleTemplatesRequest) ProtoMessage() {}
 
 func (x *ListRoleTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[78]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5678,7 +5760,7 @@ func (x *ListRoleTemplatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoleTemplatesRequest.ProtoReflect.Descriptor instead.
 func (*ListRoleTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{78}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ListRoleTemplatesRequest) GetWorkspace() string {
@@ -5697,7 +5779,7 @@ type ListRoleTemplatesResponse struct {
 
 func (x *ListRoleTemplatesResponse) Reset() {
 	*x = ListRoleTemplatesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[79]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5709,7 +5791,7 @@ func (x *ListRoleTemplatesResponse) String() string {
 func (*ListRoleTemplatesResponse) ProtoMessage() {}
 
 func (x *ListRoleTemplatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[79]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5722,7 +5804,7 @@ func (x *ListRoleTemplatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoleTemplatesResponse.ProtoReflect.Descriptor instead.
 func (*ListRoleTemplatesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{79}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *ListRoleTemplatesResponse) GetTemplates() []*RoleTemplateSummary {
@@ -5740,7 +5822,7 @@ type ListModelsRequest struct {
 
 func (x *ListModelsRequest) Reset() {
 	*x = ListModelsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[80]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5752,7 +5834,7 @@ func (x *ListModelsRequest) String() string {
 func (*ListModelsRequest) ProtoMessage() {}
 
 func (x *ListModelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[80]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5765,7 +5847,7 @@ func (x *ListModelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListModelsRequest.ProtoReflect.Descriptor instead.
 func (*ListModelsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{80}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{81}
 }
 
 type ListModelsResponse struct {
@@ -5778,7 +5860,7 @@ type ListModelsResponse struct {
 
 func (x *ListModelsResponse) Reset() {
 	*x = ListModelsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[81]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5790,7 +5872,7 @@ func (x *ListModelsResponse) String() string {
 func (*ListModelsResponse) ProtoMessage() {}
 
 func (x *ListModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[81]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5803,7 +5885,7 @@ func (x *ListModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListModelsResponse.ProtoReflect.Descriptor instead.
 func (*ListModelsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{81}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *ListModelsResponse) GetModels() []string {
@@ -5830,7 +5912,7 @@ type Change struct {
 
 func (x *Change) Reset() {
 	*x = Change{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[82]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5842,7 +5924,7 @@ func (x *Change) String() string {
 func (*Change) ProtoMessage() {}
 
 func (x *Change) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[82]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5855,7 +5937,7 @@ func (x *Change) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Change.ProtoReflect.Descriptor instead.
 func (*Change) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{82}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *Change) GetKind() string {
@@ -5900,6 +5982,215 @@ func (x *Change) GetFields() []string {
 	return nil
 }
 
+type DiscoverGitHubRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Org   string                 `protobuf:"bytes,1,opt,name=org,proto3" json:"org,omitempty"`
+	// A read-only token (fine-grained: the organization's repositories,
+	// metadata, issues and pull requests). Not stored.
+	Token string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	// Accounts named <prefix><room> become rooms; default "bot-".
+	AccountPrefix string `protobuf:"bytes,3,opt,name=account_prefix,json=accountPrefix,proto3" json:"account_prefix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoverGitHubRequest) Reset() {
+	*x = DiscoverGitHubRequest{}
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoverGitHubRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoverGitHubRequest) ProtoMessage() {}
+
+func (x *DiscoverGitHubRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoverGitHubRequest.ProtoReflect.Descriptor instead.
+func (*DiscoverGitHubRequest) Descriptor() ([]byte, []int) {
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *DiscoverGitHubRequest) GetOrg() string {
+	if x != nil {
+		return x.Org
+	}
+	return ""
+}
+
+func (x *DiscoverGitHubRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *DiscoverGitHubRequest) GetAccountPrefix() string {
+	if x != nil {
+		return x.AccountPrefix
+	}
+	return ""
+}
+
+type DiscoveredRepo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Private       bool                   `protobuf:"varint,3,opt,name=private,proto3" json:"private,omitempty"`
+	Archived      bool                   `protobuf:"varint,4,opt,name=archived,proto3" json:"archived,omitempty"`
+	HasWiki       bool                   `protobuf:"varint,5,opt,name=has_wiki,json=hasWiki,proto3" json:"has_wiki,omitempty"`
+	OpenIssues    int32                  `protobuf:"varint,6,opt,name=open_issues,json=openIssues,proto3" json:"open_issues,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoveredRepo) Reset() {
+	*x = DiscoveredRepo{}
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoveredRepo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoveredRepo) ProtoMessage() {}
+
+func (x *DiscoveredRepo) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoveredRepo.ProtoReflect.Descriptor instead.
+func (*DiscoveredRepo) Descriptor() ([]byte, []int) {
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *DiscoveredRepo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DiscoveredRepo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *DiscoveredRepo) GetPrivate() bool {
+	if x != nil {
+		return x.Private
+	}
+	return false
+}
+
+func (x *DiscoveredRepo) GetArchived() bool {
+	if x != nil {
+		return x.Archived
+	}
+	return false
+}
+
+func (x *DiscoveredRepo) GetHasWiki() bool {
+	if x != nil {
+		return x.HasWiki
+	}
+	return false
+}
+
+func (x *DiscoveredRepo) GetOpenIssues() int32 {
+	if x != nil {
+		return x.OpenIssues
+	}
+	return 0
+}
+
+type DiscoverGitHubResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Repos []*DiscoveredRepo      `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	// room is empty when the rest of the login isn't a valid room name.
+	Bots []*GitHubAccountPlan `protobuf:"bytes,2,rep,name=bots,proto3" json:"bots,omitempty"`
+	// Other accounts; their posts stay "originally by".
+	People        int32 `protobuf:"varint,3,opt,name=people,proto3" json:"people,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoverGitHubResponse) Reset() {
+	*x = DiscoverGitHubResponse{}
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[86]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoverGitHubResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoverGitHubResponse) ProtoMessage() {}
+
+func (x *DiscoverGitHubResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[86]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoverGitHubResponse.ProtoReflect.Descriptor instead.
+func (*DiscoverGitHubResponse) Descriptor() ([]byte, []int) {
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{86}
+}
+
+func (x *DiscoverGitHubResponse) GetRepos() []*DiscoveredRepo {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *DiscoverGitHubResponse) GetBots() []*GitHubAccountPlan {
+	if x != nil {
+		return x.Bots
+	}
+	return nil
+}
+
+func (x *DiscoverGitHubResponse) GetPeople() int32 {
+	if x != nil {
+		return x.People
+	}
+	return 0
+}
+
 type PreviewWorkspaceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Plan  *WorkspacePlan         `protobuf:"bytes,1,opt,name=plan,proto3" json:"plan,omitempty"`
@@ -5911,7 +6202,7 @@ type PreviewWorkspaceRequest struct {
 
 func (x *PreviewWorkspaceRequest) Reset() {
 	*x = PreviewWorkspaceRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[83]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5923,7 +6214,7 @@ func (x *PreviewWorkspaceRequest) String() string {
 func (*PreviewWorkspaceRequest) ProtoMessage() {}
 
 func (x *PreviewWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[83]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5936,7 +6227,7 @@ func (x *PreviewWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*PreviewWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{83}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *PreviewWorkspaceRequest) GetPlan() *WorkspacePlan {
@@ -5969,7 +6260,7 @@ type PreviewWorkspaceResponse struct {
 
 func (x *PreviewWorkspaceResponse) Reset() {
 	*x = PreviewWorkspaceResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[84]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5981,7 +6272,7 @@ func (x *PreviewWorkspaceResponse) String() string {
 func (*PreviewWorkspaceResponse) ProtoMessage() {}
 
 func (x *PreviewWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[84]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5994,7 +6285,7 @@ func (x *PreviewWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*PreviewWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{84}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *PreviewWorkspaceResponse) GetChanges() []*Change {
@@ -6042,7 +6333,7 @@ type ApplyWorkspaceRequest struct {
 
 func (x *ApplyWorkspaceRequest) Reset() {
 	*x = ApplyWorkspaceRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[85]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6054,7 +6345,7 @@ func (x *ApplyWorkspaceRequest) String() string {
 func (*ApplyWorkspaceRequest) ProtoMessage() {}
 
 func (x *ApplyWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[85]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6067,7 +6358,7 @@ func (x *ApplyWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*ApplyWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{85}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *ApplyWorkspaceRequest) GetPlan() *WorkspacePlan {
@@ -6093,7 +6384,7 @@ type ApplyWorkspaceResponse struct {
 
 func (x *ApplyWorkspaceResponse) Reset() {
 	*x = ApplyWorkspaceResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[86]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6105,7 +6396,7 @@ func (x *ApplyWorkspaceResponse) String() string {
 func (*ApplyWorkspaceResponse) ProtoMessage() {}
 
 func (x *ApplyWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[86]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6118,7 +6409,7 @@ func (x *ApplyWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*ApplyWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{86}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *ApplyWorkspaceResponse) GetChanges() []*Change {
@@ -6139,7 +6430,7 @@ type VolumeUsage struct {
 
 func (x *VolumeUsage) Reset() {
 	*x = VolumeUsage{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[87]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6151,7 +6442,7 @@ func (x *VolumeUsage) String() string {
 func (*VolumeUsage) ProtoMessage() {}
 
 func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[87]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6164,7 +6455,7 @@ func (x *VolumeUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeUsage.ProtoReflect.Descriptor instead.
 func (*VolumeUsage) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{87}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *VolumeUsage) GetName() string {
@@ -6227,7 +6518,7 @@ type RoomSummary struct {
 
 func (x *RoomSummary) Reset() {
 	*x = RoomSummary{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[88]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6239,7 +6530,7 @@ func (x *RoomSummary) String() string {
 func (*RoomSummary) ProtoMessage() {}
 
 func (x *RoomSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[88]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6252,7 +6543,7 @@ func (x *RoomSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomSummary.ProtoReflect.Descriptor instead.
 func (*RoomSummary) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{88}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *RoomSummary) GetWorkspace() string {
@@ -6441,7 +6732,7 @@ type WatchTranscriptRequest struct {
 
 func (x *WatchTranscriptRequest) Reset() {
 	*x = WatchTranscriptRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[89]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6453,7 +6744,7 @@ func (x *WatchTranscriptRequest) String() string {
 func (*WatchTranscriptRequest) ProtoMessage() {}
 
 func (x *WatchTranscriptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[89]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6466,7 +6757,7 @@ func (x *WatchTranscriptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchTranscriptRequest.ProtoReflect.Descriptor instead.
 func (*WatchTranscriptRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{89}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *WatchTranscriptRequest) GetRoom() *RoomRef {
@@ -6504,7 +6795,7 @@ type TranscriptItem struct {
 
 func (x *TranscriptItem) Reset() {
 	*x = TranscriptItem{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[90]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6516,7 +6807,7 @@ func (x *TranscriptItem) String() string {
 func (*TranscriptItem) ProtoMessage() {}
 
 func (x *TranscriptItem) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[90]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6529,7 +6820,7 @@ func (x *TranscriptItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TranscriptItem.ProtoReflect.Descriptor instead.
 func (*TranscriptItem) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{90}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *TranscriptItem) GetId() string {
@@ -6590,7 +6881,7 @@ type WatchTranscriptResponse struct {
 
 func (x *WatchTranscriptResponse) Reset() {
 	*x = WatchTranscriptResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[91]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6602,7 +6893,7 @@ func (x *WatchTranscriptResponse) String() string {
 func (*WatchTranscriptResponse) ProtoMessage() {}
 
 func (x *WatchTranscriptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[91]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6615,7 +6906,7 @@ func (x *WatchTranscriptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchTranscriptResponse.ProtoReflect.Descriptor instead.
 func (*WatchTranscriptResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{91}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *WatchTranscriptResponse) GetItem() *TranscriptItem {
@@ -6639,7 +6930,7 @@ type PruneEngineRequest struct {
 
 func (x *PruneEngineRequest) Reset() {
 	*x = PruneEngineRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[92]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6651,7 +6942,7 @@ func (x *PruneEngineRequest) String() string {
 func (*PruneEngineRequest) ProtoMessage() {}
 
 func (x *PruneEngineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[92]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6664,7 +6955,7 @@ func (x *PruneEngineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneEngineRequest.ProtoReflect.Descriptor instead.
 func (*PruneEngineRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{92}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *PruneEngineRequest) GetRoom() *RoomRef {
@@ -6700,7 +6991,7 @@ type PruneEngineResponse struct {
 
 func (x *PruneEngineResponse) Reset() {
 	*x = PruneEngineResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[93]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6712,7 +7003,7 @@ func (x *PruneEngineResponse) String() string {
 func (*PruneEngineResponse) ProtoMessage() {}
 
 func (x *PruneEngineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[93]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6725,7 +7016,7 @@ func (x *PruneEngineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneEngineResponse.ProtoReflect.Descriptor instead.
 func (*PruneEngineResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{93}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *PruneEngineResponse) GetOutput() string {
@@ -6751,7 +7042,7 @@ type GetRoomSettingsRequest struct {
 
 func (x *GetRoomSettingsRequest) Reset() {
 	*x = GetRoomSettingsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[94]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6763,7 +7054,7 @@ func (x *GetRoomSettingsRequest) String() string {
 func (*GetRoomSettingsRequest) ProtoMessage() {}
 
 func (x *GetRoomSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[94]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6776,7 +7067,7 @@ func (x *GetRoomSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{94}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *GetRoomSettingsRequest) GetRoom() *RoomRef {
@@ -6800,7 +7091,7 @@ type GetRoomSettingsResponse struct {
 
 func (x *GetRoomSettingsResponse) Reset() {
 	*x = GetRoomSettingsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[95]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6812,7 +7103,7 @@ func (x *GetRoomSettingsResponse) String() string {
 func (*GetRoomSettingsResponse) ProtoMessage() {}
 
 func (x *GetRoomSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[95]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6825,7 +7116,7 @@ func (x *GetRoomSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{95}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *GetRoomSettingsResponse) GetWorkspace() *RoomSettingsPlan {
@@ -6873,7 +7164,7 @@ type UpdateRoomSettingsRequest struct {
 
 func (x *UpdateRoomSettingsRequest) Reset() {
 	*x = UpdateRoomSettingsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[96]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6885,7 +7176,7 @@ func (x *UpdateRoomSettingsRequest) String() string {
 func (*UpdateRoomSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateRoomSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[96]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6898,7 +7189,7 @@ func (x *UpdateRoomSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoomSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRoomSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{96}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *UpdateRoomSettingsRequest) GetRoom() *RoomRef {
@@ -6924,7 +7215,7 @@ type UpdateRoomSettingsResponse struct {
 
 func (x *UpdateRoomSettingsResponse) Reset() {
 	*x = UpdateRoomSettingsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[97]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6936,7 +7227,7 @@ func (x *UpdateRoomSettingsResponse) String() string {
 func (*UpdateRoomSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateRoomSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[97]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6949,7 +7240,7 @@ func (x *UpdateRoomSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoomSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRoomSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{97}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *UpdateRoomSettingsResponse) GetEffective() *EffectiveSettings {
@@ -6969,7 +7260,7 @@ type RoomRef struct {
 
 func (x *RoomRef) Reset() {
 	*x = RoomRef{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[98]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6981,7 +7272,7 @@ func (x *RoomRef) String() string {
 func (*RoomRef) ProtoMessage() {}
 
 func (x *RoomRef) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[98]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6994,7 +7285,7 @@ func (x *RoomRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomRef.ProtoReflect.Descriptor instead.
 func (*RoomRef) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{98}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *RoomRef) GetWorkspace() string {
@@ -7021,7 +7312,7 @@ type ListRoomsRequest struct {
 
 func (x *ListRoomsRequest) Reset() {
 	*x = ListRoomsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[99]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7033,7 +7324,7 @@ func (x *ListRoomsRequest) String() string {
 func (*ListRoomsRequest) ProtoMessage() {}
 
 func (x *ListRoomsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[99]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7046,7 +7337,7 @@ func (x *ListRoomsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoomsRequest.ProtoReflect.Descriptor instead.
 func (*ListRoomsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{99}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ListRoomsRequest) GetWorkspace() string {
@@ -7065,7 +7356,7 @@ type ListRoomsResponse struct {
 
 func (x *ListRoomsResponse) Reset() {
 	*x = ListRoomsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[100]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7077,7 +7368,7 @@ func (x *ListRoomsResponse) String() string {
 func (*ListRoomsResponse) ProtoMessage() {}
 
 func (x *ListRoomsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[100]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7090,7 +7381,7 @@ func (x *ListRoomsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoomsResponse.ProtoReflect.Descriptor instead.
 func (*ListRoomsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{100}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *ListRoomsResponse) GetRooms() []*RoomSummary {
@@ -7109,7 +7400,7 @@ type GetRoomRequest struct {
 
 func (x *GetRoomRequest) Reset() {
 	*x = GetRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[101]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7121,7 +7412,7 @@ func (x *GetRoomRequest) String() string {
 func (*GetRoomRequest) ProtoMessage() {}
 
 func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[101]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7134,7 +7425,7 @@ func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{101}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *GetRoomRequest) GetRoom() *RoomRef {
@@ -7164,7 +7455,7 @@ type GetRoomResponse struct {
 
 func (x *GetRoomResponse) Reset() {
 	*x = GetRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[102]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7176,7 +7467,7 @@ func (x *GetRoomResponse) String() string {
 func (*GetRoomResponse) ProtoMessage() {}
 
 func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[102]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7189,7 +7480,7 @@ func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{102}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *GetRoomResponse) GetRoom() *RoomSummary {
@@ -7278,7 +7569,7 @@ type PauseRoomRequest struct {
 
 func (x *PauseRoomRequest) Reset() {
 	*x = PauseRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[103]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7290,7 +7581,7 @@ func (x *PauseRoomRequest) String() string {
 func (*PauseRoomRequest) ProtoMessage() {}
 
 func (x *PauseRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[103]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7303,7 +7594,7 @@ func (x *PauseRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseRoomRequest.ProtoReflect.Descriptor instead.
 func (*PauseRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{103}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *PauseRoomRequest) GetRoom() *RoomRef {
@@ -7321,7 +7612,7 @@ type PauseRoomResponse struct {
 
 func (x *PauseRoomResponse) Reset() {
 	*x = PauseRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[104]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7333,7 +7624,7 @@ func (x *PauseRoomResponse) String() string {
 func (*PauseRoomResponse) ProtoMessage() {}
 
 func (x *PauseRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[104]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7346,7 +7637,7 @@ func (x *PauseRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseRoomResponse.ProtoReflect.Descriptor instead.
 func (*PauseRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{104}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{108}
 }
 
 type ResumeRoomRequest struct {
@@ -7358,7 +7649,7 @@ type ResumeRoomRequest struct {
 
 func (x *ResumeRoomRequest) Reset() {
 	*x = ResumeRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[105]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7370,7 +7661,7 @@ func (x *ResumeRoomRequest) String() string {
 func (*ResumeRoomRequest) ProtoMessage() {}
 
 func (x *ResumeRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[105]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7383,7 +7674,7 @@ func (x *ResumeRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRoomRequest.ProtoReflect.Descriptor instead.
 func (*ResumeRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{105}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *ResumeRoomRequest) GetRoom() *RoomRef {
@@ -7401,7 +7692,7 @@ type ResumeRoomResponse struct {
 
 func (x *ResumeRoomResponse) Reset() {
 	*x = ResumeRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[106]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7413,7 +7704,7 @@ func (x *ResumeRoomResponse) String() string {
 func (*ResumeRoomResponse) ProtoMessage() {}
 
 func (x *ResumeRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[106]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7426,7 +7717,7 @@ func (x *ResumeRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRoomResponse.ProtoReflect.Descriptor instead.
 func (*ResumeRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{106}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{110}
 }
 
 type RecreateRoomRequest struct {
@@ -7440,7 +7731,7 @@ type RecreateRoomRequest struct {
 
 func (x *RecreateRoomRequest) Reset() {
 	*x = RecreateRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[107]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7452,7 +7743,7 @@ func (x *RecreateRoomRequest) String() string {
 func (*RecreateRoomRequest) ProtoMessage() {}
 
 func (x *RecreateRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[107]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7465,7 +7756,7 @@ func (x *RecreateRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecreateRoomRequest.ProtoReflect.Descriptor instead.
 func (*RecreateRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{107}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *RecreateRoomRequest) GetRoom() *RoomRef {
@@ -7497,7 +7788,7 @@ type RecreateRoomResponse struct {
 
 func (x *RecreateRoomResponse) Reset() {
 	*x = RecreateRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[108]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7509,7 +7800,7 @@ func (x *RecreateRoomResponse) String() string {
 func (*RecreateRoomResponse) ProtoMessage() {}
 
 func (x *RecreateRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[108]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7522,7 +7813,7 @@ func (x *RecreateRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecreateRoomResponse.ProtoReflect.Descriptor instead.
 func (*RecreateRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{108}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{112}
 }
 
 type RemoveRoomRequest struct {
@@ -7536,7 +7827,7 @@ type RemoveRoomRequest struct {
 
 func (x *RemoveRoomRequest) Reset() {
 	*x = RemoveRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[109]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7548,7 +7839,7 @@ func (x *RemoveRoomRequest) String() string {
 func (*RemoveRoomRequest) ProtoMessage() {}
 
 func (x *RemoveRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[109]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7561,7 +7852,7 @@ func (x *RemoveRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRoomRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{109}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *RemoveRoomRequest) GetRoom() *RoomRef {
@@ -7593,7 +7884,7 @@ type RemoveRoomResponse struct {
 
 func (x *RemoveRoomResponse) Reset() {
 	*x = RemoveRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[110]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7605,7 +7896,7 @@ func (x *RemoveRoomResponse) String() string {
 func (*RemoveRoomResponse) ProtoMessage() {}
 
 func (x *RemoveRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[110]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7618,7 +7909,7 @@ func (x *RemoveRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRoomResponse.ProtoReflect.Descriptor instead.
 func (*RemoveRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{110}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{114}
 }
 
 type RotateRoomCredentialsRequest struct {
@@ -7630,7 +7921,7 @@ type RotateRoomCredentialsRequest struct {
 
 func (x *RotateRoomCredentialsRequest) Reset() {
 	*x = RotateRoomCredentialsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[111]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7642,7 +7933,7 @@ func (x *RotateRoomCredentialsRequest) String() string {
 func (*RotateRoomCredentialsRequest) ProtoMessage() {}
 
 func (x *RotateRoomCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[111]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7655,7 +7946,7 @@ func (x *RotateRoomCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateRoomCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*RotateRoomCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{111}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *RotateRoomCredentialsRequest) GetRoom() *RoomRef {
@@ -7673,7 +7964,7 @@ type RotateRoomCredentialsResponse struct {
 
 func (x *RotateRoomCredentialsResponse) Reset() {
 	*x = RotateRoomCredentialsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[112]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7685,7 +7976,7 @@ func (x *RotateRoomCredentialsResponse) String() string {
 func (*RotateRoomCredentialsResponse) ProtoMessage() {}
 
 func (x *RotateRoomCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[112]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7698,7 +7989,7 @@ func (x *RotateRoomCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateRoomCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*RotateRoomCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{112}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{116}
 }
 
 type UpdateRoomNowRequest struct {
@@ -7710,7 +8001,7 @@ type UpdateRoomNowRequest struct {
 
 func (x *UpdateRoomNowRequest) Reset() {
 	*x = UpdateRoomNowRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[113]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7722,7 +8013,7 @@ func (x *UpdateRoomNowRequest) String() string {
 func (*UpdateRoomNowRequest) ProtoMessage() {}
 
 func (x *UpdateRoomNowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[113]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7735,7 +8026,7 @@ func (x *UpdateRoomNowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoomNowRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRoomNowRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{113}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *UpdateRoomNowRequest) GetRoom() *RoomRef {
@@ -7753,7 +8044,7 @@ type UpdateRoomNowResponse struct {
 
 func (x *UpdateRoomNowResponse) Reset() {
 	*x = UpdateRoomNowResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[114]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7765,7 +8056,7 @@ func (x *UpdateRoomNowResponse) String() string {
 func (*UpdateRoomNowResponse) ProtoMessage() {}
 
 func (x *UpdateRoomNowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[114]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7778,7 +8069,7 @@ func (x *UpdateRoomNowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoomNowResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRoomNowResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{114}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{118}
 }
 
 type QuarantineRoomRequest struct {
@@ -7791,7 +8082,7 @@ type QuarantineRoomRequest struct {
 
 func (x *QuarantineRoomRequest) Reset() {
 	*x = QuarantineRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[115]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7803,7 +8094,7 @@ func (x *QuarantineRoomRequest) String() string {
 func (*QuarantineRoomRequest) ProtoMessage() {}
 
 func (x *QuarantineRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[115]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7816,7 +8107,7 @@ func (x *QuarantineRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuarantineRoomRequest.ProtoReflect.Descriptor instead.
 func (*QuarantineRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{115}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *QuarantineRoomRequest) GetRoom() *RoomRef {
@@ -7841,7 +8132,7 @@ type QuarantineRoomResponse struct {
 
 func (x *QuarantineRoomResponse) Reset() {
 	*x = QuarantineRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[116]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7853,7 +8144,7 @@ func (x *QuarantineRoomResponse) String() string {
 func (*QuarantineRoomResponse) ProtoMessage() {}
 
 func (x *QuarantineRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[116]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7866,7 +8157,7 @@ func (x *QuarantineRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuarantineRoomResponse.ProtoReflect.Descriptor instead.
 func (*QuarantineRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{116}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{120}
 }
 
 type ReleaseRoomRequest struct {
@@ -7880,7 +8171,7 @@ type ReleaseRoomRequest struct {
 
 func (x *ReleaseRoomRequest) Reset() {
 	*x = ReleaseRoomRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[117]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7892,7 +8183,7 @@ func (x *ReleaseRoomRequest) String() string {
 func (*ReleaseRoomRequest) ProtoMessage() {}
 
 func (x *ReleaseRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[117]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7905,7 +8196,7 @@ func (x *ReleaseRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseRoomRequest.ProtoReflect.Descriptor instead.
 func (*ReleaseRoomRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{117}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *ReleaseRoomRequest) GetRoom() *RoomRef {
@@ -7930,7 +8221,7 @@ type ReleaseRoomResponse struct {
 
 func (x *ReleaseRoomResponse) Reset() {
 	*x = ReleaseRoomResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[118]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7942,7 +8233,7 @@ func (x *ReleaseRoomResponse) String() string {
 func (*ReleaseRoomResponse) ProtoMessage() {}
 
 func (x *ReleaseRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[118]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7955,7 +8246,7 @@ func (x *ReleaseRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseRoomResponse.ProtoReflect.Descriptor instead.
 func (*ReleaseRoomResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{118}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{122}
 }
 
 type StreamRoomLogsRequest struct {
@@ -7973,7 +8264,7 @@ type StreamRoomLogsRequest struct {
 
 func (x *StreamRoomLogsRequest) Reset() {
 	*x = StreamRoomLogsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[119]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7985,7 +8276,7 @@ func (x *StreamRoomLogsRequest) String() string {
 func (*StreamRoomLogsRequest) ProtoMessage() {}
 
 func (x *StreamRoomLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[119]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7998,7 +8289,7 @@ func (x *StreamRoomLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamRoomLogsRequest.ProtoReflect.Descriptor instead.
 func (*StreamRoomLogsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{119}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *StreamRoomLogsRequest) GetRoom() *RoomRef {
@@ -8052,7 +8343,7 @@ type StreamRoomLogsResponse struct {
 
 func (x *StreamRoomLogsResponse) Reset() {
 	*x = StreamRoomLogsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[120]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8064,7 +8355,7 @@ func (x *StreamRoomLogsResponse) String() string {
 func (*StreamRoomLogsResponse) ProtoMessage() {}
 
 func (x *StreamRoomLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[120]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8077,7 +8368,7 @@ func (x *StreamRoomLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamRoomLogsResponse.ProtoReflect.Descriptor instead.
 func (*StreamRoomLogsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{120}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *StreamRoomLogsResponse) GetLine() string {
@@ -8096,7 +8387,7 @@ type GetRoomResourcesRequest struct {
 
 func (x *GetRoomResourcesRequest) Reset() {
 	*x = GetRoomResourcesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[121]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8108,7 +8399,7 @@ func (x *GetRoomResourcesRequest) String() string {
 func (*GetRoomResourcesRequest) ProtoMessage() {}
 
 func (x *GetRoomResourcesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[121]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8121,7 +8412,7 @@ func (x *GetRoomResourcesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomResourcesRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomResourcesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{121}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *GetRoomResourcesRequest) GetRoom() *RoomRef {
@@ -8146,7 +8437,7 @@ type GetRoomResourcesResponse struct {
 
 func (x *GetRoomResourcesResponse) Reset() {
 	*x = GetRoomResourcesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[122]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8158,7 +8449,7 @@ func (x *GetRoomResourcesResponse) String() string {
 func (*GetRoomResourcesResponse) ProtoMessage() {}
 
 func (x *GetRoomResourcesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[122]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8171,7 +8462,7 @@ func (x *GetRoomResourcesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomResourcesResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomResourcesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{122}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *GetRoomResourcesResponse) GetCpuMillicores() int64 {
@@ -8225,7 +8516,7 @@ type GetRoomStorageRequest struct {
 
 func (x *GetRoomStorageRequest) Reset() {
 	*x = GetRoomStorageRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[123]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8237,7 +8528,7 @@ func (x *GetRoomStorageRequest) String() string {
 func (*GetRoomStorageRequest) ProtoMessage() {}
 
 func (x *GetRoomStorageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[123]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8250,7 +8541,7 @@ func (x *GetRoomStorageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomStorageRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomStorageRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{123}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *GetRoomStorageRequest) GetRoom() *RoomRef {
@@ -8273,7 +8564,7 @@ type ClaimInfo struct {
 
 func (x *ClaimInfo) Reset() {
 	*x = ClaimInfo{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[124]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8285,7 +8576,7 @@ func (x *ClaimInfo) String() string {
 func (*ClaimInfo) ProtoMessage() {}
 
 func (x *ClaimInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[124]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8298,7 +8589,7 @@ func (x *ClaimInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimInfo.ProtoReflect.Descriptor instead.
 func (*ClaimInfo) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{124}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *ClaimInfo) GetName() string {
@@ -8348,7 +8639,7 @@ type GetRoomStorageResponse struct {
 
 func (x *GetRoomStorageResponse) Reset() {
 	*x = GetRoomStorageResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[125]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8360,7 +8651,7 @@ func (x *GetRoomStorageResponse) String() string {
 func (*GetRoomStorageResponse) ProtoMessage() {}
 
 func (x *GetRoomStorageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[125]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8373,7 +8664,7 @@ func (x *GetRoomStorageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomStorageResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomStorageResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{125}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *GetRoomStorageResponse) GetVolumes() []*VolumeUsage {
@@ -8406,7 +8697,7 @@ type WatchFleetRequest struct {
 
 func (x *WatchFleetRequest) Reset() {
 	*x = WatchFleetRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[126]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8418,7 +8709,7 @@ func (x *WatchFleetRequest) String() string {
 func (*WatchFleetRequest) ProtoMessage() {}
 
 func (x *WatchFleetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[126]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8431,7 +8722,7 @@ func (x *WatchFleetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchFleetRequest.ProtoReflect.Descriptor instead.
 func (*WatchFleetRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{126}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *WatchFleetRequest) GetWorkspaces() []string {
@@ -8455,7 +8746,7 @@ type WatchFleetResponse struct {
 
 func (x *WatchFleetResponse) Reset() {
 	*x = WatchFleetResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[127]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8467,7 +8758,7 @@ func (x *WatchFleetResponse) String() string {
 func (*WatchFleetResponse) ProtoMessage() {}
 
 func (x *WatchFleetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[127]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8480,7 +8771,7 @@ func (x *WatchFleetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchFleetResponse.ProtoReflect.Descriptor instead.
 func (*WatchFleetResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{127}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *WatchFleetResponse) GetEvent() isWatchFleetResponse_Event {
@@ -8548,7 +8839,7 @@ type FleetSnapshot struct {
 
 func (x *FleetSnapshot) Reset() {
 	*x = FleetSnapshot{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[128]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8560,7 +8851,7 @@ func (x *FleetSnapshot) String() string {
 func (*FleetSnapshot) ProtoMessage() {}
 
 func (x *FleetSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[128]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8573,7 +8864,7 @@ func (x *FleetSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FleetSnapshot.ProtoReflect.Descriptor instead.
 func (*FleetSnapshot) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{128}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *FleetSnapshot) GetRooms() []*RoomSummary {
@@ -8601,7 +8892,7 @@ type InboxMessage struct {
 
 func (x *InboxMessage) Reset() {
 	*x = InboxMessage{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[129]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8613,7 +8904,7 @@ func (x *InboxMessage) String() string {
 func (*InboxMessage) ProtoMessage() {}
 
 func (x *InboxMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[129]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8626,7 +8917,7 @@ func (x *InboxMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboxMessage.ProtoReflect.Descriptor instead.
 func (*InboxMessage) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{129}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *InboxMessage) GetId() string {
@@ -8706,7 +8997,7 @@ type ListInboxRequest struct {
 
 func (x *ListInboxRequest) Reset() {
 	*x = ListInboxRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[130]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8718,7 +9009,7 @@ func (x *ListInboxRequest) String() string {
 func (*ListInboxRequest) ProtoMessage() {}
 
 func (x *ListInboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[130]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8731,7 +9022,7 @@ func (x *ListInboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInboxRequest.ProtoReflect.Descriptor instead.
 func (*ListInboxRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{130}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *ListInboxRequest) GetWorkspace() string {
@@ -8772,7 +9063,7 @@ type ListInboxResponse struct {
 
 func (x *ListInboxResponse) Reset() {
 	*x = ListInboxResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[131]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8784,7 +9075,7 @@ func (x *ListInboxResponse) String() string {
 func (*ListInboxResponse) ProtoMessage() {}
 
 func (x *ListInboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[131]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8797,7 +9088,7 @@ func (x *ListInboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInboxResponse.ProtoReflect.Descriptor instead.
 func (*ListInboxResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{131}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *ListInboxResponse) GetMessages() []*InboxMessage {
@@ -8827,7 +9118,7 @@ type SendMessageRequest struct {
 
 func (x *SendMessageRequest) Reset() {
 	*x = SendMessageRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[132]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8839,7 +9130,7 @@ func (x *SendMessageRequest) String() string {
 func (*SendMessageRequest) ProtoMessage() {}
 
 func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[132]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8852,7 +9143,7 @@ func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendMessageRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{132}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *SendMessageRequest) GetWorkspace() string {
@@ -8892,7 +9183,7 @@ type SendMessageResponse struct {
 
 func (x *SendMessageResponse) Reset() {
 	*x = SendMessageResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[133]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8904,7 +9195,7 @@ func (x *SendMessageResponse) String() string {
 func (*SendMessageResponse) ProtoMessage() {}
 
 func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[133]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8917,7 +9208,7 @@ func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendMessageResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{133}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *SendMessageResponse) GetMessage() *InboxMessage {
@@ -8936,7 +9227,7 @@ type MarkReadRequest struct {
 
 func (x *MarkReadRequest) Reset() {
 	*x = MarkReadRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[134]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8948,7 +9239,7 @@ func (x *MarkReadRequest) String() string {
 func (*MarkReadRequest) ProtoMessage() {}
 
 func (x *MarkReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[134]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8961,7 +9252,7 @@ func (x *MarkReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkReadRequest.ProtoReflect.Descriptor instead.
 func (*MarkReadRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{134}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *MarkReadRequest) GetIds() []string {
@@ -8979,7 +9270,7 @@ type MarkReadResponse struct {
 
 func (x *MarkReadResponse) Reset() {
 	*x = MarkReadResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[135]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8991,7 +9282,7 @@ func (x *MarkReadResponse) String() string {
 func (*MarkReadResponse) ProtoMessage() {}
 
 func (x *MarkReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[135]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9004,7 +9295,7 @@ func (x *MarkReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkReadResponse.ProtoReflect.Descriptor instead.
 func (*MarkReadResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{135}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{139}
 }
 
 type WatchInboxRequest struct {
@@ -9016,7 +9307,7 @@ type WatchInboxRequest struct {
 
 func (x *WatchInboxRequest) Reset() {
 	*x = WatchInboxRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[136]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9028,7 +9319,7 @@ func (x *WatchInboxRequest) String() string {
 func (*WatchInboxRequest) ProtoMessage() {}
 
 func (x *WatchInboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[136]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9041,7 +9332,7 @@ func (x *WatchInboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchInboxRequest.ProtoReflect.Descriptor instead.
 func (*WatchInboxRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{136}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *WatchInboxRequest) GetWorkspaces() []string {
@@ -9060,7 +9351,7 @@ type WatchInboxResponse struct {
 
 func (x *WatchInboxResponse) Reset() {
 	*x = WatchInboxResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[137]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9072,7 +9363,7 @@ func (x *WatchInboxResponse) String() string {
 func (*WatchInboxResponse) ProtoMessage() {}
 
 func (x *WatchInboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[137]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9085,7 +9376,7 @@ func (x *WatchInboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchInboxResponse.ProtoReflect.Descriptor instead.
 func (*WatchInboxResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{137}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *WatchInboxResponse) GetMessage() *InboxMessage {
@@ -9122,7 +9413,7 @@ type Approval struct {
 
 func (x *Approval) Reset() {
 	*x = Approval{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[138]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9134,7 +9425,7 @@ func (x *Approval) String() string {
 func (*Approval) ProtoMessage() {}
 
 func (x *Approval) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[138]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9147,7 +9438,7 @@ func (x *Approval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Approval.ProtoReflect.Descriptor instead.
 func (*Approval) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{138}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *Approval) GetId() string {
@@ -9278,7 +9569,7 @@ type ListApprovalsRequest struct {
 
 func (x *ListApprovalsRequest) Reset() {
 	*x = ListApprovalsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[139]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9290,7 +9581,7 @@ func (x *ListApprovalsRequest) String() string {
 func (*ListApprovalsRequest) ProtoMessage() {}
 
 func (x *ListApprovalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[139]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9303,7 +9594,7 @@ func (x *ListApprovalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalsRequest.ProtoReflect.Descriptor instead.
 func (*ListApprovalsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{139}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *ListApprovalsRequest) GetWorkspaces() []string {
@@ -9322,7 +9613,7 @@ type ListApprovalsResponse struct {
 
 func (x *ListApprovalsResponse) Reset() {
 	*x = ListApprovalsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[140]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9334,7 +9625,7 @@ func (x *ListApprovalsResponse) String() string {
 func (*ListApprovalsResponse) ProtoMessage() {}
 
 func (x *ListApprovalsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[140]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9347,7 +9638,7 @@ func (x *ListApprovalsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalsResponse.ProtoReflect.Descriptor instead.
 func (*ListApprovalsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{140}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *ListApprovalsResponse) GetApprovals() []*Approval {
@@ -9368,7 +9659,7 @@ type AnswerApprovalRequest struct {
 
 func (x *AnswerApprovalRequest) Reset() {
 	*x = AnswerApprovalRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[141]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9380,7 +9671,7 @@ func (x *AnswerApprovalRequest) String() string {
 func (*AnswerApprovalRequest) ProtoMessage() {}
 
 func (x *AnswerApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[141]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9393,7 +9684,7 @@ func (x *AnswerApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerApprovalRequest.ProtoReflect.Descriptor instead.
 func (*AnswerApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{141}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *AnswerApprovalRequest) GetId() string {
@@ -9426,7 +9717,7 @@ type AnswerApprovalResponse struct {
 
 func (x *AnswerApprovalResponse) Reset() {
 	*x = AnswerApprovalResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[142]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9438,7 +9729,7 @@ func (x *AnswerApprovalResponse) String() string {
 func (*AnswerApprovalResponse) ProtoMessage() {}
 
 func (x *AnswerApprovalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[142]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9451,7 +9742,7 @@ func (x *AnswerApprovalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerApprovalResponse.ProtoReflect.Descriptor instead.
 func (*AnswerApprovalResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{142}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *AnswerApprovalResponse) GetApproval() *Approval {
@@ -9470,7 +9761,7 @@ type WatchApprovalsRequest struct {
 
 func (x *WatchApprovalsRequest) Reset() {
 	*x = WatchApprovalsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[143]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9482,7 +9773,7 @@ func (x *WatchApprovalsRequest) String() string {
 func (*WatchApprovalsRequest) ProtoMessage() {}
 
 func (x *WatchApprovalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[143]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9495,7 +9786,7 @@ func (x *WatchApprovalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchApprovalsRequest.ProtoReflect.Descriptor instead.
 func (*WatchApprovalsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{143}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *WatchApprovalsRequest) GetWorkspaces() []string {
@@ -9515,7 +9806,7 @@ type WatchApprovalsResponse struct {
 
 func (x *WatchApprovalsResponse) Reset() {
 	*x = WatchApprovalsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[144]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9527,7 +9818,7 @@ func (x *WatchApprovalsResponse) String() string {
 func (*WatchApprovalsResponse) ProtoMessage() {}
 
 func (x *WatchApprovalsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[144]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9540,7 +9831,7 @@ func (x *WatchApprovalsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchApprovalsResponse.ProtoReflect.Descriptor instead.
 func (*WatchApprovalsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{144}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *WatchApprovalsResponse) GetApproval() *Approval {
@@ -9561,7 +9852,7 @@ type ListApprovalHistoryRequest struct {
 
 func (x *ListApprovalHistoryRequest) Reset() {
 	*x = ListApprovalHistoryRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[145]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9573,7 +9864,7 @@ func (x *ListApprovalHistoryRequest) String() string {
 func (*ListApprovalHistoryRequest) ProtoMessage() {}
 
 func (x *ListApprovalHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[145]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9586,7 +9877,7 @@ func (x *ListApprovalHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalHistoryRequest.ProtoReflect.Descriptor instead.
 func (*ListApprovalHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{145}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *ListApprovalHistoryRequest) GetWorkspace() string {
@@ -9619,7 +9910,7 @@ type ListApprovalHistoryResponse struct {
 
 func (x *ListApprovalHistoryResponse) Reset() {
 	*x = ListApprovalHistoryResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[146]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9631,7 +9922,7 @@ func (x *ListApprovalHistoryResponse) String() string {
 func (*ListApprovalHistoryResponse) ProtoMessage() {}
 
 func (x *ListApprovalHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[146]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9644,7 +9935,7 @@ func (x *ListApprovalHistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovalHistoryResponse.ProtoReflect.Descriptor instead.
 func (*ListApprovalHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{146}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *ListApprovalHistoryResponse) GetApprovals() []*Approval {
@@ -9678,7 +9969,7 @@ type AuditEntry struct {
 
 func (x *AuditEntry) Reset() {
 	*x = AuditEntry{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[147]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9690,7 +9981,7 @@ func (x *AuditEntry) String() string {
 func (*AuditEntry) ProtoMessage() {}
 
 func (x *AuditEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[147]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9703,7 +9994,7 @@ func (x *AuditEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditEntry.ProtoReflect.Descriptor instead.
 func (*AuditEntry) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{147}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *AuditEntry) GetSource() AuditSource {
@@ -9799,7 +10090,7 @@ type QueryAuditRequest struct {
 
 func (x *QueryAuditRequest) Reset() {
 	*x = QueryAuditRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[148]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9811,7 +10102,7 @@ func (x *QueryAuditRequest) String() string {
 func (*QueryAuditRequest) ProtoMessage() {}
 
 func (x *QueryAuditRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[148]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9824,7 +10115,7 @@ func (x *QueryAuditRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryAuditRequest.ProtoReflect.Descriptor instead.
 func (*QueryAuditRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{148}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *QueryAuditRequest) GetSource() AuditSource {
@@ -9885,7 +10176,7 @@ type QueryAuditResponse struct {
 
 func (x *QueryAuditResponse) Reset() {
 	*x = QueryAuditResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[149]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9897,7 +10188,7 @@ func (x *QueryAuditResponse) String() string {
 func (*QueryAuditResponse) ProtoMessage() {}
 
 func (x *QueryAuditResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[149]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9910,7 +10201,7 @@ func (x *QueryAuditResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryAuditResponse.ProtoReflect.Descriptor instead.
 func (*QueryAuditResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{149}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *QueryAuditResponse) GetEntries() []*AuditEntry {
@@ -9928,7 +10219,7 @@ type GetVapidPublicKeyRequest struct {
 
 func (x *GetVapidPublicKeyRequest) Reset() {
 	*x = GetVapidPublicKeyRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[150]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9940,7 +10231,7 @@ func (x *GetVapidPublicKeyRequest) String() string {
 func (*GetVapidPublicKeyRequest) ProtoMessage() {}
 
 func (x *GetVapidPublicKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[150]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9953,7 +10244,7 @@ func (x *GetVapidPublicKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVapidPublicKeyRequest.ProtoReflect.Descriptor instead.
 func (*GetVapidPublicKeyRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{150}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{154}
 }
 
 type GetVapidPublicKeyResponse struct {
@@ -9966,7 +10257,7 @@ type GetVapidPublicKeyResponse struct {
 
 func (x *GetVapidPublicKeyResponse) Reset() {
 	*x = GetVapidPublicKeyResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[151]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9978,7 +10269,7 @@ func (x *GetVapidPublicKeyResponse) String() string {
 func (*GetVapidPublicKeyResponse) ProtoMessage() {}
 
 func (x *GetVapidPublicKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[151]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9991,7 +10282,7 @@ func (x *GetVapidPublicKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVapidPublicKeyResponse.ProtoReflect.Descriptor instead.
 func (*GetVapidPublicKeyResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{151}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *GetVapidPublicKeyResponse) GetPublicKey() string {
@@ -10013,7 +10304,7 @@ type SubscribeWebPushRequest struct {
 
 func (x *SubscribeWebPushRequest) Reset() {
 	*x = SubscribeWebPushRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[152]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10025,7 +10316,7 @@ func (x *SubscribeWebPushRequest) String() string {
 func (*SubscribeWebPushRequest) ProtoMessage() {}
 
 func (x *SubscribeWebPushRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[152]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10038,7 +10329,7 @@ func (x *SubscribeWebPushRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeWebPushRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeWebPushRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{152}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *SubscribeWebPushRequest) GetEndpoint() string {
@@ -10077,7 +10368,7 @@ type SubscribeWebPushResponse struct {
 
 func (x *SubscribeWebPushResponse) Reset() {
 	*x = SubscribeWebPushResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[153]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10089,7 +10380,7 @@ func (x *SubscribeWebPushResponse) String() string {
 func (*SubscribeWebPushResponse) ProtoMessage() {}
 
 func (x *SubscribeWebPushResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[153]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10102,7 +10393,7 @@ func (x *SubscribeWebPushResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeWebPushResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeWebPushResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{153}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{157}
 }
 
 type UnsubscribeWebPushRequest struct {
@@ -10114,7 +10405,7 @@ type UnsubscribeWebPushRequest struct {
 
 func (x *UnsubscribeWebPushRequest) Reset() {
 	*x = UnsubscribeWebPushRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[154]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10126,7 +10417,7 @@ func (x *UnsubscribeWebPushRequest) String() string {
 func (*UnsubscribeWebPushRequest) ProtoMessage() {}
 
 func (x *UnsubscribeWebPushRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[154]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10139,7 +10430,7 @@ func (x *UnsubscribeWebPushRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeWebPushRequest.ProtoReflect.Descriptor instead.
 func (*UnsubscribeWebPushRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{154}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *UnsubscribeWebPushRequest) GetEndpoint() string {
@@ -10157,7 +10448,7 @@ type UnsubscribeWebPushResponse struct {
 
 func (x *UnsubscribeWebPushResponse) Reset() {
 	*x = UnsubscribeWebPushResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[155]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10169,7 +10460,7 @@ func (x *UnsubscribeWebPushResponse) String() string {
 func (*UnsubscribeWebPushResponse) ProtoMessage() {}
 
 func (x *UnsubscribeWebPushResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[155]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10182,7 +10473,7 @@ func (x *UnsubscribeWebPushResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeWebPushResponse.ProtoReflect.Descriptor instead.
 func (*UnsubscribeWebPushResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{155}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{159}
 }
 
 type NotificationPref struct {
@@ -10199,7 +10490,7 @@ type NotificationPref struct {
 
 func (x *NotificationPref) Reset() {
 	*x = NotificationPref{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[156]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10211,7 +10502,7 @@ func (x *NotificationPref) String() string {
 func (*NotificationPref) ProtoMessage() {}
 
 func (x *NotificationPref) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[156]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10224,7 +10515,7 @@ func (x *NotificationPref) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotificationPref.ProtoReflect.Descriptor instead.
 func (*NotificationPref) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{156}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *NotificationPref) GetWorkspace() string {
@@ -10256,7 +10547,7 @@ type GetNotificationPrefsRequest struct {
 
 func (x *GetNotificationPrefsRequest) Reset() {
 	*x = GetNotificationPrefsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[157]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10268,7 +10559,7 @@ func (x *GetNotificationPrefsRequest) String() string {
 func (*GetNotificationPrefsRequest) ProtoMessage() {}
 
 func (x *GetNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[157]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10281,7 +10572,7 @@ func (x *GetNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNotificationPrefsRequest.ProtoReflect.Descriptor instead.
 func (*GetNotificationPrefsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{157}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{161}
 }
 
 type GetNotificationPrefsResponse struct {
@@ -10295,7 +10586,7 @@ type GetNotificationPrefsResponse struct {
 
 func (x *GetNotificationPrefsResponse) Reset() {
 	*x = GetNotificationPrefsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[158]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10307,7 +10598,7 @@ func (x *GetNotificationPrefsResponse) String() string {
 func (*GetNotificationPrefsResponse) ProtoMessage() {}
 
 func (x *GetNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[158]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10320,7 +10611,7 @@ func (x *GetNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNotificationPrefsResponse.ProtoReflect.Descriptor instead.
 func (*GetNotificationPrefsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{158}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *GetNotificationPrefsResponse) GetPrefs() []*NotificationPref {
@@ -10346,7 +10637,7 @@ type SetNotificationPrefsRequest struct {
 
 func (x *SetNotificationPrefsRequest) Reset() {
 	*x = SetNotificationPrefsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[159]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10358,7 +10649,7 @@ func (x *SetNotificationPrefsRequest) String() string {
 func (*SetNotificationPrefsRequest) ProtoMessage() {}
 
 func (x *SetNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[159]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10371,7 +10662,7 @@ func (x *SetNotificationPrefsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetNotificationPrefsRequest.ProtoReflect.Descriptor instead.
 func (*SetNotificationPrefsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{159}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *SetNotificationPrefsRequest) GetPrefs() []*NotificationPref {
@@ -10389,7 +10680,7 @@ type SetNotificationPrefsResponse struct {
 
 func (x *SetNotificationPrefsResponse) Reset() {
 	*x = SetNotificationPrefsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[160]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10401,7 +10692,7 @@ func (x *SetNotificationPrefsResponse) String() string {
 func (*SetNotificationPrefsResponse) ProtoMessage() {}
 
 func (x *SetNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[160]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10414,7 +10705,7 @@ func (x *SetNotificationPrefsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetNotificationPrefsResponse.ProtoReflect.Descriptor instead.
 func (*SetNotificationPrefsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{160}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{164}
 }
 
 type SendTestNotificationRequest struct {
@@ -10426,7 +10717,7 @@ type SendTestNotificationRequest struct {
 
 func (x *SendTestNotificationRequest) Reset() {
 	*x = SendTestNotificationRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[161]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10438,7 +10729,7 @@ func (x *SendTestNotificationRequest) String() string {
 func (*SendTestNotificationRequest) ProtoMessage() {}
 
 func (x *SendTestNotificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[161]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10451,7 +10742,7 @@ func (x *SendTestNotificationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTestNotificationRequest.ProtoReflect.Descriptor instead.
 func (*SendTestNotificationRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{161}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *SendTestNotificationRequest) GetChannel() string {
@@ -10469,7 +10760,7 @@ type SendTestNotificationResponse struct {
 
 func (x *SendTestNotificationResponse) Reset() {
 	*x = SendTestNotificationResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[162]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10481,7 +10772,7 @@ func (x *SendTestNotificationResponse) String() string {
 func (*SendTestNotificationResponse) ProtoMessage() {}
 
 func (x *SendTestNotificationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[162]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10494,7 +10785,7 @@ func (x *SendTestNotificationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTestNotificationResponse.ProtoReflect.Descriptor instead.
 func (*SendTestNotificationResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{162}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{166}
 }
 
 type RoomSpend struct {
@@ -10510,7 +10801,7 @@ type RoomSpend struct {
 
 func (x *RoomSpend) Reset() {
 	*x = RoomSpend{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[163]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10522,7 +10813,7 @@ func (x *RoomSpend) String() string {
 func (*RoomSpend) ProtoMessage() {}
 
 func (x *RoomSpend) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[163]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10535,7 +10826,7 @@ func (x *RoomSpend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomSpend.ProtoReflect.Descriptor instead.
 func (*RoomSpend) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{163}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *RoomSpend) GetWorkspace() string {
@@ -10583,7 +10874,7 @@ type ModelSpend struct {
 
 func (x *ModelSpend) Reset() {
 	*x = ModelSpend{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[164]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10595,7 +10886,7 @@ func (x *ModelSpend) String() string {
 func (*ModelSpend) ProtoMessage() {}
 
 func (x *ModelSpend) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[164]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10608,7 +10899,7 @@ func (x *ModelSpend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelSpend.ProtoReflect.Descriptor instead.
 func (*ModelSpend) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{164}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *ModelSpend) GetModel() string {
@@ -10636,7 +10927,7 @@ type WorkspaceSpend struct {
 
 func (x *WorkspaceSpend) Reset() {
 	*x = WorkspaceSpend{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[165]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10648,7 +10939,7 @@ func (x *WorkspaceSpend) String() string {
 func (*WorkspaceSpend) ProtoMessage() {}
 
 func (x *WorkspaceSpend) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[165]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10661,7 +10952,7 @@ func (x *WorkspaceSpend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceSpend.ProtoReflect.Descriptor instead.
 func (*WorkspaceSpend) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{165}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{169}
 }
 
 func (x *WorkspaceSpend) GetWorkspace() string {
@@ -10695,7 +10986,7 @@ type GetSpendRequest struct {
 
 func (x *GetSpendRequest) Reset() {
 	*x = GetSpendRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[166]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10707,7 +10998,7 @@ func (x *GetSpendRequest) String() string {
 func (*GetSpendRequest) ProtoMessage() {}
 
 func (x *GetSpendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[166]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10720,7 +11011,7 @@ func (x *GetSpendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSpendRequest.ProtoReflect.Descriptor instead.
 func (*GetSpendRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{166}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *GetSpendRequest) GetWorkspace() string {
@@ -10743,7 +11034,7 @@ type GetSpendResponse struct {
 
 func (x *GetSpendResponse) Reset() {
 	*x = GetSpendResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[167]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10755,7 +11046,7 @@ func (x *GetSpendResponse) String() string {
 func (*GetSpendResponse) ProtoMessage() {}
 
 func (x *GetSpendResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[167]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10768,7 +11059,7 @@ func (x *GetSpendResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSpendResponse.ProtoReflect.Descriptor instead.
 func (*GetSpendResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{167}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{171}
 }
 
 func (x *GetSpendResponse) GetRooms() []*RoomSpend {
@@ -10807,7 +11098,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[168]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10819,7 +11110,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[168]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10832,7 +11123,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{168}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{172}
 }
 
 type ListUsersResponse struct {
@@ -10844,7 +11135,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[169]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10856,7 +11147,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[169]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10869,7 +11160,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{169}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -10889,7 +11180,7 @@ type SetUserRoleRequest struct {
 
 func (x *SetUserRoleRequest) Reset() {
 	*x = SetUserRoleRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[170]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10901,7 +11192,7 @@ func (x *SetUserRoleRequest) String() string {
 func (*SetUserRoleRequest) ProtoMessage() {}
 
 func (x *SetUserRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[170]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10914,7 +11205,7 @@ func (x *SetUserRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserRoleRequest.ProtoReflect.Descriptor instead.
 func (*SetUserRoleRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{170}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{174}
 }
 
 func (x *SetUserRoleRequest) GetUserId() string {
@@ -10940,7 +11231,7 @@ type SetUserRoleResponse struct {
 
 func (x *SetUserRoleResponse) Reset() {
 	*x = SetUserRoleResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[171]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10952,7 +11243,7 @@ func (x *SetUserRoleResponse) String() string {
 func (*SetUserRoleResponse) ProtoMessage() {}
 
 func (x *SetUserRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[171]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10965,7 +11256,7 @@ func (x *SetUserRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserRoleResponse.ProtoReflect.Descriptor instead.
 func (*SetUserRoleResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{171}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *SetUserRoleResponse) GetUser() *User {
@@ -10985,7 +11276,7 @@ type SetUserWorkspacesRequest struct {
 
 func (x *SetUserWorkspacesRequest) Reset() {
 	*x = SetUserWorkspacesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[172]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10997,7 +11288,7 @@ func (x *SetUserWorkspacesRequest) String() string {
 func (*SetUserWorkspacesRequest) ProtoMessage() {}
 
 func (x *SetUserWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[172]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11010,7 +11301,7 @@ func (x *SetUserWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*SetUserWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{172}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{176}
 }
 
 func (x *SetUserWorkspacesRequest) GetUserId() string {
@@ -11036,7 +11327,7 @@ type SetUserWorkspacesResponse struct {
 
 func (x *SetUserWorkspacesResponse) Reset() {
 	*x = SetUserWorkspacesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[173]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11048,7 +11339,7 @@ func (x *SetUserWorkspacesResponse) String() string {
 func (*SetUserWorkspacesResponse) ProtoMessage() {}
 
 func (x *SetUserWorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[173]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11061,7 +11352,7 @@ func (x *SetUserWorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserWorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*SetUserWorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{173}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{177}
 }
 
 func (x *SetUserWorkspacesResponse) GetUser() *User {
@@ -11081,7 +11372,7 @@ type SetUserDisabledRequest struct {
 
 func (x *SetUserDisabledRequest) Reset() {
 	*x = SetUserDisabledRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[174]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11093,7 +11384,7 @@ func (x *SetUserDisabledRequest) String() string {
 func (*SetUserDisabledRequest) ProtoMessage() {}
 
 func (x *SetUserDisabledRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[174]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11106,7 +11397,7 @@ func (x *SetUserDisabledRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserDisabledRequest.ProtoReflect.Descriptor instead.
 func (*SetUserDisabledRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{174}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{178}
 }
 
 func (x *SetUserDisabledRequest) GetUserId() string {
@@ -11132,7 +11423,7 @@ type SetUserDisabledResponse struct {
 
 func (x *SetUserDisabledResponse) Reset() {
 	*x = SetUserDisabledResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[175]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11144,7 +11435,7 @@ func (x *SetUserDisabledResponse) String() string {
 func (*SetUserDisabledResponse) ProtoMessage() {}
 
 func (x *SetUserDisabledResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[175]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11157,7 +11448,7 @@ func (x *SetUserDisabledResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserDisabledResponse.ProtoReflect.Descriptor instead.
 func (*SetUserDisabledResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{175}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{179}
 }
 
 func (x *SetUserDisabledResponse) GetUser() *User {
@@ -11181,7 +11472,7 @@ type Edge struct {
 
 func (x *Edge) Reset() {
 	*x = Edge{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[176]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11193,7 +11484,7 @@ func (x *Edge) String() string {
 func (*Edge) ProtoMessage() {}
 
 func (x *Edge) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[176]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11206,7 +11497,7 @@ func (x *Edge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Edge.ProtoReflect.Descriptor instead.
 func (*Edge) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{176}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *Edge) GetFrom() string {
@@ -11256,7 +11547,7 @@ type EdgesRequest struct {
 
 func (x *EdgesRequest) Reset() {
 	*x = EdgesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[177]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11268,7 +11559,7 @@ func (x *EdgesRequest) String() string {
 func (*EdgesRequest) ProtoMessage() {}
 
 func (x *EdgesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[177]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11281,7 +11572,7 @@ func (x *EdgesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgesRequest.ProtoReflect.Descriptor instead.
 func (*EdgesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{177}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{181}
 }
 
 func (x *EdgesRequest) GetWorkspace() string {
@@ -11314,7 +11605,7 @@ type EdgesResponse struct {
 
 func (x *EdgesResponse) Reset() {
 	*x = EdgesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[178]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11326,7 +11617,7 @@ func (x *EdgesResponse) String() string {
 func (*EdgesResponse) ProtoMessage() {}
 
 func (x *EdgesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[178]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11339,7 +11630,7 @@ func (x *EdgesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgesResponse.ProtoReflect.Descriptor instead.
 func (*EdgesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{178}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{182}
 }
 
 func (x *EdgesResponse) GetEdges() []*Edge {
@@ -11362,7 +11653,7 @@ type ItemRef struct {
 
 func (x *ItemRef) Reset() {
 	*x = ItemRef{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[179]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11374,7 +11665,7 @@ func (x *ItemRef) String() string {
 func (*ItemRef) ProtoMessage() {}
 
 func (x *ItemRef) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[179]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11387,7 +11678,7 @@ func (x *ItemRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemRef.ProtoReflect.Descriptor instead.
 func (*ItemRef) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{179}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{183}
 }
 
 func (x *ItemRef) GetRepo() string {
@@ -11439,7 +11730,7 @@ type AgentNow struct {
 
 func (x *AgentNow) Reset() {
 	*x = AgentNow{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[180]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11451,7 +11742,7 @@ func (x *AgentNow) String() string {
 func (*AgentNow) ProtoMessage() {}
 
 func (x *AgentNow) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[180]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11464,7 +11755,7 @@ func (x *AgentNow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentNow.ProtoReflect.Descriptor instead.
 func (*AgentNow) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{180}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{184}
 }
 
 func (x *AgentNow) GetName() string {
@@ -11518,7 +11809,7 @@ type NowRequest struct {
 
 func (x *NowRequest) Reset() {
 	*x = NowRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[181]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11530,7 +11821,7 @@ func (x *NowRequest) String() string {
 func (*NowRequest) ProtoMessage() {}
 
 func (x *NowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[181]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11543,7 +11834,7 @@ func (x *NowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NowRequest.ProtoReflect.Descriptor instead.
 func (*NowRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{181}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{185}
 }
 
 func (x *NowRequest) GetWorkspace() string {
@@ -11563,7 +11854,7 @@ type NowResponse struct {
 
 func (x *NowResponse) Reset() {
 	*x = NowResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[182]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11575,7 +11866,7 @@ func (x *NowResponse) String() string {
 func (*NowResponse) ProtoMessage() {}
 
 func (x *NowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[182]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11588,7 +11879,7 @@ func (x *NowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NowResponse.ProtoReflect.Descriptor instead.
 func (*NowResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{182}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{186}
 }
 
 func (x *NowResponse) GetAgents() []*AgentNow {
@@ -11610,7 +11901,7 @@ type HeatmapCell struct {
 
 func (x *HeatmapCell) Reset() {
 	*x = HeatmapCell{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[183]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11622,7 +11913,7 @@ func (x *HeatmapCell) String() string {
 func (*HeatmapCell) ProtoMessage() {}
 
 func (x *HeatmapCell) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[183]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11635,7 +11926,7 @@ func (x *HeatmapCell) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeatmapCell.ProtoReflect.Descriptor instead.
 func (*HeatmapCell) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{183}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{187}
 }
 
 func (x *HeatmapCell) GetActor() string {
@@ -11672,7 +11963,7 @@ type HeatmapRequest struct {
 
 func (x *HeatmapRequest) Reset() {
 	*x = HeatmapRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[184]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11684,7 +11975,7 @@ func (x *HeatmapRequest) String() string {
 func (*HeatmapRequest) ProtoMessage() {}
 
 func (x *HeatmapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[184]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11697,7 +11988,7 @@ func (x *HeatmapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeatmapRequest.ProtoReflect.Descriptor instead.
 func (*HeatmapRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{184}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{188}
 }
 
 func (x *HeatmapRequest) GetWorkspace() string {
@@ -11730,7 +12021,7 @@ type HeatmapResponse struct {
 
 func (x *HeatmapResponse) Reset() {
 	*x = HeatmapResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[185]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11742,7 +12033,7 @@ func (x *HeatmapResponse) String() string {
 func (*HeatmapResponse) ProtoMessage() {}
 
 func (x *HeatmapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[185]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11755,7 +12046,7 @@ func (x *HeatmapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeatmapResponse.ProtoReflect.Descriptor instead.
 func (*HeatmapResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{185}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{189}
 }
 
 func (x *HeatmapResponse) GetCells() []*HeatmapCell {
@@ -11779,7 +12070,7 @@ type AxesRow struct {
 
 func (x *AxesRow) Reset() {
 	*x = AxesRow{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[186]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11791,7 +12082,7 @@ func (x *AxesRow) String() string {
 func (*AxesRow) ProtoMessage() {}
 
 func (x *AxesRow) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[186]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11804,7 +12095,7 @@ func (x *AxesRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AxesRow.ProtoReflect.Descriptor instead.
 func (*AxesRow) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{186}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{190}
 }
 
 func (x *AxesRow) GetActor() string {
@@ -11860,7 +12151,7 @@ type AxesRequest struct {
 
 func (x *AxesRequest) Reset() {
 	*x = AxesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[187]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11872,7 +12163,7 @@ func (x *AxesRequest) String() string {
 func (*AxesRequest) ProtoMessage() {}
 
 func (x *AxesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[187]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11885,7 +12176,7 @@ func (x *AxesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AxesRequest.ProtoReflect.Descriptor instead.
 func (*AxesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{187}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{191}
 }
 
 func (x *AxesRequest) GetWorkspace() string {
@@ -11911,7 +12202,7 @@ type AxesResponse struct {
 
 func (x *AxesResponse) Reset() {
 	*x = AxesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[188]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11923,7 +12214,7 @@ func (x *AxesResponse) String() string {
 func (*AxesResponse) ProtoMessage() {}
 
 func (x *AxesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[188]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11936,7 +12227,7 @@ func (x *AxesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AxesResponse.ProtoReflect.Descriptor instead.
 func (*AxesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{188}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{192}
 }
 
 func (x *AxesResponse) GetRows() []*AxesRow {
@@ -11969,7 +12260,7 @@ type ActivityEvent struct {
 
 func (x *ActivityEvent) Reset() {
 	*x = ActivityEvent{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[189]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11981,7 +12272,7 @@ func (x *ActivityEvent) String() string {
 func (*ActivityEvent) ProtoMessage() {}
 
 func (x *ActivityEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[189]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11994,7 +12285,7 @@ func (x *ActivityEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityEvent.ProtoReflect.Descriptor instead.
 func (*ActivityEvent) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{189}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{193}
 }
 
 func (x *ActivityEvent) GetId() int64 {
@@ -12082,7 +12373,7 @@ type TimelineRequest struct {
 
 func (x *TimelineRequest) Reset() {
 	*x = TimelineRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[190]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12094,7 +12385,7 @@ func (x *TimelineRequest) String() string {
 func (*TimelineRequest) ProtoMessage() {}
 
 func (x *TimelineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[190]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12107,7 +12398,7 @@ func (x *TimelineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimelineRequest.ProtoReflect.Descriptor instead.
 func (*TimelineRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{190}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{194}
 }
 
 func (x *TimelineRequest) GetWorkspace() string {
@@ -12163,7 +12454,7 @@ type TimelineResponse struct {
 
 func (x *TimelineResponse) Reset() {
 	*x = TimelineResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[191]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[195]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12175,7 +12466,7 @@ func (x *TimelineResponse) String() string {
 func (*TimelineResponse) ProtoMessage() {}
 
 func (x *TimelineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[191]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[195]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12188,7 +12479,7 @@ func (x *TimelineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimelineResponse.ProtoReflect.Descriptor instead.
 func (*TimelineResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{191}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{195}
 }
 
 func (x *TimelineResponse) GetEvents() []*ActivityEvent {
@@ -12214,7 +12505,7 @@ type WatchTimelineRequest struct {
 
 func (x *WatchTimelineRequest) Reset() {
 	*x = WatchTimelineRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[192]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[196]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12226,7 +12517,7 @@ func (x *WatchTimelineRequest) String() string {
 func (*WatchTimelineRequest) ProtoMessage() {}
 
 func (x *WatchTimelineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[192]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[196]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12239,7 +12530,7 @@ func (x *WatchTimelineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchTimelineRequest.ProtoReflect.Descriptor instead.
 func (*WatchTimelineRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{192}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{196}
 }
 
 func (x *WatchTimelineRequest) GetWorkspace() string {
@@ -12258,7 +12549,7 @@ type WatchTimelineResponse struct {
 
 func (x *WatchTimelineResponse) Reset() {
 	*x = WatchTimelineResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[193]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12270,7 +12561,7 @@ func (x *WatchTimelineResponse) String() string {
 func (*WatchTimelineResponse) ProtoMessage() {}
 
 func (x *WatchTimelineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[193]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12283,7 +12574,7 @@ func (x *WatchTimelineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchTimelineResponse.ProtoReflect.Descriptor instead.
 func (*WatchTimelineResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{193}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{197}
 }
 
 func (x *WatchTimelineResponse) GetEvent() *ActivityEvent {
@@ -12306,7 +12597,7 @@ type ThroughputDay struct {
 
 func (x *ThroughputDay) Reset() {
 	*x = ThroughputDay{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[194]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12318,7 +12609,7 @@ func (x *ThroughputDay) String() string {
 func (*ThroughputDay) ProtoMessage() {}
 
 func (x *ThroughputDay) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[194]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12331,7 +12622,7 @@ func (x *ThroughputDay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThroughputDay.ProtoReflect.Descriptor instead.
 func (*ThroughputDay) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{194}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{198}
 }
 
 func (x *ThroughputDay) GetDay() string {
@@ -12380,7 +12671,7 @@ type ReviewLatency struct {
 
 func (x *ReviewLatency) Reset() {
 	*x = ReviewLatency{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[195]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12392,7 +12683,7 @@ func (x *ReviewLatency) String() string {
 func (*ReviewLatency) ProtoMessage() {}
 
 func (x *ReviewLatency) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[195]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12405,7 +12696,7 @@ func (x *ReviewLatency) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewLatency.ProtoReflect.Descriptor instead.
 func (*ReviewLatency) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{195}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{199}
 }
 
 func (x *ReviewLatency) GetDay() string {
@@ -12440,7 +12731,7 @@ type ThroughputRequest struct {
 
 func (x *ThroughputRequest) Reset() {
 	*x = ThroughputRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[196]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12452,7 +12743,7 @@ func (x *ThroughputRequest) String() string {
 func (*ThroughputRequest) ProtoMessage() {}
 
 func (x *ThroughputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[196]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12465,7 +12756,7 @@ func (x *ThroughputRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThroughputRequest.ProtoReflect.Descriptor instead.
 func (*ThroughputRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{196}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{200}
 }
 
 func (x *ThroughputRequest) GetWorkspace() string {
@@ -12494,7 +12785,7 @@ type ThroughputResponse struct {
 
 func (x *ThroughputResponse) Reset() {
 	*x = ThroughputResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[197]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12506,7 +12797,7 @@ func (x *ThroughputResponse) String() string {
 func (*ThroughputResponse) ProtoMessage() {}
 
 func (x *ThroughputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[197]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12519,7 +12810,7 @@ func (x *ThroughputResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThroughputResponse.ProtoReflect.Descriptor instead.
 func (*ThroughputResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{197}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{201}
 }
 
 func (x *ThroughputResponse) GetDays() []*ThroughputDay {
@@ -12556,7 +12847,7 @@ type Report struct {
 
 func (x *Report) Reset() {
 	*x = Report{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[198]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12568,7 +12859,7 @@ func (x *Report) String() string {
 func (*Report) ProtoMessage() {}
 
 func (x *Report) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[198]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12581,7 +12872,7 @@ func (x *Report) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Report.ProtoReflect.Descriptor instead.
 func (*Report) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{198}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{202}
 }
 
 func (x *Report) GetId() int64 {
@@ -12622,7 +12913,7 @@ type ReportsRequest struct {
 
 func (x *ReportsRequest) Reset() {
 	*x = ReportsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[199]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12634,7 +12925,7 @@ func (x *ReportsRequest) String() string {
 func (*ReportsRequest) ProtoMessage() {}
 
 func (x *ReportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[199]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12647,7 +12938,7 @@ func (x *ReportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportsRequest.ProtoReflect.Descriptor instead.
 func (*ReportsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{199}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{203}
 }
 
 func (x *ReportsRequest) GetWorkspace() string {
@@ -12673,7 +12964,7 @@ type ReportsResponse struct {
 
 func (x *ReportsResponse) Reset() {
 	*x = ReportsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[200]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[204]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12685,7 +12976,7 @@ func (x *ReportsResponse) String() string {
 func (*ReportsResponse) ProtoMessage() {}
 
 func (x *ReportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[200]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[204]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12698,7 +12989,7 @@ func (x *ReportsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportsResponse.ProtoReflect.Descriptor instead.
 func (*ReportsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{200}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{204}
 }
 
 func (x *ReportsResponse) GetReports() []*Report {
@@ -12719,7 +13010,7 @@ type RequestReportRequest struct {
 
 func (x *RequestReportRequest) Reset() {
 	*x = RequestReportRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[201]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[205]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12731,7 +13022,7 @@ func (x *RequestReportRequest) String() string {
 func (*RequestReportRequest) ProtoMessage() {}
 
 func (x *RequestReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[201]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[205]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12744,7 +13035,7 @@ func (x *RequestReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestReportRequest.ProtoReflect.Descriptor instead.
 func (*RequestReportRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{201}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{205}
 }
 
 func (x *RequestReportRequest) GetWorkspace() string {
@@ -12771,7 +13062,7 @@ type RequestReportResponse struct {
 
 func (x *RequestReportResponse) Reset() {
 	*x = RequestReportResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[202]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[206]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12783,7 +13074,7 @@ func (x *RequestReportResponse) String() string {
 func (*RequestReportResponse) ProtoMessage() {}
 
 func (x *RequestReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[202]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[206]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12796,7 +13087,7 @@ func (x *RequestReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestReportResponse.ProtoReflect.Descriptor instead.
 func (*RequestReportResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{202}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{206}
 }
 
 func (x *RequestReportResponse) GetSentTo() []string {
@@ -12815,7 +13106,7 @@ type WatchChannelItemsRequest struct {
 
 func (x *WatchChannelItemsRequest) Reset() {
 	*x = WatchChannelItemsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[203]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[207]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12827,7 +13118,7 @@ func (x *WatchChannelItemsRequest) String() string {
 func (*WatchChannelItemsRequest) ProtoMessage() {}
 
 func (x *WatchChannelItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[203]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[207]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12840,7 +13131,7 @@ func (x *WatchChannelItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchChannelItemsRequest.ProtoReflect.Descriptor instead.
 func (*WatchChannelItemsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{203}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{207}
 }
 
 func (x *WatchChannelItemsRequest) GetWorkspaces() []string {
@@ -12860,7 +13151,7 @@ type WatchChannelItemsResponse struct {
 
 func (x *WatchChannelItemsResponse) Reset() {
 	*x = WatchChannelItemsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[204]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[208]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12872,7 +13163,7 @@ func (x *WatchChannelItemsResponse) String() string {
 func (*WatchChannelItemsResponse) ProtoMessage() {}
 
 func (x *WatchChannelItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[204]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[208]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12885,7 +13176,7 @@ func (x *WatchChannelItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchChannelItemsResponse.ProtoReflect.Descriptor instead.
 func (*WatchChannelItemsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{204}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{208}
 }
 
 func (x *WatchChannelItemsResponse) GetWorkspace() string {
@@ -12922,7 +13213,7 @@ type Mentionable struct {
 
 func (x *Mentionable) Reset() {
 	*x = Mentionable{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[205]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[209]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12934,7 +13225,7 @@ func (x *Mentionable) String() string {
 func (*Mentionable) ProtoMessage() {}
 
 func (x *Mentionable) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[205]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[209]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12947,7 +13238,7 @@ func (x *Mentionable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mentionable.ProtoReflect.Descriptor instead.
 func (*Mentionable) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{205}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{209}
 }
 
 func (x *Mentionable) GetHandle() string {
@@ -13008,7 +13299,7 @@ type ListMentionablesRequest struct {
 
 func (x *ListMentionablesRequest) Reset() {
 	*x = ListMentionablesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[206]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[210]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13020,7 +13311,7 @@ func (x *ListMentionablesRequest) String() string {
 func (*ListMentionablesRequest) ProtoMessage() {}
 
 func (x *ListMentionablesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[206]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[210]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13033,7 +13324,7 @@ func (x *ListMentionablesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMentionablesRequest.ProtoReflect.Descriptor instead.
 func (*ListMentionablesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{206}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{210}
 }
 
 func (x *ListMentionablesRequest) GetWorkspace() string {
@@ -13052,7 +13343,7 @@ type ListMentionablesResponse struct {
 
 func (x *ListMentionablesResponse) Reset() {
 	*x = ListMentionablesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[207]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[211]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13064,7 +13355,7 @@ func (x *ListMentionablesResponse) String() string {
 func (*ListMentionablesResponse) ProtoMessage() {}
 
 func (x *ListMentionablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[207]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[211]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13077,7 +13368,7 @@ func (x *ListMentionablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMentionablesResponse.ProtoReflect.Descriptor instead.
 func (*ListMentionablesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{207}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{211}
 }
 
 func (x *ListMentionablesResponse) GetMentionables() []*Mentionable {
@@ -13104,7 +13395,7 @@ type ChannelInfo struct {
 
 func (x *ChannelInfo) Reset() {
 	*x = ChannelInfo{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[208]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[212]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13116,7 +13407,7 @@ func (x *ChannelInfo) String() string {
 func (*ChannelInfo) ProtoMessage() {}
 
 func (x *ChannelInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[208]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[212]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13129,7 +13420,7 @@ func (x *ChannelInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelInfo.ProtoReflect.Descriptor instead.
 func (*ChannelInfo) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{208}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{212}
 }
 
 func (x *ChannelInfo) GetName() string {
@@ -13199,7 +13490,7 @@ type ChannelItem struct {
 
 func (x *ChannelItem) Reset() {
 	*x = ChannelItem{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[209]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[213]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13211,7 +13502,7 @@ func (x *ChannelItem) String() string {
 func (*ChannelItem) ProtoMessage() {}
 
 func (x *ChannelItem) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[209]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[213]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13224,7 +13515,7 @@ func (x *ChannelItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelItem.ProtoReflect.Descriptor instead.
 func (*ChannelItem) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{209}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{213}
 }
 
 func (x *ChannelItem) GetId() string {
@@ -13299,7 +13590,7 @@ type ListChannelsRequest struct {
 
 func (x *ListChannelsRequest) Reset() {
 	*x = ListChannelsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[210]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[214]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13311,7 +13602,7 @@ func (x *ListChannelsRequest) String() string {
 func (*ListChannelsRequest) ProtoMessage() {}
 
 func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[210]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[214]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13324,7 +13615,7 @@ func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{210}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{214}
 }
 
 func (x *ListChannelsRequest) GetWorkspace() string {
@@ -13343,7 +13634,7 @@ type ListChannelsResponse struct {
 
 func (x *ListChannelsResponse) Reset() {
 	*x = ListChannelsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[211]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[215]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13355,7 +13646,7 @@ func (x *ListChannelsResponse) String() string {
 func (*ListChannelsResponse) ProtoMessage() {}
 
 func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[211]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[215]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13368,7 +13659,7 @@ func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{211}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{215}
 }
 
 func (x *ListChannelsResponse) GetChannels() []*ChannelInfo {
@@ -13390,7 +13681,7 @@ type PostToChannelRequest struct {
 
 func (x *PostToChannelRequest) Reset() {
 	*x = PostToChannelRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[212]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[216]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13402,7 +13693,7 @@ func (x *PostToChannelRequest) String() string {
 func (*PostToChannelRequest) ProtoMessage() {}
 
 func (x *PostToChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[212]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[216]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13415,7 +13706,7 @@ func (x *PostToChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostToChannelRequest.ProtoReflect.Descriptor instead.
 func (*PostToChannelRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{212}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{216}
 }
 
 func (x *PostToChannelRequest) GetWorkspace() string {
@@ -13449,7 +13740,7 @@ type PostToChannelResponse struct {
 
 func (x *PostToChannelResponse) Reset() {
 	*x = PostToChannelResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[213]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[217]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13461,7 +13752,7 @@ func (x *PostToChannelResponse) String() string {
 func (*PostToChannelResponse) ProtoMessage() {}
 
 func (x *PostToChannelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[213]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[217]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13474,7 +13765,7 @@ func (x *PostToChannelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostToChannelResponse.ProtoReflect.Descriptor instead.
 func (*PostToChannelResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{213}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{217}
 }
 
 func (x *PostToChannelResponse) GetId() string {
@@ -13507,7 +13798,7 @@ type ReadChannelMessagesRequest struct {
 
 func (x *ReadChannelMessagesRequest) Reset() {
 	*x = ReadChannelMessagesRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[214]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[218]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13519,7 +13810,7 @@ func (x *ReadChannelMessagesRequest) String() string {
 func (*ReadChannelMessagesRequest) ProtoMessage() {}
 
 func (x *ReadChannelMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[214]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[218]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13532,7 +13823,7 @@ func (x *ReadChannelMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadChannelMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ReadChannelMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{214}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{218}
 }
 
 func (x *ReadChannelMessagesRequest) GetWorkspace() string {
@@ -13595,7 +13886,7 @@ type ReadChannelMessagesResponse struct {
 
 func (x *ReadChannelMessagesResponse) Reset() {
 	*x = ReadChannelMessagesResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[215]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[219]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13607,7 +13898,7 @@ func (x *ReadChannelMessagesResponse) String() string {
 func (*ReadChannelMessagesResponse) ProtoMessage() {}
 
 func (x *ReadChannelMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[215]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[219]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13620,7 +13911,7 @@ func (x *ReadChannelMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadChannelMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ReadChannelMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{215}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{219}
 }
 
 func (x *ReadChannelMessagesResponse) GetItems() []*ChannelItem {
@@ -13654,7 +13945,7 @@ type GetChannelMessageRequest struct {
 
 func (x *GetChannelMessageRequest) Reset() {
 	*x = GetChannelMessageRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[216]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[220]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13666,7 +13957,7 @@ func (x *GetChannelMessageRequest) String() string {
 func (*GetChannelMessageRequest) ProtoMessage() {}
 
 func (x *GetChannelMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[216]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[220]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13679,7 +13970,7 @@ func (x *GetChannelMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChannelMessageRequest.ProtoReflect.Descriptor instead.
 func (*GetChannelMessageRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{216}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{220}
 }
 
 func (x *GetChannelMessageRequest) GetWorkspace() string {
@@ -13705,7 +13996,7 @@ type GetChannelMessageResponse struct {
 
 func (x *GetChannelMessageResponse) Reset() {
 	*x = GetChannelMessageResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[217]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[221]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13717,7 +14008,7 @@ func (x *GetChannelMessageResponse) String() string {
 func (*GetChannelMessageResponse) ProtoMessage() {}
 
 func (x *GetChannelMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[217]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[221]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13730,7 +14021,7 @@ func (x *GetChannelMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChannelMessageResponse.ProtoReflect.Descriptor instead.
 func (*GetChannelMessageResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{217}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{221}
 }
 
 func (x *GetChannelMessageResponse) GetItem() *ChannelItem {
@@ -13751,7 +14042,7 @@ type MarkChannelReadRequest struct {
 
 func (x *MarkChannelReadRequest) Reset() {
 	*x = MarkChannelReadRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[218]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[222]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13763,7 +14054,7 @@ func (x *MarkChannelReadRequest) String() string {
 func (*MarkChannelReadRequest) ProtoMessage() {}
 
 func (x *MarkChannelReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[218]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[222]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13776,7 +14067,7 @@ func (x *MarkChannelReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkChannelReadRequest.ProtoReflect.Descriptor instead.
 func (*MarkChannelReadRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{218}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{222}
 }
 
 func (x *MarkChannelReadRequest) GetWorkspace() string {
@@ -13808,7 +14099,7 @@ type MarkChannelReadResponse struct {
 
 func (x *MarkChannelReadResponse) Reset() {
 	*x = MarkChannelReadResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[219]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[223]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13820,7 +14111,7 @@ func (x *MarkChannelReadResponse) String() string {
 func (*MarkChannelReadResponse) ProtoMessage() {}
 
 func (x *MarkChannelReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[219]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[223]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13833,7 +14124,7 @@ func (x *MarkChannelReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkChannelReadResponse.ProtoReflect.Descriptor instead.
 func (*MarkChannelReadResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{219}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{223}
 }
 
 type GetUnreadSummaryRequest struct {
@@ -13845,7 +14136,7 @@ type GetUnreadSummaryRequest struct {
 
 func (x *GetUnreadSummaryRequest) Reset() {
 	*x = GetUnreadSummaryRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[220]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[224]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13857,7 +14148,7 @@ func (x *GetUnreadSummaryRequest) String() string {
 func (*GetUnreadSummaryRequest) ProtoMessage() {}
 
 func (x *GetUnreadSummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[220]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[224]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13870,7 +14161,7 @@ func (x *GetUnreadSummaryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUnreadSummaryRequest.ProtoReflect.Descriptor instead.
 func (*GetUnreadSummaryRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{220}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{224}
 }
 
 func (x *GetUnreadSummaryRequest) GetWorkspace() string {
@@ -13891,7 +14182,7 @@ type UnreadScope struct {
 
 func (x *UnreadScope) Reset() {
 	*x = UnreadScope{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[221]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13903,7 +14194,7 @@ func (x *UnreadScope) String() string {
 func (*UnreadScope) ProtoMessage() {}
 
 func (x *UnreadScope) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[221]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13916,7 +14207,7 @@ func (x *UnreadScope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnreadScope.ProtoReflect.Descriptor instead.
 func (*UnreadScope) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{221}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *UnreadScope) GetScope() string {
@@ -13942,7 +14233,7 @@ type GetUnreadSummaryResponse struct {
 
 func (x *GetUnreadSummaryResponse) Reset() {
 	*x = GetUnreadSummaryResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[222]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13954,7 +14245,7 @@ func (x *GetUnreadSummaryResponse) String() string {
 func (*GetUnreadSummaryResponse) ProtoMessage() {}
 
 func (x *GetUnreadSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[222]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13967,7 +14258,7 @@ func (x *GetUnreadSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUnreadSummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetUnreadSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{222}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{226}
 }
 
 func (x *GetUnreadSummaryResponse) GetCounts() []*UnreadScope {
@@ -13989,7 +14280,7 @@ type SetChannelDeliveryRequest struct {
 
 func (x *SetChannelDeliveryRequest) Reset() {
 	*x = SetChannelDeliveryRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[223]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14001,7 +14292,7 @@ func (x *SetChannelDeliveryRequest) String() string {
 func (*SetChannelDeliveryRequest) ProtoMessage() {}
 
 func (x *SetChannelDeliveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[223]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14014,7 +14305,7 @@ func (x *SetChannelDeliveryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetChannelDeliveryRequest.ProtoReflect.Descriptor instead.
 func (*SetChannelDeliveryRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{223}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{227}
 }
 
 func (x *SetChannelDeliveryRequest) GetWorkspace() string {
@@ -14046,7 +14337,7 @@ type SetChannelDeliveryResponse struct {
 
 func (x *SetChannelDeliveryResponse) Reset() {
 	*x = SetChannelDeliveryResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[224]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14058,7 +14349,7 @@ func (x *SetChannelDeliveryResponse) String() string {
 func (*SetChannelDeliveryResponse) ProtoMessage() {}
 
 func (x *SetChannelDeliveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[224]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14071,7 +14362,7 @@ func (x *SetChannelDeliveryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetChannelDeliveryResponse.ProtoReflect.Descriptor instead.
 func (*SetChannelDeliveryResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{224}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{228}
 }
 
 type Verdict struct {
@@ -14101,7 +14392,7 @@ type Verdict struct {
 
 func (x *Verdict) Reset() {
 	*x = Verdict{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[225]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14113,7 +14404,7 @@ func (x *Verdict) String() string {
 func (*Verdict) ProtoMessage() {}
 
 func (x *Verdict) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[225]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14126,7 +14417,7 @@ func (x *Verdict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Verdict.ProtoReflect.Descriptor instead.
 func (*Verdict) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{225}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *Verdict) GetId() string {
@@ -14249,7 +14540,7 @@ type ListVerdictsRequest struct {
 
 func (x *ListVerdictsRequest) Reset() {
 	*x = ListVerdictsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[226]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[230]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14261,7 +14552,7 @@ func (x *ListVerdictsRequest) String() string {
 func (*ListVerdictsRequest) ProtoMessage() {}
 
 func (x *ListVerdictsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[226]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[230]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14274,7 +14565,7 @@ func (x *ListVerdictsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVerdictsRequest.ProtoReflect.Descriptor instead.
 func (*ListVerdictsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{226}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{230}
 }
 
 func (x *ListVerdictsRequest) GetWorkspace() string {
@@ -14328,7 +14619,7 @@ type ListVerdictsResponse struct {
 
 func (x *ListVerdictsResponse) Reset() {
 	*x = ListVerdictsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[227]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[231]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14340,7 +14631,7 @@ func (x *ListVerdictsResponse) String() string {
 func (*ListVerdictsResponse) ProtoMessage() {}
 
 func (x *ListVerdictsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[227]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[231]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14353,7 +14644,7 @@ func (x *ListVerdictsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVerdictsResponse.ProtoReflect.Descriptor instead.
 func (*ListVerdictsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{227}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{231}
 }
 
 func (x *ListVerdictsResponse) GetVerdicts() []*Verdict {
@@ -14375,7 +14666,7 @@ type DecideVerdictRequest struct {
 
 func (x *DecideVerdictRequest) Reset() {
 	*x = DecideVerdictRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[228]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[232]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14387,7 +14678,7 @@ func (x *DecideVerdictRequest) String() string {
 func (*DecideVerdictRequest) ProtoMessage() {}
 
 func (x *DecideVerdictRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[228]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[232]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14400,7 +14691,7 @@ func (x *DecideVerdictRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideVerdictRequest.ProtoReflect.Descriptor instead.
 func (*DecideVerdictRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{228}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{232}
 }
 
 func (x *DecideVerdictRequest) GetId() string {
@@ -14433,7 +14724,7 @@ type DecideVerdictResponse struct {
 
 func (x *DecideVerdictResponse) Reset() {
 	*x = DecideVerdictResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[229]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14445,7 +14736,7 @@ func (x *DecideVerdictResponse) String() string {
 func (*DecideVerdictResponse) ProtoMessage() {}
 
 func (x *DecideVerdictResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[229]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14458,7 +14749,7 @@ func (x *DecideVerdictResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideVerdictResponse.ProtoReflect.Descriptor instead.
 func (*DecideVerdictResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{229}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{233}
 }
 
 func (x *DecideVerdictResponse) GetVerdict() *Verdict {
@@ -14477,7 +14768,7 @@ type WatchVerdictsRequest struct {
 
 func (x *WatchVerdictsRequest) Reset() {
 	*x = WatchVerdictsRequest{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[230]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[234]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14489,7 +14780,7 @@ func (x *WatchVerdictsRequest) String() string {
 func (*WatchVerdictsRequest) ProtoMessage() {}
 
 func (x *WatchVerdictsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[230]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[234]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14502,7 +14793,7 @@ func (x *WatchVerdictsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchVerdictsRequest.ProtoReflect.Descriptor instead.
 func (*WatchVerdictsRequest) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{230}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{234}
 }
 
 func (x *WatchVerdictsRequest) GetWorkspaces() []string {
@@ -14521,7 +14812,7 @@ type WatchVerdictsResponse struct {
 
 func (x *WatchVerdictsResponse) Reset() {
 	*x = WatchVerdictsResponse{}
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[231]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[235]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14533,7 +14824,7 @@ func (x *WatchVerdictsResponse) String() string {
 func (*WatchVerdictsResponse) ProtoMessage() {}
 
 func (x *WatchVerdictsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[231]
+	mi := &file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[235]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14546,7 +14837,7 @@ func (x *WatchVerdictsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchVerdictsResponse.ProtoReflect.Descriptor instead.
 func (*WatchVerdictsResponse) Descriptor() ([]byte, []int) {
-	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{231}
+	return file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP(), []int{235}
 }
 
 func (x *WatchVerdictsResponse) GetVerdict() *Verdict {
@@ -14843,7 +15134,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x11interrupt_on_high\x18\x03 \x01(\bR\x0finterruptOnHigh\x12,\n" +
 	"\x12quarantine_on_high\x18\x04 \x01(\bR\x10quarantineOnHigh\x12\x1f\n" +
 	"\vmonthly_usd\x18\x05 \x01(\x05R\n" +
-	"monthlyUsd\"\xcb\x02\n" +
+	"monthlyUsd\"\xf0\x02\n" +
 	"\x0eRepositoryPlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
@@ -14855,7 +15146,13 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\rstatus_checks\x18\x06 \x03(\tR\fstatusChecks\x12+\n" +
 	"\x11import_credential\x18\a \x01(\tR\x10importCredential\x12!\n" +
 	"\fmirror_token\x18\b \x01(\tR\vmirrorToken\x12,\n" +
-	"\x12import_secret_name\x18\t \x01(\tR\x10importSecretName\"A\n" +
+	"\x12import_secret_name\x18\t \x01(\tR\x10importSecretName\x12#\n" +
+	"\rimport_github\x18\n" +
+	" \x01(\bR\fimportGithub\"M\n" +
+	"\x11GitHubAccountPlan\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04room\x18\x03 \x01(\tR\x04room\"A\n" +
 	"\tGroupPlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\"\xa3\x01\n" +
@@ -14882,7 +15179,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\n" +
 	"email_from\x18\t \x01(\tR\temailFrom\x12\x19\n" +
 	"\bemail_to\x18\n" +
-	" \x01(\tR\aemailTo\"\xc6\x0e\n" +
+	" \x01(\tR\aemailTo\"\x9a\x0f\n" +
 	"\rWorkspacePlan\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x10\n" +
@@ -14918,7 +15215,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\rrole_advisors\x18\x1d \x03(\v27.swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntryR\froleAdvisors\x12:\n" +
 	"\x06warden\x18\x1e \x01(\v2\".swarm.controlcenter.v1.WardenPlanR\x06warden\x12+\n" +
 	"\x11record_keystrokes\x18\x1f \x01(\bR\x10recordKeystrokes\x12!\n" +
-	"\fmodel_access\x18  \x01(\tR\vmodelAccess\x1ai\n" +
+	"\fmodel_access\x18  \x01(\tR\vmodelAccess\x12R\n" +
+	"\x0fgithub_accounts\x18! \x03(\v2).swarm.controlcenter.v1.GitHubAccountPlanR\x0egithubAccounts\x1ai\n" +
 	"\x11RoleDefaultsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12>\n" +
 	"\x05value\x18\x02 \x01(\v2(.swarm.controlcenter.v1.RoomSettingsPlanR\x05value:\x028\x01\x1ad\n" +
@@ -14990,7 +15288,23 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\x06action\x18\x03 \x01(\x0e2$.swarm.controlcenter.v1.ChangeActionR\x06action\x12\x16\n" +
 	"\x06before\x18\x04 \x01(\tR\x06before\x12\x14\n" +
 	"\x05after\x18\x05 \x01(\tR\x05after\x12\x16\n" +
-	"\x06fields\x18\x06 \x03(\tR\x06fields\"u\n" +
+	"\x06fields\x18\x06 \x03(\tR\x06fields\"f\n" +
+	"\x15DiscoverGitHubRequest\x12\x10\n" +
+	"\x03org\x18\x01 \x01(\tR\x03org\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\x12%\n" +
+	"\x0eaccount_prefix\x18\x03 \x01(\tR\raccountPrefix\"\xb8\x01\n" +
+	"\x0eDiscoveredRepo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x18\n" +
+	"\aprivate\x18\x03 \x01(\bR\aprivate\x12\x1a\n" +
+	"\barchived\x18\x04 \x01(\bR\barchived\x12\x19\n" +
+	"\bhas_wiki\x18\x05 \x01(\bR\ahasWiki\x12\x1f\n" +
+	"\vopen_issues\x18\x06 \x01(\x05R\n" +
+	"openIssues\"\xad\x01\n" +
+	"\x16DiscoverGitHubResponse\x12<\n" +
+	"\x05repos\x18\x01 \x03(\v2&.swarm.controlcenter.v1.DiscoveredRepoR\x05repos\x12=\n" +
+	"\x04bots\x18\x02 \x03(\v2).swarm.controlcenter.v1.GitHubAccountPlanR\x04bots\x12\x16\n" +
+	"\x06people\x18\x03 \x01(\x05R\x06people\"u\n" +
 	"\x17PreviewWorkspaceRequest\x129\n" +
 	"\x04plan\x18\x01 \x01(\v2%.swarm.controlcenter.v1.WorkspacePlanR\x04plan\x12\x1f\n" +
 	"\vprune_rooms\x18\x02 \x01(\bR\n" +
@@ -15658,7 +15972,8 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"\rSetWizardStep\x12,.swarm.controlcenter.v1.SetWizardStepRequest\x1a-.swarm.controlcenter.v1.SetWizardStepResponse\x12n\n" +
 	"\rWatchPlatform\x12,.swarm.controlcenter.v1.WatchPlatformRequest\x1a-.swarm.controlcenter.v1.WatchPlatformResponse0\x01\x12i\n" +
 	"\fSetIsolation\x12+.swarm.controlcenter.v1.SetIsolationRequest\x1a,.swarm.controlcenter.v1.SetIsolationResponse\x12o\n" +
-	"\x0eRerunPreflight\x12-.swarm.controlcenter.v1.RerunPreflightRequest\x1a..swarm.controlcenter.v1.RerunPreflightResponse2\xfc\t\n" +
+	"\x0eRerunPreflight\x12-.swarm.controlcenter.v1.RerunPreflightRequest\x1a..swarm.controlcenter.v1.RerunPreflightResponse2\xed\n" +
+	"\n" +
 	"\x10WorkspaceService\x12o\n" +
 	"\x0eListWorkspaces\x12-.swarm.controlcenter.v1.ListWorkspacesRequest\x1a..swarm.controlcenter.v1.ListWorkspacesResponse\x12i\n" +
 	"\fGetWorkspace\x12+.swarm.controlcenter.v1.GetWorkspaceRequest\x1a,.swarm.controlcenter.v1.GetWorkspaceResponse\x12x\n" +
@@ -15668,6 +15983,7 @@ const file_swarm_controlcenter_v1_controlcenter_proto_rawDesc = "" +
 	"ListModels\x12).swarm.controlcenter.v1.ListModelsRequest\x1a*.swarm.controlcenter.v1.ListModelsResponse\x12u\n" +
 	"\x10PreviewWorkspace\x12/.swarm.controlcenter.v1.PreviewWorkspaceRequest\x1a0.swarm.controlcenter.v1.PreviewWorkspaceResponse\x12r\n" +
 	"\x0fDefaultChannels\x12..swarm.controlcenter.v1.DefaultChannelsRequest\x1a/.swarm.controlcenter.v1.DefaultChannelsResponse\x12o\n" +
+	"\x0eDiscoverGitHub\x12-.swarm.controlcenter.v1.DiscoverGitHubRequest\x1a..swarm.controlcenter.v1.DiscoverGitHubResponse\x12o\n" +
 	"\x0eApplyWorkspace\x12-.swarm.controlcenter.v1.ApplyWorkspaceRequest\x1a..swarm.controlcenter.v1.ApplyWorkspaceResponse\x12r\n" +
 	"\x0fListRoomSecrets\x12..swarm.controlcenter.v1.ListRoomSecretsRequest\x1a/.swarm.controlcenter.v1.ListRoomSecretsResponse\x12l\n" +
 	"\rSetRoomSecret\x12,.swarm.controlcenter.v1.SetRoomSecretRequest\x1a-.swarm.controlcenter.v1.SetRoomSecretResponse\x12u\n" +
@@ -15762,7 +16078,7 @@ func file_swarm_controlcenter_v1_controlcenter_proto_rawDescGZIP() []byte {
 }
 
 var file_swarm_controlcenter_v1_controlcenter_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_swarm_controlcenter_v1_controlcenter_proto_msgTypes = make([]protoimpl.MessageInfo, 240)
+var file_swarm_controlcenter_v1_controlcenter_proto_msgTypes = make([]protoimpl.MessageInfo, 244)
 var file_swarm_controlcenter_v1_controlcenter_proto_goTypes = []any{
 	(Role)(0),                             // 0: swarm.controlcenter.v1.Role
 	(ProviderKind)(0),                     // 1: swarm.controlcenter.v1.ProviderKind
@@ -15833,186 +16149,190 @@ var file_swarm_controlcenter_v1_controlcenter_proto_goTypes = []any{
 	(*AdvisorPlan)(nil),                   // 66: swarm.controlcenter.v1.AdvisorPlan
 	(*WardenPlan)(nil),                    // 67: swarm.controlcenter.v1.WardenPlan
 	(*RepositoryPlan)(nil),                // 68: swarm.controlcenter.v1.RepositoryPlan
-	(*GroupPlan)(nil),                     // 69: swarm.controlcenter.v1.GroupPlan
-	(*LinkPlan)(nil),                      // 70: swarm.controlcenter.v1.LinkPlan
-	(*NotificationChannelPlan)(nil),       // 71: swarm.controlcenter.v1.NotificationChannelPlan
-	(*WorkspacePlan)(nil),                 // 72: swarm.controlcenter.v1.WorkspacePlan
-	(*ChannelMemberPlan)(nil),             // 73: swarm.controlcenter.v1.ChannelMemberPlan
-	(*ChannelPlan)(nil),                   // 74: swarm.controlcenter.v1.ChannelPlan
-	(*StormPlan)(nil),                     // 75: swarm.controlcenter.v1.StormPlan
-	(*WorkspaceSummary)(nil),              // 76: swarm.controlcenter.v1.WorkspaceSummary
-	(*DefaultChannelsRequest)(nil),        // 77: swarm.controlcenter.v1.DefaultChannelsRequest
-	(*DefaultChannelsResponse)(nil),       // 78: swarm.controlcenter.v1.DefaultChannelsResponse
-	(*ListWorkspacesRequest)(nil),         // 79: swarm.controlcenter.v1.ListWorkspacesRequest
-	(*ListWorkspacesResponse)(nil),        // 80: swarm.controlcenter.v1.ListWorkspacesResponse
-	(*GetWorkspaceRequest)(nil),           // 81: swarm.controlcenter.v1.GetWorkspaceRequest
-	(*GetWorkspaceResponse)(nil),          // 82: swarm.controlcenter.v1.GetWorkspaceResponse
-	(*SuggestAgentNamesRequest)(nil),      // 83: swarm.controlcenter.v1.SuggestAgentNamesRequest
-	(*SuggestAgentNamesResponse)(nil),     // 84: swarm.controlcenter.v1.SuggestAgentNamesResponse
-	(*RoleTemplateSummary)(nil),           // 85: swarm.controlcenter.v1.RoleTemplateSummary
-	(*ListRoleTemplatesRequest)(nil),      // 86: swarm.controlcenter.v1.ListRoleTemplatesRequest
-	(*ListRoleTemplatesResponse)(nil),     // 87: swarm.controlcenter.v1.ListRoleTemplatesResponse
-	(*ListModelsRequest)(nil),             // 88: swarm.controlcenter.v1.ListModelsRequest
-	(*ListModelsResponse)(nil),            // 89: swarm.controlcenter.v1.ListModelsResponse
-	(*Change)(nil),                        // 90: swarm.controlcenter.v1.Change
-	(*PreviewWorkspaceRequest)(nil),       // 91: swarm.controlcenter.v1.PreviewWorkspaceRequest
-	(*PreviewWorkspaceResponse)(nil),      // 92: swarm.controlcenter.v1.PreviewWorkspaceResponse
-	(*ApplyWorkspaceRequest)(nil),         // 93: swarm.controlcenter.v1.ApplyWorkspaceRequest
-	(*ApplyWorkspaceResponse)(nil),        // 94: swarm.controlcenter.v1.ApplyWorkspaceResponse
-	(*VolumeUsage)(nil),                   // 95: swarm.controlcenter.v1.VolumeUsage
-	(*RoomSummary)(nil),                   // 96: swarm.controlcenter.v1.RoomSummary
-	(*WatchTranscriptRequest)(nil),        // 97: swarm.controlcenter.v1.WatchTranscriptRequest
-	(*TranscriptItem)(nil),                // 98: swarm.controlcenter.v1.TranscriptItem
-	(*WatchTranscriptResponse)(nil),       // 99: swarm.controlcenter.v1.WatchTranscriptResponse
-	(*PruneEngineRequest)(nil),            // 100: swarm.controlcenter.v1.PruneEngineRequest
-	(*PruneEngineResponse)(nil),           // 101: swarm.controlcenter.v1.PruneEngineResponse
-	(*GetRoomSettingsRequest)(nil),        // 102: swarm.controlcenter.v1.GetRoomSettingsRequest
-	(*GetRoomSettingsResponse)(nil),       // 103: swarm.controlcenter.v1.GetRoomSettingsResponse
-	(*UpdateRoomSettingsRequest)(nil),     // 104: swarm.controlcenter.v1.UpdateRoomSettingsRequest
-	(*UpdateRoomSettingsResponse)(nil),    // 105: swarm.controlcenter.v1.UpdateRoomSettingsResponse
-	(*RoomRef)(nil),                       // 106: swarm.controlcenter.v1.RoomRef
-	(*ListRoomsRequest)(nil),              // 107: swarm.controlcenter.v1.ListRoomsRequest
-	(*ListRoomsResponse)(nil),             // 108: swarm.controlcenter.v1.ListRoomsResponse
-	(*GetRoomRequest)(nil),                // 109: swarm.controlcenter.v1.GetRoomRequest
-	(*GetRoomResponse)(nil),               // 110: swarm.controlcenter.v1.GetRoomResponse
-	(*PauseRoomRequest)(nil),              // 111: swarm.controlcenter.v1.PauseRoomRequest
-	(*PauseRoomResponse)(nil),             // 112: swarm.controlcenter.v1.PauseRoomResponse
-	(*ResumeRoomRequest)(nil),             // 113: swarm.controlcenter.v1.ResumeRoomRequest
-	(*ResumeRoomResponse)(nil),            // 114: swarm.controlcenter.v1.ResumeRoomResponse
-	(*RecreateRoomRequest)(nil),           // 115: swarm.controlcenter.v1.RecreateRoomRequest
-	(*RecreateRoomResponse)(nil),          // 116: swarm.controlcenter.v1.RecreateRoomResponse
-	(*RemoveRoomRequest)(nil),             // 117: swarm.controlcenter.v1.RemoveRoomRequest
-	(*RemoveRoomResponse)(nil),            // 118: swarm.controlcenter.v1.RemoveRoomResponse
-	(*RotateRoomCredentialsRequest)(nil),  // 119: swarm.controlcenter.v1.RotateRoomCredentialsRequest
-	(*RotateRoomCredentialsResponse)(nil), // 120: swarm.controlcenter.v1.RotateRoomCredentialsResponse
-	(*UpdateRoomNowRequest)(nil),          // 121: swarm.controlcenter.v1.UpdateRoomNowRequest
-	(*UpdateRoomNowResponse)(nil),         // 122: swarm.controlcenter.v1.UpdateRoomNowResponse
-	(*QuarantineRoomRequest)(nil),         // 123: swarm.controlcenter.v1.QuarantineRoomRequest
-	(*QuarantineRoomResponse)(nil),        // 124: swarm.controlcenter.v1.QuarantineRoomResponse
-	(*ReleaseRoomRequest)(nil),            // 125: swarm.controlcenter.v1.ReleaseRoomRequest
-	(*ReleaseRoomResponse)(nil),           // 126: swarm.controlcenter.v1.ReleaseRoomResponse
-	(*StreamRoomLogsRequest)(nil),         // 127: swarm.controlcenter.v1.StreamRoomLogsRequest
-	(*StreamRoomLogsResponse)(nil),        // 128: swarm.controlcenter.v1.StreamRoomLogsResponse
-	(*GetRoomResourcesRequest)(nil),       // 129: swarm.controlcenter.v1.GetRoomResourcesRequest
-	(*GetRoomResourcesResponse)(nil),      // 130: swarm.controlcenter.v1.GetRoomResourcesResponse
-	(*GetRoomStorageRequest)(nil),         // 131: swarm.controlcenter.v1.GetRoomStorageRequest
-	(*ClaimInfo)(nil),                     // 132: swarm.controlcenter.v1.ClaimInfo
-	(*GetRoomStorageResponse)(nil),        // 133: swarm.controlcenter.v1.GetRoomStorageResponse
-	(*WatchFleetRequest)(nil),             // 134: swarm.controlcenter.v1.WatchFleetRequest
-	(*WatchFleetResponse)(nil),            // 135: swarm.controlcenter.v1.WatchFleetResponse
-	(*FleetSnapshot)(nil),                 // 136: swarm.controlcenter.v1.FleetSnapshot
-	(*InboxMessage)(nil),                  // 137: swarm.controlcenter.v1.InboxMessage
-	(*ListInboxRequest)(nil),              // 138: swarm.controlcenter.v1.ListInboxRequest
-	(*ListInboxResponse)(nil),             // 139: swarm.controlcenter.v1.ListInboxResponse
-	(*SendMessageRequest)(nil),            // 140: swarm.controlcenter.v1.SendMessageRequest
-	(*SendMessageResponse)(nil),           // 141: swarm.controlcenter.v1.SendMessageResponse
-	(*MarkReadRequest)(nil),               // 142: swarm.controlcenter.v1.MarkReadRequest
-	(*MarkReadResponse)(nil),              // 143: swarm.controlcenter.v1.MarkReadResponse
-	(*WatchInboxRequest)(nil),             // 144: swarm.controlcenter.v1.WatchInboxRequest
-	(*WatchInboxResponse)(nil),            // 145: swarm.controlcenter.v1.WatchInboxResponse
-	(*Approval)(nil),                      // 146: swarm.controlcenter.v1.Approval
-	(*ListApprovalsRequest)(nil),          // 147: swarm.controlcenter.v1.ListApprovalsRequest
-	(*ListApprovalsResponse)(nil),         // 148: swarm.controlcenter.v1.ListApprovalsResponse
-	(*AnswerApprovalRequest)(nil),         // 149: swarm.controlcenter.v1.AnswerApprovalRequest
-	(*AnswerApprovalResponse)(nil),        // 150: swarm.controlcenter.v1.AnswerApprovalResponse
-	(*WatchApprovalsRequest)(nil),         // 151: swarm.controlcenter.v1.WatchApprovalsRequest
-	(*WatchApprovalsResponse)(nil),        // 152: swarm.controlcenter.v1.WatchApprovalsResponse
-	(*ListApprovalHistoryRequest)(nil),    // 153: swarm.controlcenter.v1.ListApprovalHistoryRequest
-	(*ListApprovalHistoryResponse)(nil),   // 154: swarm.controlcenter.v1.ListApprovalHistoryResponse
-	(*AuditEntry)(nil),                    // 155: swarm.controlcenter.v1.AuditEntry
-	(*QueryAuditRequest)(nil),             // 156: swarm.controlcenter.v1.QueryAuditRequest
-	(*QueryAuditResponse)(nil),            // 157: swarm.controlcenter.v1.QueryAuditResponse
-	(*GetVapidPublicKeyRequest)(nil),      // 158: swarm.controlcenter.v1.GetVapidPublicKeyRequest
-	(*GetVapidPublicKeyResponse)(nil),     // 159: swarm.controlcenter.v1.GetVapidPublicKeyResponse
-	(*SubscribeWebPushRequest)(nil),       // 160: swarm.controlcenter.v1.SubscribeWebPushRequest
-	(*SubscribeWebPushResponse)(nil),      // 161: swarm.controlcenter.v1.SubscribeWebPushResponse
-	(*UnsubscribeWebPushRequest)(nil),     // 162: swarm.controlcenter.v1.UnsubscribeWebPushRequest
-	(*UnsubscribeWebPushResponse)(nil),    // 163: swarm.controlcenter.v1.UnsubscribeWebPushResponse
-	(*NotificationPref)(nil),              // 164: swarm.controlcenter.v1.NotificationPref
-	(*GetNotificationPrefsRequest)(nil),   // 165: swarm.controlcenter.v1.GetNotificationPrefsRequest
-	(*GetNotificationPrefsResponse)(nil),  // 166: swarm.controlcenter.v1.GetNotificationPrefsResponse
-	(*SetNotificationPrefsRequest)(nil),   // 167: swarm.controlcenter.v1.SetNotificationPrefsRequest
-	(*SetNotificationPrefsResponse)(nil),  // 168: swarm.controlcenter.v1.SetNotificationPrefsResponse
-	(*SendTestNotificationRequest)(nil),   // 169: swarm.controlcenter.v1.SendTestNotificationRequest
-	(*SendTestNotificationResponse)(nil),  // 170: swarm.controlcenter.v1.SendTestNotificationResponse
-	(*RoomSpend)(nil),                     // 171: swarm.controlcenter.v1.RoomSpend
-	(*ModelSpend)(nil),                    // 172: swarm.controlcenter.v1.ModelSpend
-	(*WorkspaceSpend)(nil),                // 173: swarm.controlcenter.v1.WorkspaceSpend
-	(*GetSpendRequest)(nil),               // 174: swarm.controlcenter.v1.GetSpendRequest
-	(*GetSpendResponse)(nil),              // 175: swarm.controlcenter.v1.GetSpendResponse
-	(*ListUsersRequest)(nil),              // 176: swarm.controlcenter.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),             // 177: swarm.controlcenter.v1.ListUsersResponse
-	(*SetUserRoleRequest)(nil),            // 178: swarm.controlcenter.v1.SetUserRoleRequest
-	(*SetUserRoleResponse)(nil),           // 179: swarm.controlcenter.v1.SetUserRoleResponse
-	(*SetUserWorkspacesRequest)(nil),      // 180: swarm.controlcenter.v1.SetUserWorkspacesRequest
-	(*SetUserWorkspacesResponse)(nil),     // 181: swarm.controlcenter.v1.SetUserWorkspacesResponse
-	(*SetUserDisabledRequest)(nil),        // 182: swarm.controlcenter.v1.SetUserDisabledRequest
-	(*SetUserDisabledResponse)(nil),       // 183: swarm.controlcenter.v1.SetUserDisabledResponse
-	(*Edge)(nil),                          // 184: swarm.controlcenter.v1.Edge
-	(*EdgesRequest)(nil),                  // 185: swarm.controlcenter.v1.EdgesRequest
-	(*EdgesResponse)(nil),                 // 186: swarm.controlcenter.v1.EdgesResponse
-	(*ItemRef)(nil),                       // 187: swarm.controlcenter.v1.ItemRef
-	(*AgentNow)(nil),                      // 188: swarm.controlcenter.v1.AgentNow
-	(*NowRequest)(nil),                    // 189: swarm.controlcenter.v1.NowRequest
-	(*NowResponse)(nil),                   // 190: swarm.controlcenter.v1.NowResponse
-	(*HeatmapCell)(nil),                   // 191: swarm.controlcenter.v1.HeatmapCell
-	(*HeatmapRequest)(nil),                // 192: swarm.controlcenter.v1.HeatmapRequest
-	(*HeatmapResponse)(nil),               // 193: swarm.controlcenter.v1.HeatmapResponse
-	(*AxesRow)(nil),                       // 194: swarm.controlcenter.v1.AxesRow
-	(*AxesRequest)(nil),                   // 195: swarm.controlcenter.v1.AxesRequest
-	(*AxesResponse)(nil),                  // 196: swarm.controlcenter.v1.AxesResponse
-	(*ActivityEvent)(nil),                 // 197: swarm.controlcenter.v1.ActivityEvent
-	(*TimelineRequest)(nil),               // 198: swarm.controlcenter.v1.TimelineRequest
-	(*TimelineResponse)(nil),              // 199: swarm.controlcenter.v1.TimelineResponse
-	(*WatchTimelineRequest)(nil),          // 200: swarm.controlcenter.v1.WatchTimelineRequest
-	(*WatchTimelineResponse)(nil),         // 201: swarm.controlcenter.v1.WatchTimelineResponse
-	(*ThroughputDay)(nil),                 // 202: swarm.controlcenter.v1.ThroughputDay
-	(*ReviewLatency)(nil),                 // 203: swarm.controlcenter.v1.ReviewLatency
-	(*ThroughputRequest)(nil),             // 204: swarm.controlcenter.v1.ThroughputRequest
-	(*ThroughputResponse)(nil),            // 205: swarm.controlcenter.v1.ThroughputResponse
-	(*Report)(nil),                        // 206: swarm.controlcenter.v1.Report
-	(*ReportsRequest)(nil),                // 207: swarm.controlcenter.v1.ReportsRequest
-	(*ReportsResponse)(nil),               // 208: swarm.controlcenter.v1.ReportsResponse
-	(*RequestReportRequest)(nil),          // 209: swarm.controlcenter.v1.RequestReportRequest
-	(*RequestReportResponse)(nil),         // 210: swarm.controlcenter.v1.RequestReportResponse
-	(*WatchChannelItemsRequest)(nil),      // 211: swarm.controlcenter.v1.WatchChannelItemsRequest
-	(*WatchChannelItemsResponse)(nil),     // 212: swarm.controlcenter.v1.WatchChannelItemsResponse
-	(*Mentionable)(nil),                   // 213: swarm.controlcenter.v1.Mentionable
-	(*ListMentionablesRequest)(nil),       // 214: swarm.controlcenter.v1.ListMentionablesRequest
-	(*ListMentionablesResponse)(nil),      // 215: swarm.controlcenter.v1.ListMentionablesResponse
-	(*ChannelInfo)(nil),                   // 216: swarm.controlcenter.v1.ChannelInfo
-	(*ChannelItem)(nil),                   // 217: swarm.controlcenter.v1.ChannelItem
-	(*ListChannelsRequest)(nil),           // 218: swarm.controlcenter.v1.ListChannelsRequest
-	(*ListChannelsResponse)(nil),          // 219: swarm.controlcenter.v1.ListChannelsResponse
-	(*PostToChannelRequest)(nil),          // 220: swarm.controlcenter.v1.PostToChannelRequest
-	(*PostToChannelResponse)(nil),         // 221: swarm.controlcenter.v1.PostToChannelResponse
-	(*ReadChannelMessagesRequest)(nil),    // 222: swarm.controlcenter.v1.ReadChannelMessagesRequest
-	(*ReadChannelMessagesResponse)(nil),   // 223: swarm.controlcenter.v1.ReadChannelMessagesResponse
-	(*GetChannelMessageRequest)(nil),      // 224: swarm.controlcenter.v1.GetChannelMessageRequest
-	(*GetChannelMessageResponse)(nil),     // 225: swarm.controlcenter.v1.GetChannelMessageResponse
-	(*MarkChannelReadRequest)(nil),        // 226: swarm.controlcenter.v1.MarkChannelReadRequest
-	(*MarkChannelReadResponse)(nil),       // 227: swarm.controlcenter.v1.MarkChannelReadResponse
-	(*GetUnreadSummaryRequest)(nil),       // 228: swarm.controlcenter.v1.GetUnreadSummaryRequest
-	(*UnreadScope)(nil),                   // 229: swarm.controlcenter.v1.UnreadScope
-	(*GetUnreadSummaryResponse)(nil),      // 230: swarm.controlcenter.v1.GetUnreadSummaryResponse
-	(*SetChannelDeliveryRequest)(nil),     // 231: swarm.controlcenter.v1.SetChannelDeliveryRequest
-	(*SetChannelDeliveryResponse)(nil),    // 232: swarm.controlcenter.v1.SetChannelDeliveryResponse
-	(*Verdict)(nil),                       // 233: swarm.controlcenter.v1.Verdict
-	(*ListVerdictsRequest)(nil),           // 234: swarm.controlcenter.v1.ListVerdictsRequest
-	(*ListVerdictsResponse)(nil),          // 235: swarm.controlcenter.v1.ListVerdictsResponse
-	(*DecideVerdictRequest)(nil),          // 236: swarm.controlcenter.v1.DecideVerdictRequest
-	(*DecideVerdictResponse)(nil),         // 237: swarm.controlcenter.v1.DecideVerdictResponse
-	(*WatchVerdictsRequest)(nil),          // 238: swarm.controlcenter.v1.WatchVerdictsRequest
-	(*WatchVerdictsResponse)(nil),         // 239: swarm.controlcenter.v1.WatchVerdictsResponse
-	nil,                                   // 240: swarm.controlcenter.v1.PlatformStatus.VersionsEntry
-	nil,                                   // 241: swarm.controlcenter.v1.McpServerPlan.EnvEntry
-	nil,                                   // 242: swarm.controlcenter.v1.McpServerPlan.HeadersEntry
-	nil,                                   // 243: swarm.controlcenter.v1.RoomSettingsPlan.EnvEntry
-	nil,                                   // 244: swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry
-	nil,                                   // 245: swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry
-	nil,                                   // 246: swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry
-	nil,                                   // 247: swarm.controlcenter.v1.GetRoomSettingsResponse.SharedVolumesEntry
-	(*timestamppb.Timestamp)(nil),         // 248: google.protobuf.Timestamp
+	(*GitHubAccountPlan)(nil),             // 69: swarm.controlcenter.v1.GitHubAccountPlan
+	(*GroupPlan)(nil),                     // 70: swarm.controlcenter.v1.GroupPlan
+	(*LinkPlan)(nil),                      // 71: swarm.controlcenter.v1.LinkPlan
+	(*NotificationChannelPlan)(nil),       // 72: swarm.controlcenter.v1.NotificationChannelPlan
+	(*WorkspacePlan)(nil),                 // 73: swarm.controlcenter.v1.WorkspacePlan
+	(*ChannelMemberPlan)(nil),             // 74: swarm.controlcenter.v1.ChannelMemberPlan
+	(*ChannelPlan)(nil),                   // 75: swarm.controlcenter.v1.ChannelPlan
+	(*StormPlan)(nil),                     // 76: swarm.controlcenter.v1.StormPlan
+	(*WorkspaceSummary)(nil),              // 77: swarm.controlcenter.v1.WorkspaceSummary
+	(*DefaultChannelsRequest)(nil),        // 78: swarm.controlcenter.v1.DefaultChannelsRequest
+	(*DefaultChannelsResponse)(nil),       // 79: swarm.controlcenter.v1.DefaultChannelsResponse
+	(*ListWorkspacesRequest)(nil),         // 80: swarm.controlcenter.v1.ListWorkspacesRequest
+	(*ListWorkspacesResponse)(nil),        // 81: swarm.controlcenter.v1.ListWorkspacesResponse
+	(*GetWorkspaceRequest)(nil),           // 82: swarm.controlcenter.v1.GetWorkspaceRequest
+	(*GetWorkspaceResponse)(nil),          // 83: swarm.controlcenter.v1.GetWorkspaceResponse
+	(*SuggestAgentNamesRequest)(nil),      // 84: swarm.controlcenter.v1.SuggestAgentNamesRequest
+	(*SuggestAgentNamesResponse)(nil),     // 85: swarm.controlcenter.v1.SuggestAgentNamesResponse
+	(*RoleTemplateSummary)(nil),           // 86: swarm.controlcenter.v1.RoleTemplateSummary
+	(*ListRoleTemplatesRequest)(nil),      // 87: swarm.controlcenter.v1.ListRoleTemplatesRequest
+	(*ListRoleTemplatesResponse)(nil),     // 88: swarm.controlcenter.v1.ListRoleTemplatesResponse
+	(*ListModelsRequest)(nil),             // 89: swarm.controlcenter.v1.ListModelsRequest
+	(*ListModelsResponse)(nil),            // 90: swarm.controlcenter.v1.ListModelsResponse
+	(*Change)(nil),                        // 91: swarm.controlcenter.v1.Change
+	(*DiscoverGitHubRequest)(nil),         // 92: swarm.controlcenter.v1.DiscoverGitHubRequest
+	(*DiscoveredRepo)(nil),                // 93: swarm.controlcenter.v1.DiscoveredRepo
+	(*DiscoverGitHubResponse)(nil),        // 94: swarm.controlcenter.v1.DiscoverGitHubResponse
+	(*PreviewWorkspaceRequest)(nil),       // 95: swarm.controlcenter.v1.PreviewWorkspaceRequest
+	(*PreviewWorkspaceResponse)(nil),      // 96: swarm.controlcenter.v1.PreviewWorkspaceResponse
+	(*ApplyWorkspaceRequest)(nil),         // 97: swarm.controlcenter.v1.ApplyWorkspaceRequest
+	(*ApplyWorkspaceResponse)(nil),        // 98: swarm.controlcenter.v1.ApplyWorkspaceResponse
+	(*VolumeUsage)(nil),                   // 99: swarm.controlcenter.v1.VolumeUsage
+	(*RoomSummary)(nil),                   // 100: swarm.controlcenter.v1.RoomSummary
+	(*WatchTranscriptRequest)(nil),        // 101: swarm.controlcenter.v1.WatchTranscriptRequest
+	(*TranscriptItem)(nil),                // 102: swarm.controlcenter.v1.TranscriptItem
+	(*WatchTranscriptResponse)(nil),       // 103: swarm.controlcenter.v1.WatchTranscriptResponse
+	(*PruneEngineRequest)(nil),            // 104: swarm.controlcenter.v1.PruneEngineRequest
+	(*PruneEngineResponse)(nil),           // 105: swarm.controlcenter.v1.PruneEngineResponse
+	(*GetRoomSettingsRequest)(nil),        // 106: swarm.controlcenter.v1.GetRoomSettingsRequest
+	(*GetRoomSettingsResponse)(nil),       // 107: swarm.controlcenter.v1.GetRoomSettingsResponse
+	(*UpdateRoomSettingsRequest)(nil),     // 108: swarm.controlcenter.v1.UpdateRoomSettingsRequest
+	(*UpdateRoomSettingsResponse)(nil),    // 109: swarm.controlcenter.v1.UpdateRoomSettingsResponse
+	(*RoomRef)(nil),                       // 110: swarm.controlcenter.v1.RoomRef
+	(*ListRoomsRequest)(nil),              // 111: swarm.controlcenter.v1.ListRoomsRequest
+	(*ListRoomsResponse)(nil),             // 112: swarm.controlcenter.v1.ListRoomsResponse
+	(*GetRoomRequest)(nil),                // 113: swarm.controlcenter.v1.GetRoomRequest
+	(*GetRoomResponse)(nil),               // 114: swarm.controlcenter.v1.GetRoomResponse
+	(*PauseRoomRequest)(nil),              // 115: swarm.controlcenter.v1.PauseRoomRequest
+	(*PauseRoomResponse)(nil),             // 116: swarm.controlcenter.v1.PauseRoomResponse
+	(*ResumeRoomRequest)(nil),             // 117: swarm.controlcenter.v1.ResumeRoomRequest
+	(*ResumeRoomResponse)(nil),            // 118: swarm.controlcenter.v1.ResumeRoomResponse
+	(*RecreateRoomRequest)(nil),           // 119: swarm.controlcenter.v1.RecreateRoomRequest
+	(*RecreateRoomResponse)(nil),          // 120: swarm.controlcenter.v1.RecreateRoomResponse
+	(*RemoveRoomRequest)(nil),             // 121: swarm.controlcenter.v1.RemoveRoomRequest
+	(*RemoveRoomResponse)(nil),            // 122: swarm.controlcenter.v1.RemoveRoomResponse
+	(*RotateRoomCredentialsRequest)(nil),  // 123: swarm.controlcenter.v1.RotateRoomCredentialsRequest
+	(*RotateRoomCredentialsResponse)(nil), // 124: swarm.controlcenter.v1.RotateRoomCredentialsResponse
+	(*UpdateRoomNowRequest)(nil),          // 125: swarm.controlcenter.v1.UpdateRoomNowRequest
+	(*UpdateRoomNowResponse)(nil),         // 126: swarm.controlcenter.v1.UpdateRoomNowResponse
+	(*QuarantineRoomRequest)(nil),         // 127: swarm.controlcenter.v1.QuarantineRoomRequest
+	(*QuarantineRoomResponse)(nil),        // 128: swarm.controlcenter.v1.QuarantineRoomResponse
+	(*ReleaseRoomRequest)(nil),            // 129: swarm.controlcenter.v1.ReleaseRoomRequest
+	(*ReleaseRoomResponse)(nil),           // 130: swarm.controlcenter.v1.ReleaseRoomResponse
+	(*StreamRoomLogsRequest)(nil),         // 131: swarm.controlcenter.v1.StreamRoomLogsRequest
+	(*StreamRoomLogsResponse)(nil),        // 132: swarm.controlcenter.v1.StreamRoomLogsResponse
+	(*GetRoomResourcesRequest)(nil),       // 133: swarm.controlcenter.v1.GetRoomResourcesRequest
+	(*GetRoomResourcesResponse)(nil),      // 134: swarm.controlcenter.v1.GetRoomResourcesResponse
+	(*GetRoomStorageRequest)(nil),         // 135: swarm.controlcenter.v1.GetRoomStorageRequest
+	(*ClaimInfo)(nil),                     // 136: swarm.controlcenter.v1.ClaimInfo
+	(*GetRoomStorageResponse)(nil),        // 137: swarm.controlcenter.v1.GetRoomStorageResponse
+	(*WatchFleetRequest)(nil),             // 138: swarm.controlcenter.v1.WatchFleetRequest
+	(*WatchFleetResponse)(nil),            // 139: swarm.controlcenter.v1.WatchFleetResponse
+	(*FleetSnapshot)(nil),                 // 140: swarm.controlcenter.v1.FleetSnapshot
+	(*InboxMessage)(nil),                  // 141: swarm.controlcenter.v1.InboxMessage
+	(*ListInboxRequest)(nil),              // 142: swarm.controlcenter.v1.ListInboxRequest
+	(*ListInboxResponse)(nil),             // 143: swarm.controlcenter.v1.ListInboxResponse
+	(*SendMessageRequest)(nil),            // 144: swarm.controlcenter.v1.SendMessageRequest
+	(*SendMessageResponse)(nil),           // 145: swarm.controlcenter.v1.SendMessageResponse
+	(*MarkReadRequest)(nil),               // 146: swarm.controlcenter.v1.MarkReadRequest
+	(*MarkReadResponse)(nil),              // 147: swarm.controlcenter.v1.MarkReadResponse
+	(*WatchInboxRequest)(nil),             // 148: swarm.controlcenter.v1.WatchInboxRequest
+	(*WatchInboxResponse)(nil),            // 149: swarm.controlcenter.v1.WatchInboxResponse
+	(*Approval)(nil),                      // 150: swarm.controlcenter.v1.Approval
+	(*ListApprovalsRequest)(nil),          // 151: swarm.controlcenter.v1.ListApprovalsRequest
+	(*ListApprovalsResponse)(nil),         // 152: swarm.controlcenter.v1.ListApprovalsResponse
+	(*AnswerApprovalRequest)(nil),         // 153: swarm.controlcenter.v1.AnswerApprovalRequest
+	(*AnswerApprovalResponse)(nil),        // 154: swarm.controlcenter.v1.AnswerApprovalResponse
+	(*WatchApprovalsRequest)(nil),         // 155: swarm.controlcenter.v1.WatchApprovalsRequest
+	(*WatchApprovalsResponse)(nil),        // 156: swarm.controlcenter.v1.WatchApprovalsResponse
+	(*ListApprovalHistoryRequest)(nil),    // 157: swarm.controlcenter.v1.ListApprovalHistoryRequest
+	(*ListApprovalHistoryResponse)(nil),   // 158: swarm.controlcenter.v1.ListApprovalHistoryResponse
+	(*AuditEntry)(nil),                    // 159: swarm.controlcenter.v1.AuditEntry
+	(*QueryAuditRequest)(nil),             // 160: swarm.controlcenter.v1.QueryAuditRequest
+	(*QueryAuditResponse)(nil),            // 161: swarm.controlcenter.v1.QueryAuditResponse
+	(*GetVapidPublicKeyRequest)(nil),      // 162: swarm.controlcenter.v1.GetVapidPublicKeyRequest
+	(*GetVapidPublicKeyResponse)(nil),     // 163: swarm.controlcenter.v1.GetVapidPublicKeyResponse
+	(*SubscribeWebPushRequest)(nil),       // 164: swarm.controlcenter.v1.SubscribeWebPushRequest
+	(*SubscribeWebPushResponse)(nil),      // 165: swarm.controlcenter.v1.SubscribeWebPushResponse
+	(*UnsubscribeWebPushRequest)(nil),     // 166: swarm.controlcenter.v1.UnsubscribeWebPushRequest
+	(*UnsubscribeWebPushResponse)(nil),    // 167: swarm.controlcenter.v1.UnsubscribeWebPushResponse
+	(*NotificationPref)(nil),              // 168: swarm.controlcenter.v1.NotificationPref
+	(*GetNotificationPrefsRequest)(nil),   // 169: swarm.controlcenter.v1.GetNotificationPrefsRequest
+	(*GetNotificationPrefsResponse)(nil),  // 170: swarm.controlcenter.v1.GetNotificationPrefsResponse
+	(*SetNotificationPrefsRequest)(nil),   // 171: swarm.controlcenter.v1.SetNotificationPrefsRequest
+	(*SetNotificationPrefsResponse)(nil),  // 172: swarm.controlcenter.v1.SetNotificationPrefsResponse
+	(*SendTestNotificationRequest)(nil),   // 173: swarm.controlcenter.v1.SendTestNotificationRequest
+	(*SendTestNotificationResponse)(nil),  // 174: swarm.controlcenter.v1.SendTestNotificationResponse
+	(*RoomSpend)(nil),                     // 175: swarm.controlcenter.v1.RoomSpend
+	(*ModelSpend)(nil),                    // 176: swarm.controlcenter.v1.ModelSpend
+	(*WorkspaceSpend)(nil),                // 177: swarm.controlcenter.v1.WorkspaceSpend
+	(*GetSpendRequest)(nil),               // 178: swarm.controlcenter.v1.GetSpendRequest
+	(*GetSpendResponse)(nil),              // 179: swarm.controlcenter.v1.GetSpendResponse
+	(*ListUsersRequest)(nil),              // 180: swarm.controlcenter.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),             // 181: swarm.controlcenter.v1.ListUsersResponse
+	(*SetUserRoleRequest)(nil),            // 182: swarm.controlcenter.v1.SetUserRoleRequest
+	(*SetUserRoleResponse)(nil),           // 183: swarm.controlcenter.v1.SetUserRoleResponse
+	(*SetUserWorkspacesRequest)(nil),      // 184: swarm.controlcenter.v1.SetUserWorkspacesRequest
+	(*SetUserWorkspacesResponse)(nil),     // 185: swarm.controlcenter.v1.SetUserWorkspacesResponse
+	(*SetUserDisabledRequest)(nil),        // 186: swarm.controlcenter.v1.SetUserDisabledRequest
+	(*SetUserDisabledResponse)(nil),       // 187: swarm.controlcenter.v1.SetUserDisabledResponse
+	(*Edge)(nil),                          // 188: swarm.controlcenter.v1.Edge
+	(*EdgesRequest)(nil),                  // 189: swarm.controlcenter.v1.EdgesRequest
+	(*EdgesResponse)(nil),                 // 190: swarm.controlcenter.v1.EdgesResponse
+	(*ItemRef)(nil),                       // 191: swarm.controlcenter.v1.ItemRef
+	(*AgentNow)(nil),                      // 192: swarm.controlcenter.v1.AgentNow
+	(*NowRequest)(nil),                    // 193: swarm.controlcenter.v1.NowRequest
+	(*NowResponse)(nil),                   // 194: swarm.controlcenter.v1.NowResponse
+	(*HeatmapCell)(nil),                   // 195: swarm.controlcenter.v1.HeatmapCell
+	(*HeatmapRequest)(nil),                // 196: swarm.controlcenter.v1.HeatmapRequest
+	(*HeatmapResponse)(nil),               // 197: swarm.controlcenter.v1.HeatmapResponse
+	(*AxesRow)(nil),                       // 198: swarm.controlcenter.v1.AxesRow
+	(*AxesRequest)(nil),                   // 199: swarm.controlcenter.v1.AxesRequest
+	(*AxesResponse)(nil),                  // 200: swarm.controlcenter.v1.AxesResponse
+	(*ActivityEvent)(nil),                 // 201: swarm.controlcenter.v1.ActivityEvent
+	(*TimelineRequest)(nil),               // 202: swarm.controlcenter.v1.TimelineRequest
+	(*TimelineResponse)(nil),              // 203: swarm.controlcenter.v1.TimelineResponse
+	(*WatchTimelineRequest)(nil),          // 204: swarm.controlcenter.v1.WatchTimelineRequest
+	(*WatchTimelineResponse)(nil),         // 205: swarm.controlcenter.v1.WatchTimelineResponse
+	(*ThroughputDay)(nil),                 // 206: swarm.controlcenter.v1.ThroughputDay
+	(*ReviewLatency)(nil),                 // 207: swarm.controlcenter.v1.ReviewLatency
+	(*ThroughputRequest)(nil),             // 208: swarm.controlcenter.v1.ThroughputRequest
+	(*ThroughputResponse)(nil),            // 209: swarm.controlcenter.v1.ThroughputResponse
+	(*Report)(nil),                        // 210: swarm.controlcenter.v1.Report
+	(*ReportsRequest)(nil),                // 211: swarm.controlcenter.v1.ReportsRequest
+	(*ReportsResponse)(nil),               // 212: swarm.controlcenter.v1.ReportsResponse
+	(*RequestReportRequest)(nil),          // 213: swarm.controlcenter.v1.RequestReportRequest
+	(*RequestReportResponse)(nil),         // 214: swarm.controlcenter.v1.RequestReportResponse
+	(*WatchChannelItemsRequest)(nil),      // 215: swarm.controlcenter.v1.WatchChannelItemsRequest
+	(*WatchChannelItemsResponse)(nil),     // 216: swarm.controlcenter.v1.WatchChannelItemsResponse
+	(*Mentionable)(nil),                   // 217: swarm.controlcenter.v1.Mentionable
+	(*ListMentionablesRequest)(nil),       // 218: swarm.controlcenter.v1.ListMentionablesRequest
+	(*ListMentionablesResponse)(nil),      // 219: swarm.controlcenter.v1.ListMentionablesResponse
+	(*ChannelInfo)(nil),                   // 220: swarm.controlcenter.v1.ChannelInfo
+	(*ChannelItem)(nil),                   // 221: swarm.controlcenter.v1.ChannelItem
+	(*ListChannelsRequest)(nil),           // 222: swarm.controlcenter.v1.ListChannelsRequest
+	(*ListChannelsResponse)(nil),          // 223: swarm.controlcenter.v1.ListChannelsResponse
+	(*PostToChannelRequest)(nil),          // 224: swarm.controlcenter.v1.PostToChannelRequest
+	(*PostToChannelResponse)(nil),         // 225: swarm.controlcenter.v1.PostToChannelResponse
+	(*ReadChannelMessagesRequest)(nil),    // 226: swarm.controlcenter.v1.ReadChannelMessagesRequest
+	(*ReadChannelMessagesResponse)(nil),   // 227: swarm.controlcenter.v1.ReadChannelMessagesResponse
+	(*GetChannelMessageRequest)(nil),      // 228: swarm.controlcenter.v1.GetChannelMessageRequest
+	(*GetChannelMessageResponse)(nil),     // 229: swarm.controlcenter.v1.GetChannelMessageResponse
+	(*MarkChannelReadRequest)(nil),        // 230: swarm.controlcenter.v1.MarkChannelReadRequest
+	(*MarkChannelReadResponse)(nil),       // 231: swarm.controlcenter.v1.MarkChannelReadResponse
+	(*GetUnreadSummaryRequest)(nil),       // 232: swarm.controlcenter.v1.GetUnreadSummaryRequest
+	(*UnreadScope)(nil),                   // 233: swarm.controlcenter.v1.UnreadScope
+	(*GetUnreadSummaryResponse)(nil),      // 234: swarm.controlcenter.v1.GetUnreadSummaryResponse
+	(*SetChannelDeliveryRequest)(nil),     // 235: swarm.controlcenter.v1.SetChannelDeliveryRequest
+	(*SetChannelDeliveryResponse)(nil),    // 236: swarm.controlcenter.v1.SetChannelDeliveryResponse
+	(*Verdict)(nil),                       // 237: swarm.controlcenter.v1.Verdict
+	(*ListVerdictsRequest)(nil),           // 238: swarm.controlcenter.v1.ListVerdictsRequest
+	(*ListVerdictsResponse)(nil),          // 239: swarm.controlcenter.v1.ListVerdictsResponse
+	(*DecideVerdictRequest)(nil),          // 240: swarm.controlcenter.v1.DecideVerdictRequest
+	(*DecideVerdictResponse)(nil),         // 241: swarm.controlcenter.v1.DecideVerdictResponse
+	(*WatchVerdictsRequest)(nil),          // 242: swarm.controlcenter.v1.WatchVerdictsRequest
+	(*WatchVerdictsResponse)(nil),         // 243: swarm.controlcenter.v1.WatchVerdictsResponse
+	nil,                                   // 244: swarm.controlcenter.v1.PlatformStatus.VersionsEntry
+	nil,                                   // 245: swarm.controlcenter.v1.McpServerPlan.EnvEntry
+	nil,                                   // 246: swarm.controlcenter.v1.McpServerPlan.HeadersEntry
+	nil,                                   // 247: swarm.controlcenter.v1.RoomSettingsPlan.EnvEntry
+	nil,                                   // 248: swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry
+	nil,                                   // 249: swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry
+	nil,                                   // 250: swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry
+	nil,                                   // 251: swarm.controlcenter.v1.GetRoomSettingsResponse.SharedVolumesEntry
+	(*timestamppb.Timestamp)(nil),         // 252: google.protobuf.Timestamp
 }
 var file_swarm_controlcenter_v1_controlcenter_proto_depIdxs = []int32{
 	21,  // 0: swarm.controlcenter.v1.ClaimAdminResponse.user:type_name -> swarm.controlcenter.v1.User
@@ -16020,9 +16340,9 @@ var file_swarm_controlcenter_v1_controlcenter_proto_depIdxs = []int32{
 	12,  // 2: swarm.controlcenter.v1.ListProvidersResponse.providers:type_name -> swarm.controlcenter.v1.Provider
 	21,  // 3: swarm.controlcenter.v1.LocalLoginResponse.user:type_name -> swarm.controlcenter.v1.User
 	21,  // 4: swarm.controlcenter.v1.GetMeResponse.user:type_name -> swarm.controlcenter.v1.User
-	248, // 5: swarm.controlcenter.v1.GetMeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	252, // 5: swarm.controlcenter.v1.GetMeResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,   // 6: swarm.controlcenter.v1.User.role:type_name -> swarm.controlcenter.v1.Role
-	248, // 7: swarm.controlcenter.v1.User.last_login:type_name -> google.protobuf.Timestamp
+	252, // 7: swarm.controlcenter.v1.User.last_login:type_name -> google.protobuf.Timestamp
 	26,  // 8: swarm.controlcenter.v1.Platform.sign_in:type_name -> swarm.controlcenter.v1.SignInSettings
 	28,  // 9: swarm.controlcenter.v1.Platform.services:type_name -> swarm.controlcenter.v1.ServicesSettings
 	29,  // 10: swarm.controlcenter.v1.Platform.hostname:type_name -> swarm.controlcenter.v1.HostnameSettings
@@ -16033,10 +16353,10 @@ var file_swarm_controlcenter_v1_controlcenter_proto_depIdxs = []int32{
 	25,  // 15: swarm.controlcenter.v1.SignInSettings.role_mappings:type_name -> swarm.controlcenter.v1.RoleMapping
 	0,   // 16: swarm.controlcenter.v1.SignInSettings.default_role:type_name -> swarm.controlcenter.v1.Role
 	27,  // 17: swarm.controlcenter.v1.ServicesSettings.providers:type_name -> swarm.controlcenter.v1.ModelProviderSettings
-	248, // 18: swarm.controlcenter.v1.Condition.last_transition:type_name -> google.protobuf.Timestamp
+	252, // 18: swarm.controlcenter.v1.Condition.last_transition:type_name -> google.protobuf.Timestamp
 	31,  // 19: swarm.controlcenter.v1.PlatformStatus.preflight:type_name -> swarm.controlcenter.v1.PreflightCheck
 	30,  // 20: swarm.controlcenter.v1.PlatformStatus.conditions:type_name -> swarm.controlcenter.v1.Condition
-	240, // 21: swarm.controlcenter.v1.PlatformStatus.versions:type_name -> swarm.controlcenter.v1.PlatformStatus.VersionsEntry
+	244, // 21: swarm.controlcenter.v1.PlatformStatus.versions:type_name -> swarm.controlcenter.v1.PlatformStatus.VersionsEntry
 	22,  // 22: swarm.controlcenter.v1.GetPlatformResponse.platform:type_name -> swarm.controlcenter.v1.Platform
 	26,  // 23: swarm.controlcenter.v1.UpdateSignInRequest.sign_in:type_name -> swarm.controlcenter.v1.SignInSettings
 	22,  // 24: swarm.controlcenter.v1.UpdateSignInResponse.platform:type_name -> swarm.controlcenter.v1.Platform
@@ -16048,11 +16368,11 @@ var file_swarm_controlcenter_v1_controlcenter_proto_depIdxs = []int32{
 	22,  // 30: swarm.controlcenter.v1.SetIsolationResponse.platform:type_name -> swarm.controlcenter.v1.Platform
 	49,  // 31: swarm.controlcenter.v1.SecretEnvPlan.secret:type_name -> swarm.controlcenter.v1.SecretKeyPlan
 	49,  // 32: swarm.controlcenter.v1.McpValuePlan.value_from:type_name -> swarm.controlcenter.v1.SecretKeyPlan
-	241, // 33: swarm.controlcenter.v1.McpServerPlan.env:type_name -> swarm.controlcenter.v1.McpServerPlan.EnvEntry
-	242, // 34: swarm.controlcenter.v1.McpServerPlan.headers:type_name -> swarm.controlcenter.v1.McpServerPlan.HeadersEntry
-	243, // 35: swarm.controlcenter.v1.RoomSettingsPlan.env:type_name -> swarm.controlcenter.v1.RoomSettingsPlan.EnvEntry
+	245, // 33: swarm.controlcenter.v1.McpServerPlan.env:type_name -> swarm.controlcenter.v1.McpServerPlan.EnvEntry
+	246, // 34: swarm.controlcenter.v1.McpServerPlan.headers:type_name -> swarm.controlcenter.v1.McpServerPlan.HeadersEntry
+	247, // 35: swarm.controlcenter.v1.RoomSettingsPlan.env:type_name -> swarm.controlcenter.v1.RoomSettingsPlan.EnvEntry
 	50,  // 36: swarm.controlcenter.v1.RoomSettingsPlan.secret_env:type_name -> swarm.controlcenter.v1.SecretEnvPlan
-	244, // 37: swarm.controlcenter.v1.RoomSettingsPlan.mcp_servers:type_name -> swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry
+	248, // 37: swarm.controlcenter.v1.RoomSettingsPlan.mcp_servers:type_name -> swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry
 	53,  // 38: swarm.controlcenter.v1.RoomSettingsPlan.network:type_name -> swarm.controlcenter.v1.NetworkPlan
 	54,  // 39: swarm.controlcenter.v1.EffectiveSettings.settings:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
 	55,  // 40: swarm.controlcenter.v1.EffectiveSettings.sources:type_name -> swarm.controlcenter.v1.SettingSource
@@ -16062,318 +16382,323 @@ var file_swarm_controlcenter_v1_controlcenter_proto_depIdxs = []int32{
 	66,  // 44: swarm.controlcenter.v1.AgentPlan.advisor:type_name -> swarm.controlcenter.v1.AdvisorPlan
 	65,  // 45: swarm.controlcenter.v1.WorkspacePlan.agents:type_name -> swarm.controlcenter.v1.AgentPlan
 	68,  // 46: swarm.controlcenter.v1.WorkspacePlan.repositories:type_name -> swarm.controlcenter.v1.RepositoryPlan
-	69,  // 47: swarm.controlcenter.v1.WorkspacePlan.groups:type_name -> swarm.controlcenter.v1.GroupPlan
-	70,  // 48: swarm.controlcenter.v1.WorkspacePlan.links:type_name -> swarm.controlcenter.v1.LinkPlan
-	71,  // 49: swarm.controlcenter.v1.WorkspacePlan.notification_channels:type_name -> swarm.controlcenter.v1.NotificationChannelPlan
-	74,  // 50: swarm.controlcenter.v1.WorkspacePlan.channels:type_name -> swarm.controlcenter.v1.ChannelPlan
-	75,  // 51: swarm.controlcenter.v1.WorkspacePlan.storm:type_name -> swarm.controlcenter.v1.StormPlan
+	70,  // 47: swarm.controlcenter.v1.WorkspacePlan.groups:type_name -> swarm.controlcenter.v1.GroupPlan
+	71,  // 48: swarm.controlcenter.v1.WorkspacePlan.links:type_name -> swarm.controlcenter.v1.LinkPlan
+	72,  // 49: swarm.controlcenter.v1.WorkspacePlan.notification_channels:type_name -> swarm.controlcenter.v1.NotificationChannelPlan
+	75,  // 50: swarm.controlcenter.v1.WorkspacePlan.channels:type_name -> swarm.controlcenter.v1.ChannelPlan
+	76,  // 51: swarm.controlcenter.v1.WorkspacePlan.storm:type_name -> swarm.controlcenter.v1.StormPlan
 	54,  // 52: swarm.controlcenter.v1.WorkspacePlan.room_defaults:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	245, // 53: swarm.controlcenter.v1.WorkspacePlan.role_defaults:type_name -> swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry
+	249, // 53: swarm.controlcenter.v1.WorkspacePlan.role_defaults:type_name -> swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry
 	58,  // 54: swarm.controlcenter.v1.WorkspacePlan.shared_volumes:type_name -> swarm.controlcenter.v1.SharedVolumePlan
-	246, // 55: swarm.controlcenter.v1.WorkspacePlan.role_advisors:type_name -> swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry
+	250, // 55: swarm.controlcenter.v1.WorkspacePlan.role_advisors:type_name -> swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry
 	67,  // 56: swarm.controlcenter.v1.WorkspacePlan.warden:type_name -> swarm.controlcenter.v1.WardenPlan
-	73,  // 57: swarm.controlcenter.v1.ChannelPlan.members:type_name -> swarm.controlcenter.v1.ChannelMemberPlan
-	30,  // 58: swarm.controlcenter.v1.WorkspaceSummary.conditions:type_name -> swarm.controlcenter.v1.Condition
-	72,  // 59: swarm.controlcenter.v1.DefaultChannelsRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
-	74,  // 60: swarm.controlcenter.v1.DefaultChannelsResponse.channels:type_name -> swarm.controlcenter.v1.ChannelPlan
-	76,  // 61: swarm.controlcenter.v1.ListWorkspacesResponse.workspaces:type_name -> swarm.controlcenter.v1.WorkspaceSummary
-	72,  // 62: swarm.controlcenter.v1.GetWorkspaceResponse.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
-	76,  // 63: swarm.controlcenter.v1.GetWorkspaceResponse.summary:type_name -> swarm.controlcenter.v1.WorkspaceSummary
-	96,  // 64: swarm.controlcenter.v1.GetWorkspaceResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
-	56,  // 65: swarm.controlcenter.v1.GetWorkspaceResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
-	85,  // 66: swarm.controlcenter.v1.ListRoleTemplatesResponse.templates:type_name -> swarm.controlcenter.v1.RoleTemplateSummary
-	2,   // 67: swarm.controlcenter.v1.Change.action:type_name -> swarm.controlcenter.v1.ChangeAction
-	72,  // 68: swarm.controlcenter.v1.PreviewWorkspaceRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
-	90,  // 69: swarm.controlcenter.v1.PreviewWorkspaceResponse.changes:type_name -> swarm.controlcenter.v1.Change
-	56,  // 70: swarm.controlcenter.v1.PreviewWorkspaceResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
-	72,  // 71: swarm.controlcenter.v1.ApplyWorkspaceRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
-	90,  // 72: swarm.controlcenter.v1.ApplyWorkspaceResponse.changes:type_name -> swarm.controlcenter.v1.Change
-	3,   // 73: swarm.controlcenter.v1.RoomSummary.presence:type_name -> swarm.controlcenter.v1.Presence
-	95,  // 74: swarm.controlcenter.v1.RoomSummary.volumes:type_name -> swarm.controlcenter.v1.VolumeUsage
-	30,  // 75: swarm.controlcenter.v1.RoomSummary.conditions:type_name -> swarm.controlcenter.v1.Condition
-	248, // 76: swarm.controlcenter.v1.RoomSummary.presence_since:type_name -> google.protobuf.Timestamp
-	7,   // 77: swarm.controlcenter.v1.RoomSummary.warden_severity:type_name -> swarm.controlcenter.v1.Severity
-	106, // 78: swarm.controlcenter.v1.WatchTranscriptRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	248, // 79: swarm.controlcenter.v1.TranscriptItem.at:type_name -> google.protobuf.Timestamp
-	98,  // 80: swarm.controlcenter.v1.WatchTranscriptResponse.item:type_name -> swarm.controlcenter.v1.TranscriptItem
-	106, // 81: swarm.controlcenter.v1.PruneEngineRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 82: swarm.controlcenter.v1.GetRoomSettingsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	54,  // 83: swarm.controlcenter.v1.GetRoomSettingsResponse.workspace:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	54,  // 84: swarm.controlcenter.v1.GetRoomSettingsResponse.role:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	54,  // 85: swarm.controlcenter.v1.GetRoomSettingsResponse.room:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	56,  // 86: swarm.controlcenter.v1.GetRoomSettingsResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
-	247, // 87: swarm.controlcenter.v1.GetRoomSettingsResponse.shared_volumes:type_name -> swarm.controlcenter.v1.GetRoomSettingsResponse.SharedVolumesEntry
-	106, // 88: swarm.controlcenter.v1.UpdateRoomSettingsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	54,  // 89: swarm.controlcenter.v1.UpdateRoomSettingsRequest.settings:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	56,  // 90: swarm.controlcenter.v1.UpdateRoomSettingsResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
-	96,  // 91: swarm.controlcenter.v1.ListRoomsResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
-	106, // 92: swarm.controlcenter.v1.GetRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	96,  // 93: swarm.controlcenter.v1.GetRoomResponse.room:type_name -> swarm.controlcenter.v1.RoomSummary
-	248, // 94: swarm.controlcenter.v1.GetRoomResponse.credentials_rotated_at:type_name -> google.protobuf.Timestamp
-	106, // 95: swarm.controlcenter.v1.PauseRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 96: swarm.controlcenter.v1.ResumeRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 97: swarm.controlcenter.v1.RecreateRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 98: swarm.controlcenter.v1.RemoveRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 99: swarm.controlcenter.v1.RotateRoomCredentialsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 100: swarm.controlcenter.v1.UpdateRoomNowRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 101: swarm.controlcenter.v1.QuarantineRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 102: swarm.controlcenter.v1.ReleaseRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 103: swarm.controlcenter.v1.StreamRoomLogsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	106, // 104: swarm.controlcenter.v1.GetRoomResourcesRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	248, // 105: swarm.controlcenter.v1.GetRoomResourcesResponse.at:type_name -> google.protobuf.Timestamp
-	106, // 106: swarm.controlcenter.v1.GetRoomStorageRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
-	95,  // 107: swarm.controlcenter.v1.GetRoomStorageResponse.volumes:type_name -> swarm.controlcenter.v1.VolumeUsage
-	132, // 108: swarm.controlcenter.v1.GetRoomStorageResponse.claims:type_name -> swarm.controlcenter.v1.ClaimInfo
-	136, // 109: swarm.controlcenter.v1.WatchFleetResponse.snapshot:type_name -> swarm.controlcenter.v1.FleetSnapshot
-	96,  // 110: swarm.controlcenter.v1.WatchFleetResponse.updated:type_name -> swarm.controlcenter.v1.RoomSummary
-	106, // 111: swarm.controlcenter.v1.WatchFleetResponse.removed:type_name -> swarm.controlcenter.v1.RoomRef
-	96,  // 112: swarm.controlcenter.v1.FleetSnapshot.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
-	248, // 113: swarm.controlcenter.v1.InboxMessage.sent_at:type_name -> google.protobuf.Timestamp
-	248, // 114: swarm.controlcenter.v1.ListInboxRequest.before:type_name -> google.protobuf.Timestamp
-	137, // 115: swarm.controlcenter.v1.ListInboxResponse.messages:type_name -> swarm.controlcenter.v1.InboxMessage
-	137, // 116: swarm.controlcenter.v1.SendMessageResponse.message:type_name -> swarm.controlcenter.v1.InboxMessage
-	137, // 117: swarm.controlcenter.v1.WatchInboxResponse.message:type_name -> swarm.controlcenter.v1.InboxMessage
-	248, // 118: swarm.controlcenter.v1.Approval.requested_at:type_name -> google.protobuf.Timestamp
-	248, // 119: swarm.controlcenter.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
-	4,   // 120: swarm.controlcenter.v1.Approval.decision:type_name -> swarm.controlcenter.v1.Decision
-	248, // 121: swarm.controlcenter.v1.Approval.answered_at:type_name -> google.protobuf.Timestamp
-	146, // 122: swarm.controlcenter.v1.ListApprovalsResponse.approvals:type_name -> swarm.controlcenter.v1.Approval
-	4,   // 123: swarm.controlcenter.v1.AnswerApprovalRequest.decision:type_name -> swarm.controlcenter.v1.Decision
-	146, // 124: swarm.controlcenter.v1.AnswerApprovalResponse.approval:type_name -> swarm.controlcenter.v1.Approval
-	146, // 125: swarm.controlcenter.v1.WatchApprovalsResponse.approval:type_name -> swarm.controlcenter.v1.Approval
-	248, // 126: swarm.controlcenter.v1.ListApprovalHistoryRequest.before:type_name -> google.protobuf.Timestamp
-	146, // 127: swarm.controlcenter.v1.ListApprovalHistoryResponse.approvals:type_name -> swarm.controlcenter.v1.Approval
-	5,   // 128: swarm.controlcenter.v1.AuditEntry.source:type_name -> swarm.controlcenter.v1.AuditSource
-	248, // 129: swarm.controlcenter.v1.AuditEntry.at:type_name -> google.protobuf.Timestamp
-	5,   // 130: swarm.controlcenter.v1.QueryAuditRequest.source:type_name -> swarm.controlcenter.v1.AuditSource
-	248, // 131: swarm.controlcenter.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
-	248, // 132: swarm.controlcenter.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
-	155, // 133: swarm.controlcenter.v1.QueryAuditResponse.entries:type_name -> swarm.controlcenter.v1.AuditEntry
-	164, // 134: swarm.controlcenter.v1.GetNotificationPrefsResponse.prefs:type_name -> swarm.controlcenter.v1.NotificationPref
-	164, // 135: swarm.controlcenter.v1.SetNotificationPrefsRequest.prefs:type_name -> swarm.controlcenter.v1.NotificationPref
-	172, // 136: swarm.controlcenter.v1.WorkspaceSpend.models:type_name -> swarm.controlcenter.v1.ModelSpend
-	171, // 137: swarm.controlcenter.v1.GetSpendResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSpend
-	173, // 138: swarm.controlcenter.v1.GetSpendResponse.workspaces:type_name -> swarm.controlcenter.v1.WorkspaceSpend
-	248, // 139: swarm.controlcenter.v1.GetSpendResponse.updated_at:type_name -> google.protobuf.Timestamp
-	21,  // 140: swarm.controlcenter.v1.ListUsersResponse.users:type_name -> swarm.controlcenter.v1.User
-	0,   // 141: swarm.controlcenter.v1.SetUserRoleRequest.role:type_name -> swarm.controlcenter.v1.Role
-	21,  // 142: swarm.controlcenter.v1.SetUserRoleResponse.user:type_name -> swarm.controlcenter.v1.User
-	21,  // 143: swarm.controlcenter.v1.SetUserWorkspacesResponse.user:type_name -> swarm.controlcenter.v1.User
-	21,  // 144: swarm.controlcenter.v1.SetUserDisabledResponse.user:type_name -> swarm.controlcenter.v1.User
-	6,   // 145: swarm.controlcenter.v1.Edge.kind:type_name -> swarm.controlcenter.v1.EdgeKind
-	248, // 146: swarm.controlcenter.v1.EdgesRequest.since:type_name -> google.protobuf.Timestamp
-	248, // 147: swarm.controlcenter.v1.EdgesRequest.until:type_name -> google.protobuf.Timestamp
-	184, // 148: swarm.controlcenter.v1.EdgesResponse.edges:type_name -> swarm.controlcenter.v1.Edge
-	248, // 149: swarm.controlcenter.v1.ItemRef.at:type_name -> google.protobuf.Timestamp
-	3,   // 150: swarm.controlcenter.v1.AgentNow.presence:type_name -> swarm.controlcenter.v1.Presence
-	248, // 151: swarm.controlcenter.v1.AgentNow.presence_since:type_name -> google.protobuf.Timestamp
-	187, // 152: swarm.controlcenter.v1.AgentNow.last_item:type_name -> swarm.controlcenter.v1.ItemRef
-	188, // 153: swarm.controlcenter.v1.NowResponse.agents:type_name -> swarm.controlcenter.v1.AgentNow
-	191, // 154: swarm.controlcenter.v1.HeatmapResponse.cells:type_name -> swarm.controlcenter.v1.HeatmapCell
-	248, // 155: swarm.controlcenter.v1.AxesRequest.since:type_name -> google.protobuf.Timestamp
-	194, // 156: swarm.controlcenter.v1.AxesResponse.rows:type_name -> swarm.controlcenter.v1.AxesRow
-	248, // 157: swarm.controlcenter.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
-	197, // 158: swarm.controlcenter.v1.TimelineResponse.events:type_name -> swarm.controlcenter.v1.ActivityEvent
-	197, // 159: swarm.controlcenter.v1.WatchTimelineResponse.event:type_name -> swarm.controlcenter.v1.ActivityEvent
-	202, // 160: swarm.controlcenter.v1.ThroughputResponse.days:type_name -> swarm.controlcenter.v1.ThroughputDay
-	203, // 161: swarm.controlcenter.v1.ThroughputResponse.review_latency:type_name -> swarm.controlcenter.v1.ReviewLatency
-	171, // 162: swarm.controlcenter.v1.ThroughputResponse.spend:type_name -> swarm.controlcenter.v1.RoomSpend
-	248, // 163: swarm.controlcenter.v1.Report.at:type_name -> google.protobuf.Timestamp
-	206, // 164: swarm.controlcenter.v1.ReportsResponse.reports:type_name -> swarm.controlcenter.v1.Report
-	217, // 165: swarm.controlcenter.v1.WatchChannelItemsResponse.item:type_name -> swarm.controlcenter.v1.ChannelItem
-	3,   // 166: swarm.controlcenter.v1.Mentionable.presence:type_name -> swarm.controlcenter.v1.Presence
-	213, // 167: swarm.controlcenter.v1.ListMentionablesResponse.mentionables:type_name -> swarm.controlcenter.v1.Mentionable
-	248, // 168: swarm.controlcenter.v1.ChannelItem.sent_at:type_name -> google.protobuf.Timestamp
-	216, // 169: swarm.controlcenter.v1.ListChannelsResponse.channels:type_name -> swarm.controlcenter.v1.ChannelInfo
-	217, // 170: swarm.controlcenter.v1.ReadChannelMessagesResponse.items:type_name -> swarm.controlcenter.v1.ChannelItem
-	217, // 171: swarm.controlcenter.v1.GetChannelMessageResponse.item:type_name -> swarm.controlcenter.v1.ChannelItem
-	229, // 172: swarm.controlcenter.v1.GetUnreadSummaryResponse.counts:type_name -> swarm.controlcenter.v1.UnreadScope
-	7,   // 173: swarm.controlcenter.v1.Verdict.severity:type_name -> swarm.controlcenter.v1.Severity
-	248, // 174: swarm.controlcenter.v1.Verdict.at:type_name -> google.protobuf.Timestamp
-	248, // 175: swarm.controlcenter.v1.Verdict.decided_at:type_name -> google.protobuf.Timestamp
-	7,   // 176: swarm.controlcenter.v1.ListVerdictsRequest.min_severity:type_name -> swarm.controlcenter.v1.Severity
-	248, // 177: swarm.controlcenter.v1.ListVerdictsRequest.before:type_name -> google.protobuf.Timestamp
-	233, // 178: swarm.controlcenter.v1.ListVerdictsResponse.verdicts:type_name -> swarm.controlcenter.v1.Verdict
-	233, // 179: swarm.controlcenter.v1.DecideVerdictResponse.verdict:type_name -> swarm.controlcenter.v1.Verdict
-	233, // 180: swarm.controlcenter.v1.WatchVerdictsResponse.verdict:type_name -> swarm.controlcenter.v1.Verdict
-	51,  // 181: swarm.controlcenter.v1.McpServerPlan.EnvEntry.value:type_name -> swarm.controlcenter.v1.McpValuePlan
-	51,  // 182: swarm.controlcenter.v1.McpServerPlan.HeadersEntry.value:type_name -> swarm.controlcenter.v1.McpValuePlan
-	52,  // 183: swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry.value:type_name -> swarm.controlcenter.v1.McpServerPlan
-	54,  // 184: swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry.value:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
-	66,  // 185: swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry.value:type_name -> swarm.controlcenter.v1.AdvisorPlan
-	8,   // 186: swarm.controlcenter.v1.SetupService.GetSetupStatus:input_type -> swarm.controlcenter.v1.GetSetupStatusRequest
-	10,  // 187: swarm.controlcenter.v1.SetupService.ClaimAdmin:input_type -> swarm.controlcenter.v1.ClaimAdminRequest
-	13,  // 188: swarm.controlcenter.v1.AuthService.ListProviders:input_type -> swarm.controlcenter.v1.ListProvidersRequest
-	15,  // 189: swarm.controlcenter.v1.AuthService.LocalLogin:input_type -> swarm.controlcenter.v1.LocalLoginRequest
-	17,  // 190: swarm.controlcenter.v1.AuthService.Logout:input_type -> swarm.controlcenter.v1.LogoutRequest
-	19,  // 191: swarm.controlcenter.v1.AuthService.GetMe:input_type -> swarm.controlcenter.v1.GetMeRequest
-	33,  // 192: swarm.controlcenter.v1.PlatformService.GetPlatform:input_type -> swarm.controlcenter.v1.GetPlatformRequest
-	35,  // 193: swarm.controlcenter.v1.PlatformService.UpdateSignIn:input_type -> swarm.controlcenter.v1.UpdateSignInRequest
-	37,  // 194: swarm.controlcenter.v1.PlatformService.UpdateServices:input_type -> swarm.controlcenter.v1.UpdateServicesRequest
-	39,  // 195: swarm.controlcenter.v1.PlatformService.UpdateHostname:input_type -> swarm.controlcenter.v1.UpdateHostnameRequest
-	41,  // 196: swarm.controlcenter.v1.PlatformService.SetWizardStep:input_type -> swarm.controlcenter.v1.SetWizardStepRequest
-	43,  // 197: swarm.controlcenter.v1.PlatformService.WatchPlatform:input_type -> swarm.controlcenter.v1.WatchPlatformRequest
-	45,  // 198: swarm.controlcenter.v1.PlatformService.SetIsolation:input_type -> swarm.controlcenter.v1.SetIsolationRequest
-	47,  // 199: swarm.controlcenter.v1.PlatformService.RerunPreflight:input_type -> swarm.controlcenter.v1.RerunPreflightRequest
-	79,  // 200: swarm.controlcenter.v1.WorkspaceService.ListWorkspaces:input_type -> swarm.controlcenter.v1.ListWorkspacesRequest
-	81,  // 201: swarm.controlcenter.v1.WorkspaceService.GetWorkspace:input_type -> swarm.controlcenter.v1.GetWorkspaceRequest
-	83,  // 202: swarm.controlcenter.v1.WorkspaceService.SuggestAgentNames:input_type -> swarm.controlcenter.v1.SuggestAgentNamesRequest
-	86,  // 203: swarm.controlcenter.v1.WorkspaceService.ListRoleTemplates:input_type -> swarm.controlcenter.v1.ListRoleTemplatesRequest
-	88,  // 204: swarm.controlcenter.v1.WorkspaceService.ListModels:input_type -> swarm.controlcenter.v1.ListModelsRequest
-	91,  // 205: swarm.controlcenter.v1.WorkspaceService.PreviewWorkspace:input_type -> swarm.controlcenter.v1.PreviewWorkspaceRequest
-	77,  // 206: swarm.controlcenter.v1.WorkspaceService.DefaultChannels:input_type -> swarm.controlcenter.v1.DefaultChannelsRequest
-	93,  // 207: swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace:input_type -> swarm.controlcenter.v1.ApplyWorkspaceRequest
-	59,  // 208: swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets:input_type -> swarm.controlcenter.v1.ListRoomSecretsRequest
-	61,  // 209: swarm.controlcenter.v1.WorkspaceService.SetRoomSecret:input_type -> swarm.controlcenter.v1.SetRoomSecretRequest
-	63,  // 210: swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret:input_type -> swarm.controlcenter.v1.DeleteRoomSecretRequest
-	107, // 211: swarm.controlcenter.v1.RoomService.ListRooms:input_type -> swarm.controlcenter.v1.ListRoomsRequest
-	109, // 212: swarm.controlcenter.v1.RoomService.GetRoom:input_type -> swarm.controlcenter.v1.GetRoomRequest
-	111, // 213: swarm.controlcenter.v1.RoomService.PauseRoom:input_type -> swarm.controlcenter.v1.PauseRoomRequest
-	113, // 214: swarm.controlcenter.v1.RoomService.ResumeRoom:input_type -> swarm.controlcenter.v1.ResumeRoomRequest
-	115, // 215: swarm.controlcenter.v1.RoomService.RecreateRoom:input_type -> swarm.controlcenter.v1.RecreateRoomRequest
-	117, // 216: swarm.controlcenter.v1.RoomService.RemoveRoom:input_type -> swarm.controlcenter.v1.RemoveRoomRequest
-	119, // 217: swarm.controlcenter.v1.RoomService.RotateRoomCredentials:input_type -> swarm.controlcenter.v1.RotateRoomCredentialsRequest
-	121, // 218: swarm.controlcenter.v1.RoomService.UpdateRoomNow:input_type -> swarm.controlcenter.v1.UpdateRoomNowRequest
-	123, // 219: swarm.controlcenter.v1.RoomService.QuarantineRoom:input_type -> swarm.controlcenter.v1.QuarantineRoomRequest
-	125, // 220: swarm.controlcenter.v1.RoomService.ReleaseRoom:input_type -> swarm.controlcenter.v1.ReleaseRoomRequest
-	127, // 221: swarm.controlcenter.v1.RoomService.StreamRoomLogs:input_type -> swarm.controlcenter.v1.StreamRoomLogsRequest
-	129, // 222: swarm.controlcenter.v1.RoomService.GetRoomResources:input_type -> swarm.controlcenter.v1.GetRoomResourcesRequest
-	131, // 223: swarm.controlcenter.v1.RoomService.GetRoomStorage:input_type -> swarm.controlcenter.v1.GetRoomStorageRequest
-	102, // 224: swarm.controlcenter.v1.RoomService.GetRoomSettings:input_type -> swarm.controlcenter.v1.GetRoomSettingsRequest
-	104, // 225: swarm.controlcenter.v1.RoomService.UpdateRoomSettings:input_type -> swarm.controlcenter.v1.UpdateRoomSettingsRequest
-	97,  // 226: swarm.controlcenter.v1.RoomService.WatchTranscript:input_type -> swarm.controlcenter.v1.WatchTranscriptRequest
-	100, // 227: swarm.controlcenter.v1.RoomService.PruneEngine:input_type -> swarm.controlcenter.v1.PruneEngineRequest
-	134, // 228: swarm.controlcenter.v1.FleetService.WatchFleet:input_type -> swarm.controlcenter.v1.WatchFleetRequest
-	138, // 229: swarm.controlcenter.v1.InboxService.ListInbox:input_type -> swarm.controlcenter.v1.ListInboxRequest
-	140, // 230: swarm.controlcenter.v1.InboxService.SendMessage:input_type -> swarm.controlcenter.v1.SendMessageRequest
-	142, // 231: swarm.controlcenter.v1.InboxService.MarkRead:input_type -> swarm.controlcenter.v1.MarkReadRequest
-	144, // 232: swarm.controlcenter.v1.InboxService.WatchInbox:input_type -> swarm.controlcenter.v1.WatchInboxRequest
-	147, // 233: swarm.controlcenter.v1.ApprovalService.ListApprovals:input_type -> swarm.controlcenter.v1.ListApprovalsRequest
-	149, // 234: swarm.controlcenter.v1.ApprovalService.AnswerApproval:input_type -> swarm.controlcenter.v1.AnswerApprovalRequest
-	151, // 235: swarm.controlcenter.v1.ApprovalService.WatchApprovals:input_type -> swarm.controlcenter.v1.WatchApprovalsRequest
-	153, // 236: swarm.controlcenter.v1.ApprovalService.ListApprovalHistory:input_type -> swarm.controlcenter.v1.ListApprovalHistoryRequest
-	156, // 237: swarm.controlcenter.v1.AuditService.QueryAudit:input_type -> swarm.controlcenter.v1.QueryAuditRequest
-	158, // 238: swarm.controlcenter.v1.NotificationService.GetVapidPublicKey:input_type -> swarm.controlcenter.v1.GetVapidPublicKeyRequest
-	160, // 239: swarm.controlcenter.v1.NotificationService.SubscribeWebPush:input_type -> swarm.controlcenter.v1.SubscribeWebPushRequest
-	162, // 240: swarm.controlcenter.v1.NotificationService.UnsubscribeWebPush:input_type -> swarm.controlcenter.v1.UnsubscribeWebPushRequest
-	165, // 241: swarm.controlcenter.v1.NotificationService.GetNotificationPrefs:input_type -> swarm.controlcenter.v1.GetNotificationPrefsRequest
-	167, // 242: swarm.controlcenter.v1.NotificationService.SetNotificationPrefs:input_type -> swarm.controlcenter.v1.SetNotificationPrefsRequest
-	169, // 243: swarm.controlcenter.v1.NotificationService.SendTestNotification:input_type -> swarm.controlcenter.v1.SendTestNotificationRequest
-	174, // 244: swarm.controlcenter.v1.SpendService.GetSpend:input_type -> swarm.controlcenter.v1.GetSpendRequest
-	176, // 245: swarm.controlcenter.v1.UserService.ListUsers:input_type -> swarm.controlcenter.v1.ListUsersRequest
-	178, // 246: swarm.controlcenter.v1.UserService.SetUserRole:input_type -> swarm.controlcenter.v1.SetUserRoleRequest
-	180, // 247: swarm.controlcenter.v1.UserService.SetUserWorkspaces:input_type -> swarm.controlcenter.v1.SetUserWorkspacesRequest
-	182, // 248: swarm.controlcenter.v1.UserService.SetUserDisabled:input_type -> swarm.controlcenter.v1.SetUserDisabledRequest
-	185, // 249: swarm.controlcenter.v1.ObservatoryService.Edges:input_type -> swarm.controlcenter.v1.EdgesRequest
-	189, // 250: swarm.controlcenter.v1.ObservatoryService.Now:input_type -> swarm.controlcenter.v1.NowRequest
-	192, // 251: swarm.controlcenter.v1.ObservatoryService.Heatmap:input_type -> swarm.controlcenter.v1.HeatmapRequest
-	195, // 252: swarm.controlcenter.v1.ObservatoryService.Axes:input_type -> swarm.controlcenter.v1.AxesRequest
-	198, // 253: swarm.controlcenter.v1.ObservatoryService.Timeline:input_type -> swarm.controlcenter.v1.TimelineRequest
-	200, // 254: swarm.controlcenter.v1.ObservatoryService.WatchTimeline:input_type -> swarm.controlcenter.v1.WatchTimelineRequest
-	204, // 255: swarm.controlcenter.v1.ObservatoryService.Throughput:input_type -> swarm.controlcenter.v1.ThroughputRequest
-	207, // 256: swarm.controlcenter.v1.ObservatoryService.Reports:input_type -> swarm.controlcenter.v1.ReportsRequest
-	209, // 257: swarm.controlcenter.v1.ObservatoryService.RequestReport:input_type -> swarm.controlcenter.v1.RequestReportRequest
-	218, // 258: swarm.controlcenter.v1.ChannelService.ListChannels:input_type -> swarm.controlcenter.v1.ListChannelsRequest
-	220, // 259: swarm.controlcenter.v1.ChannelService.PostToChannel:input_type -> swarm.controlcenter.v1.PostToChannelRequest
-	222, // 260: swarm.controlcenter.v1.ChannelService.ReadChannelMessages:input_type -> swarm.controlcenter.v1.ReadChannelMessagesRequest
-	224, // 261: swarm.controlcenter.v1.ChannelService.GetChannelMessage:input_type -> swarm.controlcenter.v1.GetChannelMessageRequest
-	226, // 262: swarm.controlcenter.v1.ChannelService.MarkChannelRead:input_type -> swarm.controlcenter.v1.MarkChannelReadRequest
-	228, // 263: swarm.controlcenter.v1.ChannelService.GetUnreadSummary:input_type -> swarm.controlcenter.v1.GetUnreadSummaryRequest
-	231, // 264: swarm.controlcenter.v1.ChannelService.SetChannelDelivery:input_type -> swarm.controlcenter.v1.SetChannelDeliveryRequest
-	211, // 265: swarm.controlcenter.v1.ChannelService.WatchChannelItems:input_type -> swarm.controlcenter.v1.WatchChannelItemsRequest
-	214, // 266: swarm.controlcenter.v1.ChannelService.ListMentionables:input_type -> swarm.controlcenter.v1.ListMentionablesRequest
-	234, // 267: swarm.controlcenter.v1.WardenService.ListVerdicts:input_type -> swarm.controlcenter.v1.ListVerdictsRequest
-	236, // 268: swarm.controlcenter.v1.WardenService.DecideVerdict:input_type -> swarm.controlcenter.v1.DecideVerdictRequest
-	238, // 269: swarm.controlcenter.v1.WardenService.WatchVerdicts:input_type -> swarm.controlcenter.v1.WatchVerdictsRequest
-	9,   // 270: swarm.controlcenter.v1.SetupService.GetSetupStatus:output_type -> swarm.controlcenter.v1.GetSetupStatusResponse
-	11,  // 271: swarm.controlcenter.v1.SetupService.ClaimAdmin:output_type -> swarm.controlcenter.v1.ClaimAdminResponse
-	14,  // 272: swarm.controlcenter.v1.AuthService.ListProviders:output_type -> swarm.controlcenter.v1.ListProvidersResponse
-	16,  // 273: swarm.controlcenter.v1.AuthService.LocalLogin:output_type -> swarm.controlcenter.v1.LocalLoginResponse
-	18,  // 274: swarm.controlcenter.v1.AuthService.Logout:output_type -> swarm.controlcenter.v1.LogoutResponse
-	20,  // 275: swarm.controlcenter.v1.AuthService.GetMe:output_type -> swarm.controlcenter.v1.GetMeResponse
-	34,  // 276: swarm.controlcenter.v1.PlatformService.GetPlatform:output_type -> swarm.controlcenter.v1.GetPlatformResponse
-	36,  // 277: swarm.controlcenter.v1.PlatformService.UpdateSignIn:output_type -> swarm.controlcenter.v1.UpdateSignInResponse
-	38,  // 278: swarm.controlcenter.v1.PlatformService.UpdateServices:output_type -> swarm.controlcenter.v1.UpdateServicesResponse
-	40,  // 279: swarm.controlcenter.v1.PlatformService.UpdateHostname:output_type -> swarm.controlcenter.v1.UpdateHostnameResponse
-	42,  // 280: swarm.controlcenter.v1.PlatformService.SetWizardStep:output_type -> swarm.controlcenter.v1.SetWizardStepResponse
-	44,  // 281: swarm.controlcenter.v1.PlatformService.WatchPlatform:output_type -> swarm.controlcenter.v1.WatchPlatformResponse
-	46,  // 282: swarm.controlcenter.v1.PlatformService.SetIsolation:output_type -> swarm.controlcenter.v1.SetIsolationResponse
-	48,  // 283: swarm.controlcenter.v1.PlatformService.RerunPreflight:output_type -> swarm.controlcenter.v1.RerunPreflightResponse
-	80,  // 284: swarm.controlcenter.v1.WorkspaceService.ListWorkspaces:output_type -> swarm.controlcenter.v1.ListWorkspacesResponse
-	82,  // 285: swarm.controlcenter.v1.WorkspaceService.GetWorkspace:output_type -> swarm.controlcenter.v1.GetWorkspaceResponse
-	84,  // 286: swarm.controlcenter.v1.WorkspaceService.SuggestAgentNames:output_type -> swarm.controlcenter.v1.SuggestAgentNamesResponse
-	87,  // 287: swarm.controlcenter.v1.WorkspaceService.ListRoleTemplates:output_type -> swarm.controlcenter.v1.ListRoleTemplatesResponse
-	89,  // 288: swarm.controlcenter.v1.WorkspaceService.ListModels:output_type -> swarm.controlcenter.v1.ListModelsResponse
-	92,  // 289: swarm.controlcenter.v1.WorkspaceService.PreviewWorkspace:output_type -> swarm.controlcenter.v1.PreviewWorkspaceResponse
-	78,  // 290: swarm.controlcenter.v1.WorkspaceService.DefaultChannels:output_type -> swarm.controlcenter.v1.DefaultChannelsResponse
-	94,  // 291: swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace:output_type -> swarm.controlcenter.v1.ApplyWorkspaceResponse
-	60,  // 292: swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets:output_type -> swarm.controlcenter.v1.ListRoomSecretsResponse
-	62,  // 293: swarm.controlcenter.v1.WorkspaceService.SetRoomSecret:output_type -> swarm.controlcenter.v1.SetRoomSecretResponse
-	64,  // 294: swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret:output_type -> swarm.controlcenter.v1.DeleteRoomSecretResponse
-	108, // 295: swarm.controlcenter.v1.RoomService.ListRooms:output_type -> swarm.controlcenter.v1.ListRoomsResponse
-	110, // 296: swarm.controlcenter.v1.RoomService.GetRoom:output_type -> swarm.controlcenter.v1.GetRoomResponse
-	112, // 297: swarm.controlcenter.v1.RoomService.PauseRoom:output_type -> swarm.controlcenter.v1.PauseRoomResponse
-	114, // 298: swarm.controlcenter.v1.RoomService.ResumeRoom:output_type -> swarm.controlcenter.v1.ResumeRoomResponse
-	116, // 299: swarm.controlcenter.v1.RoomService.RecreateRoom:output_type -> swarm.controlcenter.v1.RecreateRoomResponse
-	118, // 300: swarm.controlcenter.v1.RoomService.RemoveRoom:output_type -> swarm.controlcenter.v1.RemoveRoomResponse
-	120, // 301: swarm.controlcenter.v1.RoomService.RotateRoomCredentials:output_type -> swarm.controlcenter.v1.RotateRoomCredentialsResponse
-	122, // 302: swarm.controlcenter.v1.RoomService.UpdateRoomNow:output_type -> swarm.controlcenter.v1.UpdateRoomNowResponse
-	124, // 303: swarm.controlcenter.v1.RoomService.QuarantineRoom:output_type -> swarm.controlcenter.v1.QuarantineRoomResponse
-	126, // 304: swarm.controlcenter.v1.RoomService.ReleaseRoom:output_type -> swarm.controlcenter.v1.ReleaseRoomResponse
-	128, // 305: swarm.controlcenter.v1.RoomService.StreamRoomLogs:output_type -> swarm.controlcenter.v1.StreamRoomLogsResponse
-	130, // 306: swarm.controlcenter.v1.RoomService.GetRoomResources:output_type -> swarm.controlcenter.v1.GetRoomResourcesResponse
-	133, // 307: swarm.controlcenter.v1.RoomService.GetRoomStorage:output_type -> swarm.controlcenter.v1.GetRoomStorageResponse
-	103, // 308: swarm.controlcenter.v1.RoomService.GetRoomSettings:output_type -> swarm.controlcenter.v1.GetRoomSettingsResponse
-	105, // 309: swarm.controlcenter.v1.RoomService.UpdateRoomSettings:output_type -> swarm.controlcenter.v1.UpdateRoomSettingsResponse
-	99,  // 310: swarm.controlcenter.v1.RoomService.WatchTranscript:output_type -> swarm.controlcenter.v1.WatchTranscriptResponse
-	101, // 311: swarm.controlcenter.v1.RoomService.PruneEngine:output_type -> swarm.controlcenter.v1.PruneEngineResponse
-	135, // 312: swarm.controlcenter.v1.FleetService.WatchFleet:output_type -> swarm.controlcenter.v1.WatchFleetResponse
-	139, // 313: swarm.controlcenter.v1.InboxService.ListInbox:output_type -> swarm.controlcenter.v1.ListInboxResponse
-	141, // 314: swarm.controlcenter.v1.InboxService.SendMessage:output_type -> swarm.controlcenter.v1.SendMessageResponse
-	143, // 315: swarm.controlcenter.v1.InboxService.MarkRead:output_type -> swarm.controlcenter.v1.MarkReadResponse
-	145, // 316: swarm.controlcenter.v1.InboxService.WatchInbox:output_type -> swarm.controlcenter.v1.WatchInboxResponse
-	148, // 317: swarm.controlcenter.v1.ApprovalService.ListApprovals:output_type -> swarm.controlcenter.v1.ListApprovalsResponse
-	150, // 318: swarm.controlcenter.v1.ApprovalService.AnswerApproval:output_type -> swarm.controlcenter.v1.AnswerApprovalResponse
-	152, // 319: swarm.controlcenter.v1.ApprovalService.WatchApprovals:output_type -> swarm.controlcenter.v1.WatchApprovalsResponse
-	154, // 320: swarm.controlcenter.v1.ApprovalService.ListApprovalHistory:output_type -> swarm.controlcenter.v1.ListApprovalHistoryResponse
-	157, // 321: swarm.controlcenter.v1.AuditService.QueryAudit:output_type -> swarm.controlcenter.v1.QueryAuditResponse
-	159, // 322: swarm.controlcenter.v1.NotificationService.GetVapidPublicKey:output_type -> swarm.controlcenter.v1.GetVapidPublicKeyResponse
-	161, // 323: swarm.controlcenter.v1.NotificationService.SubscribeWebPush:output_type -> swarm.controlcenter.v1.SubscribeWebPushResponse
-	163, // 324: swarm.controlcenter.v1.NotificationService.UnsubscribeWebPush:output_type -> swarm.controlcenter.v1.UnsubscribeWebPushResponse
-	166, // 325: swarm.controlcenter.v1.NotificationService.GetNotificationPrefs:output_type -> swarm.controlcenter.v1.GetNotificationPrefsResponse
-	168, // 326: swarm.controlcenter.v1.NotificationService.SetNotificationPrefs:output_type -> swarm.controlcenter.v1.SetNotificationPrefsResponse
-	170, // 327: swarm.controlcenter.v1.NotificationService.SendTestNotification:output_type -> swarm.controlcenter.v1.SendTestNotificationResponse
-	175, // 328: swarm.controlcenter.v1.SpendService.GetSpend:output_type -> swarm.controlcenter.v1.GetSpendResponse
-	177, // 329: swarm.controlcenter.v1.UserService.ListUsers:output_type -> swarm.controlcenter.v1.ListUsersResponse
-	179, // 330: swarm.controlcenter.v1.UserService.SetUserRole:output_type -> swarm.controlcenter.v1.SetUserRoleResponse
-	181, // 331: swarm.controlcenter.v1.UserService.SetUserWorkspaces:output_type -> swarm.controlcenter.v1.SetUserWorkspacesResponse
-	183, // 332: swarm.controlcenter.v1.UserService.SetUserDisabled:output_type -> swarm.controlcenter.v1.SetUserDisabledResponse
-	186, // 333: swarm.controlcenter.v1.ObservatoryService.Edges:output_type -> swarm.controlcenter.v1.EdgesResponse
-	190, // 334: swarm.controlcenter.v1.ObservatoryService.Now:output_type -> swarm.controlcenter.v1.NowResponse
-	193, // 335: swarm.controlcenter.v1.ObservatoryService.Heatmap:output_type -> swarm.controlcenter.v1.HeatmapResponse
-	196, // 336: swarm.controlcenter.v1.ObservatoryService.Axes:output_type -> swarm.controlcenter.v1.AxesResponse
-	199, // 337: swarm.controlcenter.v1.ObservatoryService.Timeline:output_type -> swarm.controlcenter.v1.TimelineResponse
-	201, // 338: swarm.controlcenter.v1.ObservatoryService.WatchTimeline:output_type -> swarm.controlcenter.v1.WatchTimelineResponse
-	205, // 339: swarm.controlcenter.v1.ObservatoryService.Throughput:output_type -> swarm.controlcenter.v1.ThroughputResponse
-	208, // 340: swarm.controlcenter.v1.ObservatoryService.Reports:output_type -> swarm.controlcenter.v1.ReportsResponse
-	210, // 341: swarm.controlcenter.v1.ObservatoryService.RequestReport:output_type -> swarm.controlcenter.v1.RequestReportResponse
-	219, // 342: swarm.controlcenter.v1.ChannelService.ListChannels:output_type -> swarm.controlcenter.v1.ListChannelsResponse
-	221, // 343: swarm.controlcenter.v1.ChannelService.PostToChannel:output_type -> swarm.controlcenter.v1.PostToChannelResponse
-	223, // 344: swarm.controlcenter.v1.ChannelService.ReadChannelMessages:output_type -> swarm.controlcenter.v1.ReadChannelMessagesResponse
-	225, // 345: swarm.controlcenter.v1.ChannelService.GetChannelMessage:output_type -> swarm.controlcenter.v1.GetChannelMessageResponse
-	227, // 346: swarm.controlcenter.v1.ChannelService.MarkChannelRead:output_type -> swarm.controlcenter.v1.MarkChannelReadResponse
-	230, // 347: swarm.controlcenter.v1.ChannelService.GetUnreadSummary:output_type -> swarm.controlcenter.v1.GetUnreadSummaryResponse
-	232, // 348: swarm.controlcenter.v1.ChannelService.SetChannelDelivery:output_type -> swarm.controlcenter.v1.SetChannelDeliveryResponse
-	212, // 349: swarm.controlcenter.v1.ChannelService.WatchChannelItems:output_type -> swarm.controlcenter.v1.WatchChannelItemsResponse
-	215, // 350: swarm.controlcenter.v1.ChannelService.ListMentionables:output_type -> swarm.controlcenter.v1.ListMentionablesResponse
-	235, // 351: swarm.controlcenter.v1.WardenService.ListVerdicts:output_type -> swarm.controlcenter.v1.ListVerdictsResponse
-	237, // 352: swarm.controlcenter.v1.WardenService.DecideVerdict:output_type -> swarm.controlcenter.v1.DecideVerdictResponse
-	239, // 353: swarm.controlcenter.v1.WardenService.WatchVerdicts:output_type -> swarm.controlcenter.v1.WatchVerdictsResponse
-	270, // [270:354] is the sub-list for method output_type
-	186, // [186:270] is the sub-list for method input_type
-	186, // [186:186] is the sub-list for extension type_name
-	186, // [186:186] is the sub-list for extension extendee
-	0,   // [0:186] is the sub-list for field type_name
+	69,  // 57: swarm.controlcenter.v1.WorkspacePlan.github_accounts:type_name -> swarm.controlcenter.v1.GitHubAccountPlan
+	74,  // 58: swarm.controlcenter.v1.ChannelPlan.members:type_name -> swarm.controlcenter.v1.ChannelMemberPlan
+	30,  // 59: swarm.controlcenter.v1.WorkspaceSummary.conditions:type_name -> swarm.controlcenter.v1.Condition
+	73,  // 60: swarm.controlcenter.v1.DefaultChannelsRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
+	75,  // 61: swarm.controlcenter.v1.DefaultChannelsResponse.channels:type_name -> swarm.controlcenter.v1.ChannelPlan
+	77,  // 62: swarm.controlcenter.v1.ListWorkspacesResponse.workspaces:type_name -> swarm.controlcenter.v1.WorkspaceSummary
+	73,  // 63: swarm.controlcenter.v1.GetWorkspaceResponse.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
+	77,  // 64: swarm.controlcenter.v1.GetWorkspaceResponse.summary:type_name -> swarm.controlcenter.v1.WorkspaceSummary
+	100, // 65: swarm.controlcenter.v1.GetWorkspaceResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
+	56,  // 66: swarm.controlcenter.v1.GetWorkspaceResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
+	86,  // 67: swarm.controlcenter.v1.ListRoleTemplatesResponse.templates:type_name -> swarm.controlcenter.v1.RoleTemplateSummary
+	2,   // 68: swarm.controlcenter.v1.Change.action:type_name -> swarm.controlcenter.v1.ChangeAction
+	93,  // 69: swarm.controlcenter.v1.DiscoverGitHubResponse.repos:type_name -> swarm.controlcenter.v1.DiscoveredRepo
+	69,  // 70: swarm.controlcenter.v1.DiscoverGitHubResponse.bots:type_name -> swarm.controlcenter.v1.GitHubAccountPlan
+	73,  // 71: swarm.controlcenter.v1.PreviewWorkspaceRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
+	91,  // 72: swarm.controlcenter.v1.PreviewWorkspaceResponse.changes:type_name -> swarm.controlcenter.v1.Change
+	56,  // 73: swarm.controlcenter.v1.PreviewWorkspaceResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
+	73,  // 74: swarm.controlcenter.v1.ApplyWorkspaceRequest.plan:type_name -> swarm.controlcenter.v1.WorkspacePlan
+	91,  // 75: swarm.controlcenter.v1.ApplyWorkspaceResponse.changes:type_name -> swarm.controlcenter.v1.Change
+	3,   // 76: swarm.controlcenter.v1.RoomSummary.presence:type_name -> swarm.controlcenter.v1.Presence
+	99,  // 77: swarm.controlcenter.v1.RoomSummary.volumes:type_name -> swarm.controlcenter.v1.VolumeUsage
+	30,  // 78: swarm.controlcenter.v1.RoomSummary.conditions:type_name -> swarm.controlcenter.v1.Condition
+	252, // 79: swarm.controlcenter.v1.RoomSummary.presence_since:type_name -> google.protobuf.Timestamp
+	7,   // 80: swarm.controlcenter.v1.RoomSummary.warden_severity:type_name -> swarm.controlcenter.v1.Severity
+	110, // 81: swarm.controlcenter.v1.WatchTranscriptRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	252, // 82: swarm.controlcenter.v1.TranscriptItem.at:type_name -> google.protobuf.Timestamp
+	102, // 83: swarm.controlcenter.v1.WatchTranscriptResponse.item:type_name -> swarm.controlcenter.v1.TranscriptItem
+	110, // 84: swarm.controlcenter.v1.PruneEngineRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 85: swarm.controlcenter.v1.GetRoomSettingsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	54,  // 86: swarm.controlcenter.v1.GetRoomSettingsResponse.workspace:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
+	54,  // 87: swarm.controlcenter.v1.GetRoomSettingsResponse.role:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
+	54,  // 88: swarm.controlcenter.v1.GetRoomSettingsResponse.room:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
+	56,  // 89: swarm.controlcenter.v1.GetRoomSettingsResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
+	251, // 90: swarm.controlcenter.v1.GetRoomSettingsResponse.shared_volumes:type_name -> swarm.controlcenter.v1.GetRoomSettingsResponse.SharedVolumesEntry
+	110, // 91: swarm.controlcenter.v1.UpdateRoomSettingsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	54,  // 92: swarm.controlcenter.v1.UpdateRoomSettingsRequest.settings:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
+	56,  // 93: swarm.controlcenter.v1.UpdateRoomSettingsResponse.effective:type_name -> swarm.controlcenter.v1.EffectiveSettings
+	100, // 94: swarm.controlcenter.v1.ListRoomsResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
+	110, // 95: swarm.controlcenter.v1.GetRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	100, // 96: swarm.controlcenter.v1.GetRoomResponse.room:type_name -> swarm.controlcenter.v1.RoomSummary
+	252, // 97: swarm.controlcenter.v1.GetRoomResponse.credentials_rotated_at:type_name -> google.protobuf.Timestamp
+	110, // 98: swarm.controlcenter.v1.PauseRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 99: swarm.controlcenter.v1.ResumeRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 100: swarm.controlcenter.v1.RecreateRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 101: swarm.controlcenter.v1.RemoveRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 102: swarm.controlcenter.v1.RotateRoomCredentialsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 103: swarm.controlcenter.v1.UpdateRoomNowRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 104: swarm.controlcenter.v1.QuarantineRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 105: swarm.controlcenter.v1.ReleaseRoomRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 106: swarm.controlcenter.v1.StreamRoomLogsRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	110, // 107: swarm.controlcenter.v1.GetRoomResourcesRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	252, // 108: swarm.controlcenter.v1.GetRoomResourcesResponse.at:type_name -> google.protobuf.Timestamp
+	110, // 109: swarm.controlcenter.v1.GetRoomStorageRequest.room:type_name -> swarm.controlcenter.v1.RoomRef
+	99,  // 110: swarm.controlcenter.v1.GetRoomStorageResponse.volumes:type_name -> swarm.controlcenter.v1.VolumeUsage
+	136, // 111: swarm.controlcenter.v1.GetRoomStorageResponse.claims:type_name -> swarm.controlcenter.v1.ClaimInfo
+	140, // 112: swarm.controlcenter.v1.WatchFleetResponse.snapshot:type_name -> swarm.controlcenter.v1.FleetSnapshot
+	100, // 113: swarm.controlcenter.v1.WatchFleetResponse.updated:type_name -> swarm.controlcenter.v1.RoomSummary
+	110, // 114: swarm.controlcenter.v1.WatchFleetResponse.removed:type_name -> swarm.controlcenter.v1.RoomRef
+	100, // 115: swarm.controlcenter.v1.FleetSnapshot.rooms:type_name -> swarm.controlcenter.v1.RoomSummary
+	252, // 116: swarm.controlcenter.v1.InboxMessage.sent_at:type_name -> google.protobuf.Timestamp
+	252, // 117: swarm.controlcenter.v1.ListInboxRequest.before:type_name -> google.protobuf.Timestamp
+	141, // 118: swarm.controlcenter.v1.ListInboxResponse.messages:type_name -> swarm.controlcenter.v1.InboxMessage
+	141, // 119: swarm.controlcenter.v1.SendMessageResponse.message:type_name -> swarm.controlcenter.v1.InboxMessage
+	141, // 120: swarm.controlcenter.v1.WatchInboxResponse.message:type_name -> swarm.controlcenter.v1.InboxMessage
+	252, // 121: swarm.controlcenter.v1.Approval.requested_at:type_name -> google.protobuf.Timestamp
+	252, // 122: swarm.controlcenter.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
+	4,   // 123: swarm.controlcenter.v1.Approval.decision:type_name -> swarm.controlcenter.v1.Decision
+	252, // 124: swarm.controlcenter.v1.Approval.answered_at:type_name -> google.protobuf.Timestamp
+	150, // 125: swarm.controlcenter.v1.ListApprovalsResponse.approvals:type_name -> swarm.controlcenter.v1.Approval
+	4,   // 126: swarm.controlcenter.v1.AnswerApprovalRequest.decision:type_name -> swarm.controlcenter.v1.Decision
+	150, // 127: swarm.controlcenter.v1.AnswerApprovalResponse.approval:type_name -> swarm.controlcenter.v1.Approval
+	150, // 128: swarm.controlcenter.v1.WatchApprovalsResponse.approval:type_name -> swarm.controlcenter.v1.Approval
+	252, // 129: swarm.controlcenter.v1.ListApprovalHistoryRequest.before:type_name -> google.protobuf.Timestamp
+	150, // 130: swarm.controlcenter.v1.ListApprovalHistoryResponse.approvals:type_name -> swarm.controlcenter.v1.Approval
+	5,   // 131: swarm.controlcenter.v1.AuditEntry.source:type_name -> swarm.controlcenter.v1.AuditSource
+	252, // 132: swarm.controlcenter.v1.AuditEntry.at:type_name -> google.protobuf.Timestamp
+	5,   // 133: swarm.controlcenter.v1.QueryAuditRequest.source:type_name -> swarm.controlcenter.v1.AuditSource
+	252, // 134: swarm.controlcenter.v1.QueryAuditRequest.since:type_name -> google.protobuf.Timestamp
+	252, // 135: swarm.controlcenter.v1.QueryAuditRequest.until:type_name -> google.protobuf.Timestamp
+	159, // 136: swarm.controlcenter.v1.QueryAuditResponse.entries:type_name -> swarm.controlcenter.v1.AuditEntry
+	168, // 137: swarm.controlcenter.v1.GetNotificationPrefsResponse.prefs:type_name -> swarm.controlcenter.v1.NotificationPref
+	168, // 138: swarm.controlcenter.v1.SetNotificationPrefsRequest.prefs:type_name -> swarm.controlcenter.v1.NotificationPref
+	176, // 139: swarm.controlcenter.v1.WorkspaceSpend.models:type_name -> swarm.controlcenter.v1.ModelSpend
+	175, // 140: swarm.controlcenter.v1.GetSpendResponse.rooms:type_name -> swarm.controlcenter.v1.RoomSpend
+	177, // 141: swarm.controlcenter.v1.GetSpendResponse.workspaces:type_name -> swarm.controlcenter.v1.WorkspaceSpend
+	252, // 142: swarm.controlcenter.v1.GetSpendResponse.updated_at:type_name -> google.protobuf.Timestamp
+	21,  // 143: swarm.controlcenter.v1.ListUsersResponse.users:type_name -> swarm.controlcenter.v1.User
+	0,   // 144: swarm.controlcenter.v1.SetUserRoleRequest.role:type_name -> swarm.controlcenter.v1.Role
+	21,  // 145: swarm.controlcenter.v1.SetUserRoleResponse.user:type_name -> swarm.controlcenter.v1.User
+	21,  // 146: swarm.controlcenter.v1.SetUserWorkspacesResponse.user:type_name -> swarm.controlcenter.v1.User
+	21,  // 147: swarm.controlcenter.v1.SetUserDisabledResponse.user:type_name -> swarm.controlcenter.v1.User
+	6,   // 148: swarm.controlcenter.v1.Edge.kind:type_name -> swarm.controlcenter.v1.EdgeKind
+	252, // 149: swarm.controlcenter.v1.EdgesRequest.since:type_name -> google.protobuf.Timestamp
+	252, // 150: swarm.controlcenter.v1.EdgesRequest.until:type_name -> google.protobuf.Timestamp
+	188, // 151: swarm.controlcenter.v1.EdgesResponse.edges:type_name -> swarm.controlcenter.v1.Edge
+	252, // 152: swarm.controlcenter.v1.ItemRef.at:type_name -> google.protobuf.Timestamp
+	3,   // 153: swarm.controlcenter.v1.AgentNow.presence:type_name -> swarm.controlcenter.v1.Presence
+	252, // 154: swarm.controlcenter.v1.AgentNow.presence_since:type_name -> google.protobuf.Timestamp
+	191, // 155: swarm.controlcenter.v1.AgentNow.last_item:type_name -> swarm.controlcenter.v1.ItemRef
+	192, // 156: swarm.controlcenter.v1.NowResponse.agents:type_name -> swarm.controlcenter.v1.AgentNow
+	195, // 157: swarm.controlcenter.v1.HeatmapResponse.cells:type_name -> swarm.controlcenter.v1.HeatmapCell
+	252, // 158: swarm.controlcenter.v1.AxesRequest.since:type_name -> google.protobuf.Timestamp
+	198, // 159: swarm.controlcenter.v1.AxesResponse.rows:type_name -> swarm.controlcenter.v1.AxesRow
+	252, // 160: swarm.controlcenter.v1.ActivityEvent.at:type_name -> google.protobuf.Timestamp
+	201, // 161: swarm.controlcenter.v1.TimelineResponse.events:type_name -> swarm.controlcenter.v1.ActivityEvent
+	201, // 162: swarm.controlcenter.v1.WatchTimelineResponse.event:type_name -> swarm.controlcenter.v1.ActivityEvent
+	206, // 163: swarm.controlcenter.v1.ThroughputResponse.days:type_name -> swarm.controlcenter.v1.ThroughputDay
+	207, // 164: swarm.controlcenter.v1.ThroughputResponse.review_latency:type_name -> swarm.controlcenter.v1.ReviewLatency
+	175, // 165: swarm.controlcenter.v1.ThroughputResponse.spend:type_name -> swarm.controlcenter.v1.RoomSpend
+	252, // 166: swarm.controlcenter.v1.Report.at:type_name -> google.protobuf.Timestamp
+	210, // 167: swarm.controlcenter.v1.ReportsResponse.reports:type_name -> swarm.controlcenter.v1.Report
+	221, // 168: swarm.controlcenter.v1.WatchChannelItemsResponse.item:type_name -> swarm.controlcenter.v1.ChannelItem
+	3,   // 169: swarm.controlcenter.v1.Mentionable.presence:type_name -> swarm.controlcenter.v1.Presence
+	217, // 170: swarm.controlcenter.v1.ListMentionablesResponse.mentionables:type_name -> swarm.controlcenter.v1.Mentionable
+	252, // 171: swarm.controlcenter.v1.ChannelItem.sent_at:type_name -> google.protobuf.Timestamp
+	220, // 172: swarm.controlcenter.v1.ListChannelsResponse.channels:type_name -> swarm.controlcenter.v1.ChannelInfo
+	221, // 173: swarm.controlcenter.v1.ReadChannelMessagesResponse.items:type_name -> swarm.controlcenter.v1.ChannelItem
+	221, // 174: swarm.controlcenter.v1.GetChannelMessageResponse.item:type_name -> swarm.controlcenter.v1.ChannelItem
+	233, // 175: swarm.controlcenter.v1.GetUnreadSummaryResponse.counts:type_name -> swarm.controlcenter.v1.UnreadScope
+	7,   // 176: swarm.controlcenter.v1.Verdict.severity:type_name -> swarm.controlcenter.v1.Severity
+	252, // 177: swarm.controlcenter.v1.Verdict.at:type_name -> google.protobuf.Timestamp
+	252, // 178: swarm.controlcenter.v1.Verdict.decided_at:type_name -> google.protobuf.Timestamp
+	7,   // 179: swarm.controlcenter.v1.ListVerdictsRequest.min_severity:type_name -> swarm.controlcenter.v1.Severity
+	252, // 180: swarm.controlcenter.v1.ListVerdictsRequest.before:type_name -> google.protobuf.Timestamp
+	237, // 181: swarm.controlcenter.v1.ListVerdictsResponse.verdicts:type_name -> swarm.controlcenter.v1.Verdict
+	237, // 182: swarm.controlcenter.v1.DecideVerdictResponse.verdict:type_name -> swarm.controlcenter.v1.Verdict
+	237, // 183: swarm.controlcenter.v1.WatchVerdictsResponse.verdict:type_name -> swarm.controlcenter.v1.Verdict
+	51,  // 184: swarm.controlcenter.v1.McpServerPlan.EnvEntry.value:type_name -> swarm.controlcenter.v1.McpValuePlan
+	51,  // 185: swarm.controlcenter.v1.McpServerPlan.HeadersEntry.value:type_name -> swarm.controlcenter.v1.McpValuePlan
+	52,  // 186: swarm.controlcenter.v1.RoomSettingsPlan.McpServersEntry.value:type_name -> swarm.controlcenter.v1.McpServerPlan
+	54,  // 187: swarm.controlcenter.v1.WorkspacePlan.RoleDefaultsEntry.value:type_name -> swarm.controlcenter.v1.RoomSettingsPlan
+	66,  // 188: swarm.controlcenter.v1.WorkspacePlan.RoleAdvisorsEntry.value:type_name -> swarm.controlcenter.v1.AdvisorPlan
+	8,   // 189: swarm.controlcenter.v1.SetupService.GetSetupStatus:input_type -> swarm.controlcenter.v1.GetSetupStatusRequest
+	10,  // 190: swarm.controlcenter.v1.SetupService.ClaimAdmin:input_type -> swarm.controlcenter.v1.ClaimAdminRequest
+	13,  // 191: swarm.controlcenter.v1.AuthService.ListProviders:input_type -> swarm.controlcenter.v1.ListProvidersRequest
+	15,  // 192: swarm.controlcenter.v1.AuthService.LocalLogin:input_type -> swarm.controlcenter.v1.LocalLoginRequest
+	17,  // 193: swarm.controlcenter.v1.AuthService.Logout:input_type -> swarm.controlcenter.v1.LogoutRequest
+	19,  // 194: swarm.controlcenter.v1.AuthService.GetMe:input_type -> swarm.controlcenter.v1.GetMeRequest
+	33,  // 195: swarm.controlcenter.v1.PlatformService.GetPlatform:input_type -> swarm.controlcenter.v1.GetPlatformRequest
+	35,  // 196: swarm.controlcenter.v1.PlatformService.UpdateSignIn:input_type -> swarm.controlcenter.v1.UpdateSignInRequest
+	37,  // 197: swarm.controlcenter.v1.PlatformService.UpdateServices:input_type -> swarm.controlcenter.v1.UpdateServicesRequest
+	39,  // 198: swarm.controlcenter.v1.PlatformService.UpdateHostname:input_type -> swarm.controlcenter.v1.UpdateHostnameRequest
+	41,  // 199: swarm.controlcenter.v1.PlatformService.SetWizardStep:input_type -> swarm.controlcenter.v1.SetWizardStepRequest
+	43,  // 200: swarm.controlcenter.v1.PlatformService.WatchPlatform:input_type -> swarm.controlcenter.v1.WatchPlatformRequest
+	45,  // 201: swarm.controlcenter.v1.PlatformService.SetIsolation:input_type -> swarm.controlcenter.v1.SetIsolationRequest
+	47,  // 202: swarm.controlcenter.v1.PlatformService.RerunPreflight:input_type -> swarm.controlcenter.v1.RerunPreflightRequest
+	80,  // 203: swarm.controlcenter.v1.WorkspaceService.ListWorkspaces:input_type -> swarm.controlcenter.v1.ListWorkspacesRequest
+	82,  // 204: swarm.controlcenter.v1.WorkspaceService.GetWorkspace:input_type -> swarm.controlcenter.v1.GetWorkspaceRequest
+	84,  // 205: swarm.controlcenter.v1.WorkspaceService.SuggestAgentNames:input_type -> swarm.controlcenter.v1.SuggestAgentNamesRequest
+	87,  // 206: swarm.controlcenter.v1.WorkspaceService.ListRoleTemplates:input_type -> swarm.controlcenter.v1.ListRoleTemplatesRequest
+	89,  // 207: swarm.controlcenter.v1.WorkspaceService.ListModels:input_type -> swarm.controlcenter.v1.ListModelsRequest
+	95,  // 208: swarm.controlcenter.v1.WorkspaceService.PreviewWorkspace:input_type -> swarm.controlcenter.v1.PreviewWorkspaceRequest
+	78,  // 209: swarm.controlcenter.v1.WorkspaceService.DefaultChannels:input_type -> swarm.controlcenter.v1.DefaultChannelsRequest
+	92,  // 210: swarm.controlcenter.v1.WorkspaceService.DiscoverGitHub:input_type -> swarm.controlcenter.v1.DiscoverGitHubRequest
+	97,  // 211: swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace:input_type -> swarm.controlcenter.v1.ApplyWorkspaceRequest
+	59,  // 212: swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets:input_type -> swarm.controlcenter.v1.ListRoomSecretsRequest
+	61,  // 213: swarm.controlcenter.v1.WorkspaceService.SetRoomSecret:input_type -> swarm.controlcenter.v1.SetRoomSecretRequest
+	63,  // 214: swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret:input_type -> swarm.controlcenter.v1.DeleteRoomSecretRequest
+	111, // 215: swarm.controlcenter.v1.RoomService.ListRooms:input_type -> swarm.controlcenter.v1.ListRoomsRequest
+	113, // 216: swarm.controlcenter.v1.RoomService.GetRoom:input_type -> swarm.controlcenter.v1.GetRoomRequest
+	115, // 217: swarm.controlcenter.v1.RoomService.PauseRoom:input_type -> swarm.controlcenter.v1.PauseRoomRequest
+	117, // 218: swarm.controlcenter.v1.RoomService.ResumeRoom:input_type -> swarm.controlcenter.v1.ResumeRoomRequest
+	119, // 219: swarm.controlcenter.v1.RoomService.RecreateRoom:input_type -> swarm.controlcenter.v1.RecreateRoomRequest
+	121, // 220: swarm.controlcenter.v1.RoomService.RemoveRoom:input_type -> swarm.controlcenter.v1.RemoveRoomRequest
+	123, // 221: swarm.controlcenter.v1.RoomService.RotateRoomCredentials:input_type -> swarm.controlcenter.v1.RotateRoomCredentialsRequest
+	125, // 222: swarm.controlcenter.v1.RoomService.UpdateRoomNow:input_type -> swarm.controlcenter.v1.UpdateRoomNowRequest
+	127, // 223: swarm.controlcenter.v1.RoomService.QuarantineRoom:input_type -> swarm.controlcenter.v1.QuarantineRoomRequest
+	129, // 224: swarm.controlcenter.v1.RoomService.ReleaseRoom:input_type -> swarm.controlcenter.v1.ReleaseRoomRequest
+	131, // 225: swarm.controlcenter.v1.RoomService.StreamRoomLogs:input_type -> swarm.controlcenter.v1.StreamRoomLogsRequest
+	133, // 226: swarm.controlcenter.v1.RoomService.GetRoomResources:input_type -> swarm.controlcenter.v1.GetRoomResourcesRequest
+	135, // 227: swarm.controlcenter.v1.RoomService.GetRoomStorage:input_type -> swarm.controlcenter.v1.GetRoomStorageRequest
+	106, // 228: swarm.controlcenter.v1.RoomService.GetRoomSettings:input_type -> swarm.controlcenter.v1.GetRoomSettingsRequest
+	108, // 229: swarm.controlcenter.v1.RoomService.UpdateRoomSettings:input_type -> swarm.controlcenter.v1.UpdateRoomSettingsRequest
+	101, // 230: swarm.controlcenter.v1.RoomService.WatchTranscript:input_type -> swarm.controlcenter.v1.WatchTranscriptRequest
+	104, // 231: swarm.controlcenter.v1.RoomService.PruneEngine:input_type -> swarm.controlcenter.v1.PruneEngineRequest
+	138, // 232: swarm.controlcenter.v1.FleetService.WatchFleet:input_type -> swarm.controlcenter.v1.WatchFleetRequest
+	142, // 233: swarm.controlcenter.v1.InboxService.ListInbox:input_type -> swarm.controlcenter.v1.ListInboxRequest
+	144, // 234: swarm.controlcenter.v1.InboxService.SendMessage:input_type -> swarm.controlcenter.v1.SendMessageRequest
+	146, // 235: swarm.controlcenter.v1.InboxService.MarkRead:input_type -> swarm.controlcenter.v1.MarkReadRequest
+	148, // 236: swarm.controlcenter.v1.InboxService.WatchInbox:input_type -> swarm.controlcenter.v1.WatchInboxRequest
+	151, // 237: swarm.controlcenter.v1.ApprovalService.ListApprovals:input_type -> swarm.controlcenter.v1.ListApprovalsRequest
+	153, // 238: swarm.controlcenter.v1.ApprovalService.AnswerApproval:input_type -> swarm.controlcenter.v1.AnswerApprovalRequest
+	155, // 239: swarm.controlcenter.v1.ApprovalService.WatchApprovals:input_type -> swarm.controlcenter.v1.WatchApprovalsRequest
+	157, // 240: swarm.controlcenter.v1.ApprovalService.ListApprovalHistory:input_type -> swarm.controlcenter.v1.ListApprovalHistoryRequest
+	160, // 241: swarm.controlcenter.v1.AuditService.QueryAudit:input_type -> swarm.controlcenter.v1.QueryAuditRequest
+	162, // 242: swarm.controlcenter.v1.NotificationService.GetVapidPublicKey:input_type -> swarm.controlcenter.v1.GetVapidPublicKeyRequest
+	164, // 243: swarm.controlcenter.v1.NotificationService.SubscribeWebPush:input_type -> swarm.controlcenter.v1.SubscribeWebPushRequest
+	166, // 244: swarm.controlcenter.v1.NotificationService.UnsubscribeWebPush:input_type -> swarm.controlcenter.v1.UnsubscribeWebPushRequest
+	169, // 245: swarm.controlcenter.v1.NotificationService.GetNotificationPrefs:input_type -> swarm.controlcenter.v1.GetNotificationPrefsRequest
+	171, // 246: swarm.controlcenter.v1.NotificationService.SetNotificationPrefs:input_type -> swarm.controlcenter.v1.SetNotificationPrefsRequest
+	173, // 247: swarm.controlcenter.v1.NotificationService.SendTestNotification:input_type -> swarm.controlcenter.v1.SendTestNotificationRequest
+	178, // 248: swarm.controlcenter.v1.SpendService.GetSpend:input_type -> swarm.controlcenter.v1.GetSpendRequest
+	180, // 249: swarm.controlcenter.v1.UserService.ListUsers:input_type -> swarm.controlcenter.v1.ListUsersRequest
+	182, // 250: swarm.controlcenter.v1.UserService.SetUserRole:input_type -> swarm.controlcenter.v1.SetUserRoleRequest
+	184, // 251: swarm.controlcenter.v1.UserService.SetUserWorkspaces:input_type -> swarm.controlcenter.v1.SetUserWorkspacesRequest
+	186, // 252: swarm.controlcenter.v1.UserService.SetUserDisabled:input_type -> swarm.controlcenter.v1.SetUserDisabledRequest
+	189, // 253: swarm.controlcenter.v1.ObservatoryService.Edges:input_type -> swarm.controlcenter.v1.EdgesRequest
+	193, // 254: swarm.controlcenter.v1.ObservatoryService.Now:input_type -> swarm.controlcenter.v1.NowRequest
+	196, // 255: swarm.controlcenter.v1.ObservatoryService.Heatmap:input_type -> swarm.controlcenter.v1.HeatmapRequest
+	199, // 256: swarm.controlcenter.v1.ObservatoryService.Axes:input_type -> swarm.controlcenter.v1.AxesRequest
+	202, // 257: swarm.controlcenter.v1.ObservatoryService.Timeline:input_type -> swarm.controlcenter.v1.TimelineRequest
+	204, // 258: swarm.controlcenter.v1.ObservatoryService.WatchTimeline:input_type -> swarm.controlcenter.v1.WatchTimelineRequest
+	208, // 259: swarm.controlcenter.v1.ObservatoryService.Throughput:input_type -> swarm.controlcenter.v1.ThroughputRequest
+	211, // 260: swarm.controlcenter.v1.ObservatoryService.Reports:input_type -> swarm.controlcenter.v1.ReportsRequest
+	213, // 261: swarm.controlcenter.v1.ObservatoryService.RequestReport:input_type -> swarm.controlcenter.v1.RequestReportRequest
+	222, // 262: swarm.controlcenter.v1.ChannelService.ListChannels:input_type -> swarm.controlcenter.v1.ListChannelsRequest
+	224, // 263: swarm.controlcenter.v1.ChannelService.PostToChannel:input_type -> swarm.controlcenter.v1.PostToChannelRequest
+	226, // 264: swarm.controlcenter.v1.ChannelService.ReadChannelMessages:input_type -> swarm.controlcenter.v1.ReadChannelMessagesRequest
+	228, // 265: swarm.controlcenter.v1.ChannelService.GetChannelMessage:input_type -> swarm.controlcenter.v1.GetChannelMessageRequest
+	230, // 266: swarm.controlcenter.v1.ChannelService.MarkChannelRead:input_type -> swarm.controlcenter.v1.MarkChannelReadRequest
+	232, // 267: swarm.controlcenter.v1.ChannelService.GetUnreadSummary:input_type -> swarm.controlcenter.v1.GetUnreadSummaryRequest
+	235, // 268: swarm.controlcenter.v1.ChannelService.SetChannelDelivery:input_type -> swarm.controlcenter.v1.SetChannelDeliveryRequest
+	215, // 269: swarm.controlcenter.v1.ChannelService.WatchChannelItems:input_type -> swarm.controlcenter.v1.WatchChannelItemsRequest
+	218, // 270: swarm.controlcenter.v1.ChannelService.ListMentionables:input_type -> swarm.controlcenter.v1.ListMentionablesRequest
+	238, // 271: swarm.controlcenter.v1.WardenService.ListVerdicts:input_type -> swarm.controlcenter.v1.ListVerdictsRequest
+	240, // 272: swarm.controlcenter.v1.WardenService.DecideVerdict:input_type -> swarm.controlcenter.v1.DecideVerdictRequest
+	242, // 273: swarm.controlcenter.v1.WardenService.WatchVerdicts:input_type -> swarm.controlcenter.v1.WatchVerdictsRequest
+	9,   // 274: swarm.controlcenter.v1.SetupService.GetSetupStatus:output_type -> swarm.controlcenter.v1.GetSetupStatusResponse
+	11,  // 275: swarm.controlcenter.v1.SetupService.ClaimAdmin:output_type -> swarm.controlcenter.v1.ClaimAdminResponse
+	14,  // 276: swarm.controlcenter.v1.AuthService.ListProviders:output_type -> swarm.controlcenter.v1.ListProvidersResponse
+	16,  // 277: swarm.controlcenter.v1.AuthService.LocalLogin:output_type -> swarm.controlcenter.v1.LocalLoginResponse
+	18,  // 278: swarm.controlcenter.v1.AuthService.Logout:output_type -> swarm.controlcenter.v1.LogoutResponse
+	20,  // 279: swarm.controlcenter.v1.AuthService.GetMe:output_type -> swarm.controlcenter.v1.GetMeResponse
+	34,  // 280: swarm.controlcenter.v1.PlatformService.GetPlatform:output_type -> swarm.controlcenter.v1.GetPlatformResponse
+	36,  // 281: swarm.controlcenter.v1.PlatformService.UpdateSignIn:output_type -> swarm.controlcenter.v1.UpdateSignInResponse
+	38,  // 282: swarm.controlcenter.v1.PlatformService.UpdateServices:output_type -> swarm.controlcenter.v1.UpdateServicesResponse
+	40,  // 283: swarm.controlcenter.v1.PlatformService.UpdateHostname:output_type -> swarm.controlcenter.v1.UpdateHostnameResponse
+	42,  // 284: swarm.controlcenter.v1.PlatformService.SetWizardStep:output_type -> swarm.controlcenter.v1.SetWizardStepResponse
+	44,  // 285: swarm.controlcenter.v1.PlatformService.WatchPlatform:output_type -> swarm.controlcenter.v1.WatchPlatformResponse
+	46,  // 286: swarm.controlcenter.v1.PlatformService.SetIsolation:output_type -> swarm.controlcenter.v1.SetIsolationResponse
+	48,  // 287: swarm.controlcenter.v1.PlatformService.RerunPreflight:output_type -> swarm.controlcenter.v1.RerunPreflightResponse
+	81,  // 288: swarm.controlcenter.v1.WorkspaceService.ListWorkspaces:output_type -> swarm.controlcenter.v1.ListWorkspacesResponse
+	83,  // 289: swarm.controlcenter.v1.WorkspaceService.GetWorkspace:output_type -> swarm.controlcenter.v1.GetWorkspaceResponse
+	85,  // 290: swarm.controlcenter.v1.WorkspaceService.SuggestAgentNames:output_type -> swarm.controlcenter.v1.SuggestAgentNamesResponse
+	88,  // 291: swarm.controlcenter.v1.WorkspaceService.ListRoleTemplates:output_type -> swarm.controlcenter.v1.ListRoleTemplatesResponse
+	90,  // 292: swarm.controlcenter.v1.WorkspaceService.ListModels:output_type -> swarm.controlcenter.v1.ListModelsResponse
+	96,  // 293: swarm.controlcenter.v1.WorkspaceService.PreviewWorkspace:output_type -> swarm.controlcenter.v1.PreviewWorkspaceResponse
+	79,  // 294: swarm.controlcenter.v1.WorkspaceService.DefaultChannels:output_type -> swarm.controlcenter.v1.DefaultChannelsResponse
+	94,  // 295: swarm.controlcenter.v1.WorkspaceService.DiscoverGitHub:output_type -> swarm.controlcenter.v1.DiscoverGitHubResponse
+	98,  // 296: swarm.controlcenter.v1.WorkspaceService.ApplyWorkspace:output_type -> swarm.controlcenter.v1.ApplyWorkspaceResponse
+	60,  // 297: swarm.controlcenter.v1.WorkspaceService.ListRoomSecrets:output_type -> swarm.controlcenter.v1.ListRoomSecretsResponse
+	62,  // 298: swarm.controlcenter.v1.WorkspaceService.SetRoomSecret:output_type -> swarm.controlcenter.v1.SetRoomSecretResponse
+	64,  // 299: swarm.controlcenter.v1.WorkspaceService.DeleteRoomSecret:output_type -> swarm.controlcenter.v1.DeleteRoomSecretResponse
+	112, // 300: swarm.controlcenter.v1.RoomService.ListRooms:output_type -> swarm.controlcenter.v1.ListRoomsResponse
+	114, // 301: swarm.controlcenter.v1.RoomService.GetRoom:output_type -> swarm.controlcenter.v1.GetRoomResponse
+	116, // 302: swarm.controlcenter.v1.RoomService.PauseRoom:output_type -> swarm.controlcenter.v1.PauseRoomResponse
+	118, // 303: swarm.controlcenter.v1.RoomService.ResumeRoom:output_type -> swarm.controlcenter.v1.ResumeRoomResponse
+	120, // 304: swarm.controlcenter.v1.RoomService.RecreateRoom:output_type -> swarm.controlcenter.v1.RecreateRoomResponse
+	122, // 305: swarm.controlcenter.v1.RoomService.RemoveRoom:output_type -> swarm.controlcenter.v1.RemoveRoomResponse
+	124, // 306: swarm.controlcenter.v1.RoomService.RotateRoomCredentials:output_type -> swarm.controlcenter.v1.RotateRoomCredentialsResponse
+	126, // 307: swarm.controlcenter.v1.RoomService.UpdateRoomNow:output_type -> swarm.controlcenter.v1.UpdateRoomNowResponse
+	128, // 308: swarm.controlcenter.v1.RoomService.QuarantineRoom:output_type -> swarm.controlcenter.v1.QuarantineRoomResponse
+	130, // 309: swarm.controlcenter.v1.RoomService.ReleaseRoom:output_type -> swarm.controlcenter.v1.ReleaseRoomResponse
+	132, // 310: swarm.controlcenter.v1.RoomService.StreamRoomLogs:output_type -> swarm.controlcenter.v1.StreamRoomLogsResponse
+	134, // 311: swarm.controlcenter.v1.RoomService.GetRoomResources:output_type -> swarm.controlcenter.v1.GetRoomResourcesResponse
+	137, // 312: swarm.controlcenter.v1.RoomService.GetRoomStorage:output_type -> swarm.controlcenter.v1.GetRoomStorageResponse
+	107, // 313: swarm.controlcenter.v1.RoomService.GetRoomSettings:output_type -> swarm.controlcenter.v1.GetRoomSettingsResponse
+	109, // 314: swarm.controlcenter.v1.RoomService.UpdateRoomSettings:output_type -> swarm.controlcenter.v1.UpdateRoomSettingsResponse
+	103, // 315: swarm.controlcenter.v1.RoomService.WatchTranscript:output_type -> swarm.controlcenter.v1.WatchTranscriptResponse
+	105, // 316: swarm.controlcenter.v1.RoomService.PruneEngine:output_type -> swarm.controlcenter.v1.PruneEngineResponse
+	139, // 317: swarm.controlcenter.v1.FleetService.WatchFleet:output_type -> swarm.controlcenter.v1.WatchFleetResponse
+	143, // 318: swarm.controlcenter.v1.InboxService.ListInbox:output_type -> swarm.controlcenter.v1.ListInboxResponse
+	145, // 319: swarm.controlcenter.v1.InboxService.SendMessage:output_type -> swarm.controlcenter.v1.SendMessageResponse
+	147, // 320: swarm.controlcenter.v1.InboxService.MarkRead:output_type -> swarm.controlcenter.v1.MarkReadResponse
+	149, // 321: swarm.controlcenter.v1.InboxService.WatchInbox:output_type -> swarm.controlcenter.v1.WatchInboxResponse
+	152, // 322: swarm.controlcenter.v1.ApprovalService.ListApprovals:output_type -> swarm.controlcenter.v1.ListApprovalsResponse
+	154, // 323: swarm.controlcenter.v1.ApprovalService.AnswerApproval:output_type -> swarm.controlcenter.v1.AnswerApprovalResponse
+	156, // 324: swarm.controlcenter.v1.ApprovalService.WatchApprovals:output_type -> swarm.controlcenter.v1.WatchApprovalsResponse
+	158, // 325: swarm.controlcenter.v1.ApprovalService.ListApprovalHistory:output_type -> swarm.controlcenter.v1.ListApprovalHistoryResponse
+	161, // 326: swarm.controlcenter.v1.AuditService.QueryAudit:output_type -> swarm.controlcenter.v1.QueryAuditResponse
+	163, // 327: swarm.controlcenter.v1.NotificationService.GetVapidPublicKey:output_type -> swarm.controlcenter.v1.GetVapidPublicKeyResponse
+	165, // 328: swarm.controlcenter.v1.NotificationService.SubscribeWebPush:output_type -> swarm.controlcenter.v1.SubscribeWebPushResponse
+	167, // 329: swarm.controlcenter.v1.NotificationService.UnsubscribeWebPush:output_type -> swarm.controlcenter.v1.UnsubscribeWebPushResponse
+	170, // 330: swarm.controlcenter.v1.NotificationService.GetNotificationPrefs:output_type -> swarm.controlcenter.v1.GetNotificationPrefsResponse
+	172, // 331: swarm.controlcenter.v1.NotificationService.SetNotificationPrefs:output_type -> swarm.controlcenter.v1.SetNotificationPrefsResponse
+	174, // 332: swarm.controlcenter.v1.NotificationService.SendTestNotification:output_type -> swarm.controlcenter.v1.SendTestNotificationResponse
+	179, // 333: swarm.controlcenter.v1.SpendService.GetSpend:output_type -> swarm.controlcenter.v1.GetSpendResponse
+	181, // 334: swarm.controlcenter.v1.UserService.ListUsers:output_type -> swarm.controlcenter.v1.ListUsersResponse
+	183, // 335: swarm.controlcenter.v1.UserService.SetUserRole:output_type -> swarm.controlcenter.v1.SetUserRoleResponse
+	185, // 336: swarm.controlcenter.v1.UserService.SetUserWorkspaces:output_type -> swarm.controlcenter.v1.SetUserWorkspacesResponse
+	187, // 337: swarm.controlcenter.v1.UserService.SetUserDisabled:output_type -> swarm.controlcenter.v1.SetUserDisabledResponse
+	190, // 338: swarm.controlcenter.v1.ObservatoryService.Edges:output_type -> swarm.controlcenter.v1.EdgesResponse
+	194, // 339: swarm.controlcenter.v1.ObservatoryService.Now:output_type -> swarm.controlcenter.v1.NowResponse
+	197, // 340: swarm.controlcenter.v1.ObservatoryService.Heatmap:output_type -> swarm.controlcenter.v1.HeatmapResponse
+	200, // 341: swarm.controlcenter.v1.ObservatoryService.Axes:output_type -> swarm.controlcenter.v1.AxesResponse
+	203, // 342: swarm.controlcenter.v1.ObservatoryService.Timeline:output_type -> swarm.controlcenter.v1.TimelineResponse
+	205, // 343: swarm.controlcenter.v1.ObservatoryService.WatchTimeline:output_type -> swarm.controlcenter.v1.WatchTimelineResponse
+	209, // 344: swarm.controlcenter.v1.ObservatoryService.Throughput:output_type -> swarm.controlcenter.v1.ThroughputResponse
+	212, // 345: swarm.controlcenter.v1.ObservatoryService.Reports:output_type -> swarm.controlcenter.v1.ReportsResponse
+	214, // 346: swarm.controlcenter.v1.ObservatoryService.RequestReport:output_type -> swarm.controlcenter.v1.RequestReportResponse
+	223, // 347: swarm.controlcenter.v1.ChannelService.ListChannels:output_type -> swarm.controlcenter.v1.ListChannelsResponse
+	225, // 348: swarm.controlcenter.v1.ChannelService.PostToChannel:output_type -> swarm.controlcenter.v1.PostToChannelResponse
+	227, // 349: swarm.controlcenter.v1.ChannelService.ReadChannelMessages:output_type -> swarm.controlcenter.v1.ReadChannelMessagesResponse
+	229, // 350: swarm.controlcenter.v1.ChannelService.GetChannelMessage:output_type -> swarm.controlcenter.v1.GetChannelMessageResponse
+	231, // 351: swarm.controlcenter.v1.ChannelService.MarkChannelRead:output_type -> swarm.controlcenter.v1.MarkChannelReadResponse
+	234, // 352: swarm.controlcenter.v1.ChannelService.GetUnreadSummary:output_type -> swarm.controlcenter.v1.GetUnreadSummaryResponse
+	236, // 353: swarm.controlcenter.v1.ChannelService.SetChannelDelivery:output_type -> swarm.controlcenter.v1.SetChannelDeliveryResponse
+	216, // 354: swarm.controlcenter.v1.ChannelService.WatchChannelItems:output_type -> swarm.controlcenter.v1.WatchChannelItemsResponse
+	219, // 355: swarm.controlcenter.v1.ChannelService.ListMentionables:output_type -> swarm.controlcenter.v1.ListMentionablesResponse
+	239, // 356: swarm.controlcenter.v1.WardenService.ListVerdicts:output_type -> swarm.controlcenter.v1.ListVerdictsResponse
+	241, // 357: swarm.controlcenter.v1.WardenService.DecideVerdict:output_type -> swarm.controlcenter.v1.DecideVerdictResponse
+	243, // 358: swarm.controlcenter.v1.WardenService.WatchVerdicts:output_type -> swarm.controlcenter.v1.WatchVerdictsResponse
+	274, // [274:359] is the sub-list for method output_type
+	189, // [189:274] is the sub-list for method input_type
+	189, // [189:189] is the sub-list for extension type_name
+	189, // [189:189] is the sub-list for extension extendee
+	0,   // [0:189] is the sub-list for field type_name
 }
 
 func init() { file_swarm_controlcenter_v1_controlcenter_proto_init() }
@@ -16382,19 +16707,19 @@ func file_swarm_controlcenter_v1_controlcenter_proto_init() {
 		return
 	}
 	file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[45].OneofWrappers = []any{}
-	file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[127].OneofWrappers = []any{
+	file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[131].OneofWrappers = []any{
 		(*WatchFleetResponse_Snapshot)(nil),
 		(*WatchFleetResponse_Updated)(nil),
 		(*WatchFleetResponse_Removed)(nil),
 	}
-	file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[214].OneofWrappers = []any{}
+	file_swarm_controlcenter_v1_controlcenter_proto_msgTypes[218].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_swarm_controlcenter_v1_controlcenter_proto_rawDesc), len(file_swarm_controlcenter_v1_controlcenter_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   240,
+			NumMessages:   244,
 			NumExtensions: 0,
 			NumServices:   15,
 		},

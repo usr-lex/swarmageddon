@@ -13,6 +13,7 @@ import (
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	ccv1 "github.com/usr-lex/swarmageddon/gen/swarm/controlcenter/v1"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/auth"
+	"github.com/usr-lex/swarmageddon/internal/controlcenter/githubimport"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/k8s"
 	"github.com/usr-lex/swarmageddon/internal/controlcenter/wizard"
 )
@@ -271,4 +272,35 @@ func (s workspaceSvc) ApplyWorkspace(ctx context.Context, req *connect.Request[c
 	}
 	s.Fleet.Kick()
 	return connect.NewResponse(&ccv1.ApplyWorkspaceResponse{Changes: changes}), nil
+}
+
+// DiscoverGitHub reads a GitHub organization for an import (ADR 0012). The
+// token is used for these calls only; the wizard sends it again, per
+// repository, as the import credential.
+func (s workspaceSvc) DiscoverGitHub(ctx context.Context, req *connect.Request[ccv1.DiscoverGitHubRequest]) (*connect.Response[ccv1.DiscoverGitHubResponse], error) {
+	if _, err := requireRole(ctx, auth.RoleOperator); err != nil {
+		return nil, err
+	}
+	m := req.Msg
+	if m.GetOrg() == "" || m.GetToken() == "" {
+		return nil, errInvalid("the organization and a token are required")
+	}
+	prefix := m.GetAccountPrefix()
+	if prefix == "" {
+		prefix = "bot-"
+	}
+	c := &githubimport.Client{BaseURL: s.Cfg.GitHubAPI, Token: m.GetToken()}
+	d, err := c.Discover(ctx, m.GetOrg(), prefix)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	out := &ccv1.DiscoverGitHubResponse{People: int32(d.People)}
+	for _, r := range d.Repos {
+		out.Repos = append(out.Repos, &ccv1.DiscoveredRepo{Name: r.Name, Description: r.Description, Private: r.Private,
+			Archived: r.Archived, HasWiki: r.HasWiki, OpenIssues: int32(r.OpenIssues)})
+	}
+	for _, b := range d.Bots {
+		out.Bots = append(out.Bots, &ccv1.GitHubAccountPlan{Login: b.Login, Id: b.ID, Room: b.Room})
+	}
+	return connect.NewResponse(out), nil
 }

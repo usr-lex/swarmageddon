@@ -128,6 +128,19 @@ ingress:
         podSelector: {matchLabels: {swarmageddon.dev/component: litellm}}
 ```
 
+### Importing a GitHub organization
+
+In the workspace wizard's Repositories step, **Import from GitHub** takes an
+organization and a read-only fine-grained token (repositories: contents,
+metadata, issues and pull requests). It lists the repositories and the
+`bot-<name>` accounts; each chosen account becomes room `<name>`. Applying
+imports each repository once with its issues, pull requests and reviews,
+comments, labels, milestones, releases and wiki, deletes the token's Secret,
+and, once the rooms' Forgejo users exist, makes the bot accounts' posts the
+rooms' own (the workspace's GitHubHistoryLinked condition). People's posts
+stay "originally by <login>". Large organizations take a while: Forgejo
+imports one repository at a time and GitHub's API limits apply.
+
 ## Rooms
 
 ### Isolation tiers

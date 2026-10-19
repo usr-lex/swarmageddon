@@ -683,6 +683,18 @@ export function createMockApi(mode: string): Api {
       audit("workspace.apply", `Workspace/${draft.name}`, `${draft.rooms.length} rooms`, draft.name);
       save();
     },
+    async discoverGitHub(org, token, prefix) {
+      if (!token) throw new ApiError("invalid_argument", "A token is required.");
+      return {
+        repos: [
+          { name: "api", description: "The public API", private: false, archived: false, hasWiki: true, openIssues: 14 },
+          { name: "web", description: "The web app", private: true, archived: false, hasWiki: false, openIssues: 6 },
+          { name: "old-site", description: "", private: true, archived: true, hasWiki: false, openIssues: 0 },
+        ],
+        bots: ["athena", "hermes", "apollo"].map((n, i) => ({ login: `${prefix}${n}`, id: 9000 + i, room: n })),
+        people: org.length,
+      };
+    },
     async defaultChannels(draft) {
       return defaultChatChannels(draft);
     },

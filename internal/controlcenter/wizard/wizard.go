@@ -69,6 +69,9 @@ func validateRepos(p *ccv1.WorkspacePlan) []string {
 		if !repoRE.MatchString(n) {
 			probs = append(probs, fmt.Sprintf("repository %q: the name is not valid", n))
 		}
+		if r.GetImportGithub() && !strings.HasPrefix(r.GetImportUrl(), "https://github.com/") {
+			probs = append(probs, fmt.Sprintf("repository %q: a GitHub import needs a github.com import URL", n))
+		}
 		for _, c := range []struct{ what, cred, url string }{
 			{"import credential", r.GetImportCredential(), r.GetImportUrl()},
 			{"mirror token", r.GetMirrorToken(), r.GetPushMirror()},
@@ -84,8 +87,25 @@ func validateRepos(p *ccv1.WorkspacePlan) []string {
 			}
 		}
 	}
+	agents := map[string]bool{}
+	for _, a := range p.GetAgents() {
+		agents[a.GetName()] = true
+	}
+	for _, a := range p.GetGithubAccounts() {
+		if !githubLoginRE.MatchString(a.GetLogin()) {
+			probs = append(probs, fmt.Sprintf("GitHub account %q: not a GitHub login", a.GetLogin()))
+		}
+		if a.GetId() <= 0 {
+			probs = append(probs, fmt.Sprintf("GitHub account %s: GitHub user ID is required", a.GetLogin()))
+		}
+		if !agents[a.GetRoom()] {
+			probs = append(probs, fmt.Sprintf("GitHub account %s: no room %s in the plan", a.GetLogin(), a.GetRoom()))
+		}
+	}
 	return probs
 }
+
+var githubLoginRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
 
 var repoRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
@@ -320,7 +340,12 @@ func Build(p *ccv1.WorkspacePlan, cur Current) Desired {
 	s.Repositories = nil
 	for _, r := range p.GetRepositories() {
 		s.Repositories = append(s.Repositories, v1alpha1.RepositorySpec{Name: r.GetName(), ImportURL: r.GetImportUrl(), ImportSecretName: r.GetImportSecretName(),
-			Group: r.GetGroup(), PushMirror: r.GetPushMirror(), MirrorSecretName: r.GetMirrorSecretName(), StatusChecks: r.GetStatusChecks()})
+			Group: r.GetGroup(), PushMirror: r.GetPushMirror(), MirrorSecretName: r.GetMirrorSecretName(), StatusChecks: r.GetStatusChecks(),
+			ImportGitHub: r.GetImportGithub()})
+	}
+	s.GitHubAccounts = nil
+	for _, a := range p.GetGithubAccounts() {
+		s.GitHubAccounts = append(s.GitHubAccounts, v1alpha1.GitHubAccount{Login: a.GetLogin(), ID: a.GetId(), Room: a.GetRoom()})
 	}
 	s.Owners = p.GetOwners()
 	if p.RoomDefaults != nil {
@@ -466,7 +491,11 @@ func FromCluster(cur Current) *ccv1.WorkspacePlan {
 	channelsToPlan(s, p)
 	for _, r := range s.Repositories {
 		p.Repositories = append(p.Repositories, &ccv1.RepositoryPlan{Name: r.Name, ImportUrl: r.ImportURL, ImportSecretName: r.ImportSecretName,
-			Group: r.Group, PushMirror: r.PushMirror, MirrorSecretName: r.MirrorSecretName, StatusChecks: r.StatusChecks})
+			Group: r.Group, PushMirror: r.PushMirror, MirrorSecretName: r.MirrorSecretName, StatusChecks: r.StatusChecks,
+			ImportGithub: r.ImportGitHub})
+	}
+	for _, a := range s.GitHubAccounts {
+		p.GithubAccounts = append(p.GithubAccounts, &ccv1.GitHubAccountPlan{Login: a.Login, Id: a.ID, Room: a.Room})
 	}
 	rooms := append([]v1alpha1.Room(nil), cur.Rooms...)
 	sort.Slice(rooms, func(i, j int) bool { return rooms[i].Name < rooms[j].Name })

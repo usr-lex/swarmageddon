@@ -45,6 +45,8 @@ type Config struct {
 	ForgeURL  string // Forgejo's in-cluster URL, for permission checks
 	// Sentry is what the web UI reports errors with; nil: it doesn't.
 	Sentry *telemetry.BrowserConfig
+	// GitHubAPI is GitHub's REST API base URL for imports; empty: api.github.com.
+	GitHubAPI string
 }
 
 // Server holds every component the API uses.

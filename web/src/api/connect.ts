@@ -412,7 +412,8 @@ function draftFrom(p: pb.WorkspacePlan): WorkspaceDraft {
       recipients: l.recipients,
       requirePrefix: l.requirePrefix,
     })),
-    repositories: p.repositories.map((r) => ({ name: r.name, importURL: r.importUrl, importCredential: "", group: r.group, pushMirror: r.pushMirror, mirrorToken: "" })),
+    repositories: p.repositories.map((r) => ({ name: r.name, importURL: r.importUrl, importCredential: "", group: r.group, pushMirror: r.pushMirror, mirrorToken: "", importGitHub: r.importGithub })),
+    githubAccounts: p.githubAccounts.map((a) => ({ login: a.login, id: Number(a.id), room: a.room })),
     // Write-only channel settings come back empty; an empty target keeps what's stored.
     channels: p.notificationChannels.map((c) => ({ kind: c.kind as ChannelKind, target: c.kind === "ntfy" ? c.topic : "" })),
     events: p.notificationEvents as NotificationEvent[],
@@ -485,6 +486,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
         pushMirror: r.pushMirror,
         importCredential: r.importCredential,
         mirrorToken: r.mirrorToken,
+        importGithub: r.importGitHub ?? false,
       }),
     ),
     notificationChannels: d.channels.map(channel),
@@ -507,6 +509,7 @@ function planTo(d: WorkspaceDraft): pb.WorkspacePlan {
     sharedVolumes: d.sharedVolumes.map((v) => create(pb.SharedVolumePlanSchema, { name: v.name, size: gi(v.sizeGi), storageClass: v.storageClass, mounts: v.mounts })),
     recordKeystrokes: d.recordKeystrokes ?? false,
     modelAccess: d.modelAccess === "direct" ? "direct" : "",
+    githubAccounts: (d.githubAccounts ?? []).map((a) => create(pb.GitHubAccountPlanSchema, { login: a.login, id: BigInt(a.id), room: a.room })),
   });
 }
 
@@ -872,6 +875,14 @@ export function createConnectApi(transport: Transport = createConnectTransport({
     async defaultChannels(draft) {
       const r = await workspaces.defaultChannels({ plan: planTo(draft) });
       return r.channels.map(chatChannelFrom);
+    },
+    async discoverGitHub(org, token, prefix) {
+      const r = await workspaces.discoverGitHub({ org, token, accountPrefix: prefix });
+      return {
+        repos: r.repos.map((x) => ({ name: x.name, description: x.description, private: x.private, archived: x.archived, hasWiki: x.hasWiki, openIssues: x.openIssues })),
+        bots: r.bots.map((b) => ({ login: b.login, id: Number(b.id), room: b.room })),
+        people: r.people,
+      };
     },
     async listRoomSecrets(workspace) {
       const r = await workspaces.listRoomSecrets({ workspace });

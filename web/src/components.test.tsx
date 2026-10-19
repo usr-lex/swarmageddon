@@ -8,6 +8,7 @@ import { createMockApi, MOCK_SETUP_TOKEN } from "@/api/mock";
 import { defaultRoom, emptyDraft } from "@/lib/workspace";
 import { EditRoom } from "@/pages/room/EditRoom";
 import { PreflightStep } from "@/pages/wizard/PreflightStep";
+import { GitHubImport } from "@/pages/workspace/GitHubImport";
 import { ReachDiagram } from "@/pages/workspace/ReachDiagram";
 
 function wrap(ui: ReactNode) {
@@ -133,5 +134,32 @@ describe("EditRoom", () => {
     expect(updateNow).toHaveBeenCalledWith(ws.name, target.name, { kind: "updateNow" });
     const after = await api.getWorkspaceDraft(ws.name);
     expect(after.rooms.filter((r) => r.name !== target.name)).toEqual(draft.rooms.filter((r) => r.name !== target.name));
+  });
+});
+
+describe("GitHubImport", () => {
+  it("adds the chosen repositories as GitHub imports, and rooms and account links for bot accounts", async () => {
+    sessionStorage.clear();
+    setApi(createMockApi("demo"));
+    const set = vi.fn();
+    const draft = { ...emptyDraft("claude-opus-5-5"), org: "acme" };
+    wrap(<GitHubImport draft={draft} set={set} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Token"), "github_pat_x");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await screen.findByTestId("github-found");
+    expect(screen.getByLabelText(/old-site/)).not.toBeChecked(); // archived
+    await user.click(screen.getByLabelText(/bot-apollo/)); // leave one out
+    await user.click(screen.getByRole("button", { name: "Add to the plan" }));
+    const d = set.mock.calls[0][0] as typeof draft;
+    expect(d.repositories.map((r) => [r.name, r.importURL, r.importCredential, r.importGitHub])).toEqual([
+      ["api", "https://github.com/acme/api.git", "github_pat_x", true],
+      ["web", "https://github.com/acme/web.git", "github_pat_x", true],
+    ]);
+    expect(d.rooms.map((r) => r.name)).toEqual(["athena", "hermes"]);
+    expect(d.githubAccounts).toEqual([
+      { login: "bot-athena", id: 9000, room: "athena" },
+      { login: "bot-hermes", id: 9001, room: "hermes" },
+    ]);
   });
 });
