@@ -386,8 +386,19 @@ func (d *Driver) runTUI(ctx context.Context, thread string) {
 	}
 }
 
+// ErrWaitingOnHuman: the turn is blocked on an approval, so a message would
+// be steered into a turn that can't act on it, and marked read. The
+// subscriber keeps it unacked and retries.
+var ErrWaitingOnHuman = errors.New("the agent's turn is waiting on a person's approval; holding the message")
+
+// deliverTimeout bounds one turn/steer or turn/start call, so a hung call
+// fails and is retried instead of holding every later message (messaging
+// allows one unacked delivery).
+const deliverTimeout = 30 * time.Second
+
 // Deliver implements agent.Agent: turn/steer while a turn runs, else
-// turn/start (also when a steer raced the end of the turn).
+// turn/start (also when a steer raced the end of the turn). While the turn
+// waits on a person it holds the message (ErrWaitingOnHuman).
 func (d *Driver) Deliver(ctx context.Context, msgID, text string) error {
 	d.init()
 	d.mu.Lock()
@@ -399,11 +410,16 @@ func (d *Driver) Deliver(ctx context.Context, msgID, text string) error {
 		return ctx.Err()
 	}
 	d.mu.Lock()
-	c, thread, active := d.client, d.thread, d.activeTurn
+	c, thread, active, waiting := d.client, d.thread, d.activeTurn, d.pendingN > 0
 	d.mu.Unlock()
 	if c == nil {
 		return errors.New("ore is restarting")
 	}
+	if waiting {
+		return ErrWaitingOnHuman
+	}
+	ctx, cancel := context.WithTimeout(ctx, deliverTimeout)
+	defer cancel()
 	input := []map[string]any{{"type": "text", "text": text}}
 	if active != "" {
 		err := c.Call(ctx, "turn/steer", map[string]any{"threadId": thread, "input": input, "expectedTurnId": active}, nil)
