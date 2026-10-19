@@ -27,6 +27,7 @@ const (
 	KeyTLSKey         = "tls.key"
 	KeyCA             = "ca.crt"
 	KeyGatewayKey     = "gateway_key"
+	// KeyVNCPassword is no longer issued; the operator removes it.
 	KeyVNCPassword    = "vnc_password"
 	KeyForgeKnownHost = "forge_known_hosts"
 	// KeyAdvisorKey is the advisor's gateway key (ADR 0010), when the room has an advisor.

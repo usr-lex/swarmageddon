@@ -57,7 +57,7 @@ Change them here first.
 | `forgejo-tls` | platform | `tls.crt`, `tls.key`, `ca.crt` for `forge.<hostname>` |
 | `sentry` | system, platform | `dsn`, only when error reporting is on (below). System: made by the chart from `sentry.dsn` (or the admin's own, named by `sentry.existingSecret`); platform: the operator's copy of its `SENTRY_DSN`, owned by the Platform and deleted when the DSN is unset |
 | repository credentials | `ws-<ws>` | named by `RepositorySpec.mirrorSecretName` (push mirror) and `importSecretName` (import): `token`, optional `username` (default `oauth2`). Read only by the operator and handed to Forgejo; never mounted in a room. The control center creates each as a new Secret `repo-<repo>-<kind>-<random>` (kind `import` or `mirror`) (label `swarmageddon.dev/component=repo-credential`) and can't read it back |
-| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `vnc_password`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
+| `room-<name>-identity` | `ws-<ws>` | `id_ed25519`, `id_ed25519.pub`, `gpg_secret.asc`, `forge_token`, `tls.crt`, `tls.key`, `ca.crt`, `gateway_key`, `forge_known_hosts`; when configured: `advisor_key` (ADR 0010), `warden_key` (ADR 0011), `egress_auth` (the egress proxy password; the user is the room name), and `env_<NAME>` per secretEnv variable (design §6.6) |
 
 ## Identities (internal CA)
 

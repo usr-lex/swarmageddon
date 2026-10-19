@@ -436,7 +436,7 @@ per kind:
 | Object | Content |
 |---|---|
 | ServiceAccount `room-<name>` | `automountServiceAccountToken: false`; no RoleBindings |
-| Secret `room-<name>-identity` | SSH key, GPG key, Forgejo token, messaging client certificate and key, gateway key, VNC password |
+| Secret `room-<name>-identity` | SSH key, GPG key, Forgejo token, messaging client certificate and key, gateway key |
 | ConfigMap `room-<name>-persona` | Claude managed settings and CLAUDE.md, or ore `/etc/codex` files; generated instructions |
 | StatefulSet `room-<name>` | 1 replica; volumeClaimTemplates `home` and `engine` |
 | Service `room-<name>` | headless; the VNC port reachable only from the control center |
@@ -535,7 +535,8 @@ On start it:
 4. Starts its services:
    - `podman system service` on `/var/run/docker.sock`
    - Xvfb `:99` with owner-only access (remote-labs' `room-xvfb`)
-   - x11vnc on localhost only, reached through the control center
+   - x11vnc on localhost only, without a password, reached through the
+     control center's audited port-forward
    - the disk janitor
 5. Clones `spec.repos` that are missing.
 6. Starts the agent (ADR 0006 for Claude Code, ADR 0007 for ore). The agent

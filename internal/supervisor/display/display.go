@@ -3,12 +3,7 @@
 // localhost for the control center's noVNC.
 package display
 
-import (
-	"os"
-	"path/filepath"
-
-	"github.com/usr-lex/swarmageddon/internal/supervisor/proc"
-)
+import "github.com/usr-lex/swarmageddon/internal/supervisor/proc"
 
 // Display is the X display number used in rooms.
 const Display = ":99"
@@ -47,28 +42,13 @@ func Openbox(u *proc.User) proc.Spec {
 	return proc.Spec{Name: "openbox", Path: "openbox", Env: []string{"DISPLAY=" + Display}, User: u}
 }
 
-// X11VNC serves the display on 127.0.0.1:5900, with the password from a
-// plain-text file readable only by the agent user.
-func X11VNC(u *proc.User, passwdFile string) proc.Spec {
+// X11VNC serves the display on 127.0.0.1:5900 without a password: only
+// the control center reaches it, through the pods/portforward that needs the
+// operator role and is audited; a password would protect nothing more, and
+// nobody could type it (OpenShift report, issue 6).
+func X11VNC(u *proc.User) proc.Spec {
 	return proc.Spec{
 		Name: "x11vnc", Path: "x11vnc", User: u,
-		Args: []string{"-display", Display, "-localhost", "-rfbport", "5900", "-forever", "-shared", "-passwdfile", passwdFile, "-quiet"},
+		Args: []string{"-display", Display, "-localhost", "-rfbport", "5900", "-forever", "-shared", "-nopw", "-quiet"},
 	}
-}
-
-// WriteVNCPassword writes the password file x11vnc reads (owned by u, 0600).
-func WriteVNCPassword(u *proc.User, password, file string) error {
-	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return err
-	}
-	if err := os.WriteFile(file, []byte(password+"\n"), 0o600); err != nil {
-		return err
-	}
-	if u != nil && os.Getuid() == 0 {
-		if err := os.Chown(filepath.Dir(file), int(u.UID), int(u.GID)); err != nil {
-			return err
-		}
-		return os.Chown(file, int(u.UID), int(u.GID))
-	}
-	return nil
 }

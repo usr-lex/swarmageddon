@@ -426,14 +426,14 @@ func (r *Reconciler) reconcileIdentity(ctx context.Context, room *v1.Room, ws *v
 		}
 		sec.Data[KeyGPGSecret] = []byte(kp.ArmoredPrivate)
 	}
-	if rotating || len(sec.Data[KeyVNCPassword]) == 0 {
-		sec.Data[KeyVNCPassword] = []byte(randomString(6)) // VNC uses at most 8 characters
-	}
+	// The display has no password (x11vnc -nopw on localhost, reached only
+	// through the audited port-forward); drop one an older operator made.
+	delete(sec.Data, KeyVNCPassword)
 	if rotating || len(sec.Data[KeyEgressAuth]) == 0 {
 		sec.Data[KeyEgressAuth] = []byte(randomString(24))
 	}
 	syncSecretEnv(sec, secretEnv)
-	setCond(st, gen, v1.ConditionKeysReady, true, "Generated", "SSH, GPG and VNC credentials are in "+sec.Name)
+	setCond(st, gen, v1.ConditionKeysReady, true, "Generated", "SSH and GPG keys are in "+sec.Name)
 
 	// Messaging identity. A rotated certificate goes on messaging's deny
 	// list once the Secret holds the new one.

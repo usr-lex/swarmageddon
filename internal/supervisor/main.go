@@ -69,11 +69,10 @@ func installPersona(dir string) error {
 // Identity Secret keys the supervisor reads besides the identity files
 // (docs/conventions.md).
 const (
-	KeyGateway     = "gateway_key"
-	KeyAdvisor     = "advisor_key"
-	KeyWarden      = "warden_key"
-	KeyEgressAuth  = "egress_auth"
-	KeyVNCPassword = "vnc_password"
+	KeyGateway    = "gateway_key"
+	KeyAdvisor    = "advisor_key"
+	KeyWarden     = "warden_key"
+	KeyEgressAuth = "egress_auth"
 )
 
 func readSecret(name string) string {
@@ -170,14 +169,7 @@ func Main(ctx context.Context, log *slog.Logger) error {
 	start(eng)
 	start(display.Xvfb(user, ""))
 	start(display.Openbox(user))
-	if pw := readSecret(KeyVNCPassword); pw != "" {
-		file := "/run/swarm/vnc/passwd"
-		if err := display.WriteVNCPassword(user, pw, file); err != nil {
-			log.Warn("vnc password", "err", err)
-		} else {
-			start(display.X11VNC(user, file))
-		}
-	}
+	start(display.X11VNC(user))
 
 	core := &Core{
 		Room: room, CLI: room.CLI, Messaging: msg, Log: log, CoalesceBytes: room.Storm.CoalesceLimit(),

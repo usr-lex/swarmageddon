@@ -139,10 +139,15 @@ func TestProvisionsRoom(t *testing.T) {
 		t.Errorf("status = %+v", r.Status)
 	}
 	sec := e.secret("athena")
-	for _, k := range []string{KeySSHPrivate, KeySSHPublic, KeyGPGSecret, KeyForgeToken, KeyTLSCert, KeyTLSKey, KeyCA, KeyGatewayKey, KeyVNCPassword} {
+	for _, k := range []string{KeySSHPrivate, KeySSHPublic, KeyGPGSecret, KeyForgeToken, KeyTLSCert, KeyTLSKey, KeyCA, KeyGatewayKey} {
 		if len(sec.Data[k]) == 0 {
 			t.Errorf("secret key %s empty", k)
 		}
+	}
+	// The display has no password (x11vnc -nopw on localhost): nobody could
+	// type it (OpenShift report, issue 6).
+	if _, ok := sec.Data[KeyVNCPassword]; ok {
+		t.Error("vnc_password still issued")
 	}
 	if _, ok := sec.Data[KeyForgeKnownHost]; !ok {
 		t.Error("forge_known_hosts key missing")
@@ -260,7 +265,7 @@ func TestRotate(t *testing.T) {
 	e.update("athena", func(r *v1.Room) { r.Annotations = map[string]string{v1.AnnotationRotate: "2026-10-16"} })
 	e.reconcile("athena")
 	sec := e.secret("athena")
-	for _, k := range []string{KeySSHPrivate, KeyGPGSecret, KeyForgeToken, KeyGatewayKey, KeyTLSCert, KeyVNCPassword} {
+	for _, k := range []string{KeySSHPrivate, KeyGPGSecret, KeyForgeToken, KeyGatewayKey, KeyTLSCert} {
 		if string(sec.Data[k]) == string(old.Data[k]) {
 			t.Errorf("%s not rotated", k)
 		}

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { apiMode } from "@/api";
 import { vncURL } from "@/lib/sockets";
-import { Badge, Button, Field, Input } from "./ui";
+import { Badge, Button } from "./ui";
 
 type RFBType = {
   scaleViewport: boolean;
   resizeSession: boolean;
   viewOnly: boolean;
   disconnect(): void;
-  sendCredentials(c: { password: string }): void;
   addEventListener(ev: string, fn: (e: CustomEvent) => void): void;
 };
 
@@ -17,8 +16,6 @@ export function DisplayView({ workspace, room }: { workspace: string; room: stri
   const ref = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFBType | null>(null);
   const [status, setStatus] = useState("connecting");
-  const [needPassword, setNeedPassword] = useState(false);
-  const [password, setPassword] = useState("");
   const [viewOnly, setViewOnly] = useState(true);
   const mock = apiMode() !== "real";
 
@@ -34,7 +31,12 @@ export function DisplayView({ workspace, room }: { workspace: string; room: stri
       rfb.viewOnly = true;
       rfb.addEventListener("connect", () => setStatus("connected"));
       rfb.addEventListener("disconnect", (e) => setStatus(e.detail?.clean ? "disconnected" : "connection lost"));
-      rfb.addEventListener("credentialsrequired", () => setNeedPassword(true));
+      // Rooms serve the display without a password; one that asks runs an
+      // older room image. Say so instead of prompting for a password nobody has.
+      rfb.addEventListener("credentialsrequired", () => {
+        setStatus("display asks for a password: recreate the room to update its image");
+        rfb?.disconnect();
+      });
       rfbRef.current = rfb;
     });
     return () => {
@@ -51,26 +53,11 @@ export function DisplayView({ workspace, room }: { workspace: string; room: stri
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge tone={status === "connected" ? "ok" : "info"}>{mock ? "mock: no display" : status}</Badge>
+        <Badge tone={status === "connected" ? "ok" : status.startsWith("display asks") ? "bad" : "info"}>{mock ? "mock: no display" : status}</Badge>
         <Button onClick={() => setViewOnly(!viewOnly)} aria-pressed={!viewOnly}>
           {viewOnly ? "Take control" : "View only"}
         </Button>
       </div>
-      {needPassword && (
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            rfbRef.current?.sendCredentials({ password });
-            setNeedPassword(false);
-          }}
-        >
-          <Field label="VNC password">{(id) => <Input id={id} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />}</Field>
-          <Button type="submit" variant="primary">
-            Connect
-          </Button>
-        </form>
-      )}
       <div ref={ref} data-testid="display" aria-label={`Display of ${room}`} className="h-[60vh] min-h-64 overflow-hidden rounded-xs border border-border bg-black" />
     </div>
   );
