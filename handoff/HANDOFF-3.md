@@ -46,16 +46,17 @@ nodes and room pods and shows the k3s scheduler's log lines.
 | 5.7 capacity warning | Exists already ("Doesn't fit" in the preview); not changed |
 | 5.7 preflight noise on OpenShift | Fixed: pod/service ranges from `config.openshift.io` Network; Route hint |
 | 7 per-room edit | Fixed: Edit on the room page (plan → preview → apply → update now), no new RPC |
-| 8 bypass LiteLLM | **Not started: needs the owner's design decision** (what is lost: spend, warden gateway guard, advisor) |
+| 8 bypass LiteLLM | Done (ADR 0013): models.access gateway/direct, per-room override, wizard, Edit dialog, room page hint. Not run against real provider logins. |
 
 None of the OpenShift fixes has run on OpenShift.
 
 ## New since session 2
 
-- ADR 0012 (Proposed): importing a GitHub organization with `bot-<room>`
-  accounts mapped to rooms. Forgejo's migration keeps original authors and
-  re-attributes them through linked external logins; there's no API for the
-  link. **Five questions for the owner at the end of the ADR.**
+- GitHub organization import (ADR 0012, accepted with the owner's answers):
+  built end to end (discovery, wizard card, migration with history, token
+  deleted, bot accounts linked to rooms). The attribution SQL was verified on
+  Forgejo 17 with Postgres; nothing has run against github.com yet.
+- The repository is public since 2026-10-19, so CI runners have 4 vCPUs.
 - Forgejo: turning `oidcLogin` off now deletes the auth source (Forgejo 17
   can't deactivate one; it refuses to delete one in use, which is reported).
 

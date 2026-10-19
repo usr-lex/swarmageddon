@@ -82,6 +82,20 @@ and discussions are not migrated; commit authorship stays the git author
    set in the wizard; any can be skipped).
 5. **A read-only fine-grained token**, used for the import and not stored.
 
+## Implementation (2026-10-19)
+
+- Control center: `WorkspaceService.DiscoverGitHub` (internal/controlcenter/
+  githubimport) and the wizard's Import from GitHub card.
+- Operator: `RepositorySpec.importGitHub` (Forgejo's GitHub migration with the
+  whole history; the token's Secret is deleted afterwards) and
+  `WorkspaceSpec.githubAccounts`, linked through an inactive OAuth2 source
+  `github-import` and `external_login_user` rows written with psql, then
+  `update_migration_poster_id` (internal/operator/workspace/githubimport.go).
+- Verified by hand on Forgejo 17 with Postgres: the generated SQL, the
+  inactive source (no sign-in button), and re-attribution of an imported
+  issue. Not yet run against github.com: neither discovery nor a real
+  migration (no token, and this environment blocks GitHub's org API).
+
 ## Questions that were asked
 
 1. One-time import, or keep GitHub and Forgejo in sync for a while (pull
