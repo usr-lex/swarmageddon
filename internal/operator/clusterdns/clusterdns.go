@@ -45,10 +45,10 @@ var wellKnown = []types.NamespacedName{
 	{Namespace: "openshift-dns", Name: "dns-default"},
 }
 
-// Finder discovers the Target and caches it. A nil Finder returns Default.
-//
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=list
+
+// Finder discovers the Target and caches it. A nil Finder returns Default.
 type Finder struct {
 	Reader client.Reader
 	// ResolvConf is read for the nameserver pods use (the operator's own pod

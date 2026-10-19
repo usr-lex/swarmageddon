@@ -61,3 +61,9 @@ readOnlyRootFilesystem: true
 capabilities:
   drop: ["ALL"]
 {{- end -}}
+
+{{/* "true" when rendering for OpenShift (values openshift.enabled: auto, true or false). */}}
+{{- define "swarmageddon.openshift" -}}
+{{- $e := toString .Values.openshift.enabled -}}
+{{- if or (eq $e "true") (and (eq $e "auto") (.Capabilities.APIVersions.Has "security.openshift.io/v1")) -}}true{{- end -}}
+{{- end -}}

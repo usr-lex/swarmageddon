@@ -19,14 +19,14 @@ import (
 
 // Keys of the identity Secret (docs/conventions.md).
 const (
-	KeySSHPrivate     = "id_ed25519"
-	KeySSHPublic      = "id_ed25519.pub"
-	KeyGPGSecret      = "gpg_secret.asc"
-	KeyForgeToken     = "forge_token"
-	KeyTLSCert        = "tls.crt"
-	KeyTLSKey         = "tls.key"
-	KeyCA             = "ca.crt"
-	KeyGatewayKey     = "gateway_key"
+	KeySSHPrivate = "id_ed25519"
+	KeySSHPublic  = "id_ed25519.pub"
+	KeyGPGSecret  = "gpg_secret.asc"
+	KeyForgeToken = "forge_token"
+	KeyTLSCert    = "tls.crt"
+	KeyTLSKey     = "tls.key"
+	KeyCA         = "ca.crt"
+	KeyGatewayKey = "gateway_key"
 	// KeyVNCPassword is no longer issued; the operator removes it.
 	KeyVNCPassword    = "vnc_password"
 	KeyForgeKnownHost = "forge_known_hosts"

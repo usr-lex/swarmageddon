@@ -58,6 +58,9 @@ type Deps struct {
 	// DNS finds the cluster's DNS pods for NetworkPolicies; nil means
 	// kube-system's kube-dns on port 53.
 	DNS *clusterdns.Finder
+	// OpenShift: bind the chart's security context constraints in each
+	// namespace the operator creates (package openshift).
+	OpenShift bool
 }
 
 // ErrNotReady means a platform service isn't deployed or reachable yet;

@@ -20,6 +20,7 @@ import (
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/devices"
 	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
+	"github.com/usr-lex/swarmageddon/internal/operator/preflight"
 )
 
 // Platform endpoints (docs/conventions.md).
@@ -104,10 +105,7 @@ func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
 			AllowPrivilegeEscalation: ptr.To(true),
 			SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
 			AppArmorProfile:          &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined},
-			Capabilities: &corev1.Capabilities{Add: []corev1.Capability{
-				"SYS_ADMIN", "NET_ADMIN", "SETUID", "SETGID", "MKNOD", "CHOWN",
-				"DAC_OVERRIDE", "FOWNER", "SYS_CHROOT", "SETFCAP", "KILL", "AUDIT_WRITE",
-			}},
+			Capabilities:             &corev1.Capabilities{Add: preflight.RoomCapabilities},
 		}
 		one := resource.MustParse("1")
 		for _, rn := range []corev1.ResourceName{devices.ResourceFuse, devices.ResourceTun} {

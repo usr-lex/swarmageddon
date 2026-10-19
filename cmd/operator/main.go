@@ -25,6 +25,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
+	"github.com/usr-lex/swarmageddon/internal/operator/openshift"
 	"github.com/usr-lex/swarmageddon/internal/operator/platform"
 	"github.com/usr-lex/swarmageddon/internal/operator/preflight"
 	"github.com/usr-lex/swarmageddon/internal/operator/room"
@@ -128,6 +129,13 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 	if err != nil {
 		return err
 	}
+	onOpenShift, err := openshift.Detect(dc)
+	if err != nil {
+		return fmt.Errorf("API discovery: %w", err)
+	}
+	if onOpenShift {
+		log.Info("OpenShift: binding the chart's security context constraints in each namespace")
+	}
 	c := mgr.GetClient()
 	d := deps.Deps{
 		PKI:          ca,
@@ -142,9 +150,10 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 		// The platform services report with the operator's settings.
 		Sentry: telemetry.Current(),
 		// Uncached: one lookup every few minutes needs no cluster-wide watch.
-		DNS: &clusterdns.Finder{Reader: mgr.GetAPIReader()},
+		DNS:       &clusterdns.Finder{Reader: mgr.GetAPIReader()},
+		OpenShift: onOpenShift,
 	}
-	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs}
+	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs, OpenShift: onOpenShift}
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {
 		return fmt.Errorf("platform controller: %w", err)
 	}

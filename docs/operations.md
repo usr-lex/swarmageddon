@@ -32,6 +32,23 @@ comes from. Check the fingerprint your browser shows before typing the token.
 The install creates only the operator and the control center, in the
 `swarmageddon-system` namespace. The web wizard deploys everything else.
 
+### OpenShift
+
+Install with `helm install` (as above): the chart sees the
+`security.openshift.io` API and ships two security context constraints,
+`swarmageddon-rooms` (user-namespaced rooms, runners and preflight probes)
+and `swarmageddon-devices` (the device plugin), and lets its own pods use
+`nonroot-v2`. The operator binds the right one in each namespace it creates.
+`helm template` and `install.yaml` can't see the cluster's APIs: add
+`--set openshift.enabled=true` there. Network policies follow the cluster's
+DNS (`openshift-dns`, port 5353) by themselves.
+
+On arm64 OpenShift Local (CRC) on Apple silicon, the node advertises SVE2
+and OpenSSL crashes in LiteLLM (SIGILL, exit 132, no output). Until the
+gateway takes extra environment variables,
+`kubectl -n swarmageddon-platform set env deploy/litellm OPENSSL_armcap=0`
+works around it (the operator may undo it on its next update).
+
 ### Getting the setup token again
 
 ```sh

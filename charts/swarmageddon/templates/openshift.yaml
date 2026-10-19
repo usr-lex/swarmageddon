@@ -1,0 +1,100 @@
+{{- /*
+OpenShift's security context constraints (OpenShift report, issue 5.3). The
+default SCC, restricted-v2, refuses the pods swarmageddon runs: fixed UIDs
+(this chart's pods, the platform services), user-namespaced rooms with added
+capabilities, and the device plugin's hostPath. This file ships two SCCs and
+a ClusterRole to use each; the operator binds them (or OpenShift's own
+nonroot-v2) to the service accounts of each namespace it creates
+(internal/operator/openshift). Rendered when the cluster serves
+security.openshift.io (helm install), or with openshift.enabled=true.
+*/ -}}
+{{- if include "swarmageddon.openshift" . }}
+# Rooms, CI runners and the preflight probes: root and the capabilities apply
+# only inside the pod's user namespace (hostUsers: false is required).
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: swarmageddon-rooms
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+userNamespaceLevel: RequirePodLevel
+allowPrivilegedContainer: false
+allowPrivilegeEscalation: true
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowedCapabilities: [SYS_ADMIN, NET_ADMIN, SETUID, SETGID, MKNOD, SYS_CHROOT, CHOWN, DAC_OVERRIDE, FOWNER, SETFCAP, AUDIT_WRITE, KILL]
+runAsUser: {type: RunAsAny}
+fsGroup: {type: RunAsAny}
+supplementalGroups: {type: RunAsAny}
+seLinuxContext: {type: MustRunAs, seLinuxOptions: {type: container_engine_t}}
+seccompProfiles: ['*']
+volumes: [configMap, csi, downwardAPI, emptyDir, ephemeral, persistentVolumeClaim, projected, secret]
+---
+# The device plugin: hostPath for the kubelet's device-plugin directory and
+# /dev, and the SELinux type that may reach the kubelet's socket.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: swarmageddon-devices
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+allowHostDirVolumePlugin: true
+allowPrivilegedContainer: false
+allowPrivilegeEscalation: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowedCapabilities: []
+requiredDropCapabilities: [ALL]
+runAsUser: {type: RunAsAny}
+fsGroup: {type: RunAsAny}
+supplementalGroups: {type: RunAsAny}
+seLinuxContext: {type: MustRunAs, seLinuxOptions: {type: container_device_plugin_t}}
+seccompProfiles: [runtime/default]
+volumes: [hostPath, configMap, secret, projected, emptyDir, downwardAPI]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-scc-rooms
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [security.openshift.io]
+    resources: [securitycontextconstraints]
+    resourceNames: [swarmageddon-rooms]
+    verbs: [use]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swarmageddon-scc-devices
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [security.openshift.io]
+    resources: [securitycontextconstraints]
+    resourceNames: [swarmageddon-devices]
+    verbs: [use]
+---
+# The operator, the control center and the welcome Job run as UID 65532.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: swarmageddon-scc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "swarmageddon.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:nonroot-v2
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts:{{ .Release.Namespace }}
+{{- end }}

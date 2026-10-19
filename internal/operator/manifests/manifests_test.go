@@ -267,3 +267,25 @@ func TestEgressDNSOnOpenShift(t *testing.T) {
 	}
 	t.Fatal("no egress policy")
 }
+
+// On OpenShift the device plugin runs as container_device_plugin_t, or it
+// can't reach the kubelet's socket (OpenShift report 5.3); elsewhere it
+// keeps the runtime's default.
+func TestDevicesSELinuxType(t *testing.T) {
+	for _, typ := range []string{"", "container_device_plugin_t"} {
+		v := testValues()
+		v.Devices = DevicesValues{Namespace: DevicesNamespace, SELinuxType: typ}
+		objs, err := Render(Devices, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		for _, o := range objs {
+			b, _ := yaml.Marshal(o.Object)
+			found = found || strings.Contains(string(b), "type: container_device_plugin_t")
+		}
+		if found != (typ != "") {
+			t.Errorf("SELinuxType %q: rendered type %v", typ, found)
+		}
+	}
+}

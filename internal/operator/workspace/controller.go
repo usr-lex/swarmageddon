@@ -32,6 +32,7 @@ import (
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/operator/apply"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
+	"github.com/usr-lex/swarmageddon/internal/operator/openshift"
 	"github.com/usr-lex/swarmageddon/internal/operator/room"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
@@ -204,6 +205,11 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 	}
 	if r.Deps.PKI == nil {
 		return fmt.Errorf("no PKI")
+	}
+	if r.Deps.OpenShift {
+		if err := a.Apply(ctx, w, openshift.Binding(ns, openshift.Rooms)); err != nil {
+			return err
+		}
 	}
 	dns, err := r.Deps.DNS.Target(ctx)
 	if err != nil {

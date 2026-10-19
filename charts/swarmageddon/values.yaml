@@ -60,3 +60,9 @@ welcome:
   enabled: true
   # Seconds the finished Job (and its log) is kept.
   ttlSecondsAfterFinished: 3600
+
+openshift:
+  # Ship the security context constraints OpenShift needs (templates/
+  # openshift.yaml): auto when the cluster serves security.openshift.io
+  # (helm install, not helm template), or true/false.
+  enabled: auto

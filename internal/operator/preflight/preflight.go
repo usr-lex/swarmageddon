@@ -63,6 +63,8 @@ type Runner struct {
 	Now func() time.Time
 	// ProbeTimeout bounds each probe pod; default 3 minutes.
 	ProbeTimeout time.Duration
+	// OpenShift: the probes' namespace gets SCC swarmageddon-rooms, as rooms do.
+	OpenShift bool
 }
 
 // Result of a whole run.

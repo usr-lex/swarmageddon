@@ -40,6 +40,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/operator/apply"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/manifests"
+	"github.com/usr-lex/swarmageddon/internal/operator/openshift"
 	"github.com/usr-lex/swarmageddon/internal/operator/preflight"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
@@ -215,6 +216,11 @@ func (r *Reconciler) reconcile(ctx context.Context, logger logr.Logger, p *v1alp
 		}},
 	}); err != nil {
 		return result, err
+	}
+	if r.Deps.OpenShift {
+		if err := r.applier().Apply(ctx, p, openshift.Binding(v1alpha1.PlatformNamespace, openshift.Nonroot)); err != nil {
+			return result, err
+		}
 	}
 
 	ca, err := r.Deps.CAStore.CA(ctx)

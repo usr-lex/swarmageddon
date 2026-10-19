@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/operator/openshift"
 )
 
 type ingressClass struct {
@@ -283,6 +284,12 @@ func (r *Runner) ensureNamespace(ctx context.Context) error {
 	err := r.Client.Create(ctx, ns)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
+	}
+	if r.OpenShift {
+		err := r.Client.Create(ctx, openshift.Binding(Namespace, openshift.Rooms))
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
 	}
 	return nil
 }

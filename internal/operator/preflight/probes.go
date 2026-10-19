@@ -322,6 +322,15 @@ exit 1`, ips[0], ips[1])
 	return c
 }
 
+// RoomCapabilities are what a room's container adds in the userns tier. The
+// podman probe asks for exactly these, so admission (an OpenShift SCC, a
+// policy engine) that refuses a room refuses the probe too (OpenShift
+// report 5.3: the probe passed without KILL and AUDIT_WRITE, rooms didn't).
+var RoomCapabilities = []corev1.Capability{
+	"SYS_ADMIN", "NET_ADMIN", "SETUID", "SETGID", "MKNOD", "CHOWN",
+	"DAC_OVERRIDE", "FOWNER", "SYS_CHROOT", "SETFCAP", "KILL", "AUDIT_WRITE",
+}
+
 // podman: Podman in a user-namespaced pod, from the room image (ADR 0001).
 func (r *Runner) podman(ctx context.Context) v1alpha1.PreflightCheck {
 	c := v1alpha1.PreflightCheck{Name: CheckPodmanUserns}
@@ -332,13 +341,12 @@ func (r *Runner) podman(ctx context.Context) v1alpha1.PreflightCheck {
 	ctr.Command = []string{"podman", "info", "--format", "{{.Host.OCIRuntime.Name}} {{.Store.GraphDriverName}}"}
 	ctr.Resources.Limits = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("256Mi")}
 	ctr.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:       ptr.To[int64](0),
-		ProcMount:       ptr.To(corev1.UnmaskedProcMount),
-		SeccompProfile:  &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
-		AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined},
-		Capabilities: &corev1.Capabilities{Add: []corev1.Capability{
-			"SYS_ADMIN", "NET_ADMIN", "SETUID", "SETGID", "MKNOD", "SYS_CHROOT", "CHOWN", "DAC_OVERRIDE", "FOWNER", "SETFCAP",
-		}},
+		RunAsUser:                ptr.To[int64](0),
+		AllowPrivilegeEscalation: ptr.To(true),
+		ProcMount:                ptr.To(corev1.UnmaskedProcMount),
+		SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
+		AppArmorProfile:          &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined},
+		Capabilities:             &corev1.Capabilities{Add: RoomCapabilities},
 	}
 	p, err := r.run(ctx, pod, true)
 	if err != nil {

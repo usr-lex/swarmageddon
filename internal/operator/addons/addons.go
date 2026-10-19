@@ -33,6 +33,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 	"github.com/usr-lex/swarmageddon/internal/operator/manifests"
+	"github.com/usr-lex/swarmageddon/internal/operator/openshift"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
 
@@ -136,7 +137,11 @@ func (r *Reconciler) devices(ctx context.Context, p *v1alpha1.Platform) error {
 		ds := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: manifests.DevicesNamespace, Name: "devices"}}
 		return client.IgnoreNotFound(r.Delete(ctx, ds))
 	}
-	objs, err := manifests.Render(manifests.Devices, manifests.Values{Images: r.images(), Devices: manifests.DevicesValues{Namespace: manifests.DevicesNamespace}})
+	dv := manifests.DevicesValues{Namespace: manifests.DevicesNamespace}
+	if r.Deps.OpenShift {
+		dv.SELinuxType = openshift.DevicePluginSELinuxType
+	}
+	objs, err := manifests.Render(manifests.Devices, manifests.Values{Images: r.images(), Devices: dv})
 	if err != nil {
 		return err
 	}
@@ -144,6 +149,9 @@ func (r *Reconciler) devices(ctx context.Context, p *v1alpha1.Platform) error {
 		if err := r.applier().Apply(ctx, p, o); err != nil {
 			return err
 		}
+	}
+	if r.Deps.OpenShift {
+		return r.applier().Apply(ctx, p, openshift.Binding(manifests.DevicesNamespace, openshift.Devices))
 	}
 	return nil
 }

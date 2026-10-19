@@ -192,6 +192,16 @@
   - update
   - watch
 - apiGroups:
+  - rbac.authorization.k8s.io
+  resourceNames:
+  - swarmageddon-scc-devices
+  - swarmageddon-scc-rooms
+  - system:openshift:scc:nonroot-v2
+  resources:
+  - clusterroles
+  verbs:
+  - bind
+- apiGroups:
   - storage.k8s.io
   resources:
   - storageclasses

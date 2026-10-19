@@ -44,6 +44,9 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
             seccompProfile: {type: RuntimeDefault}
+{{- if .Devices.SELinuxType }}
+            seLinuxOptions: {type: {{ .Devices.SELinuxType }}}
+{{- end }}
           volumeMounts:
             - {name: device-plugins, mountPath: /var/lib/kubelet/device-plugins}
             - {name: dev, mountPath: /host/dev, readOnly: true}

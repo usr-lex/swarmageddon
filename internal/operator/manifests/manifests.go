@@ -119,6 +119,9 @@ type SentryValues struct {
 
 type DevicesValues struct {
 	Namespace string
+	// SELinuxType for the plugin's container, so it may reach the kubelet's
+	// socket (OpenShift: container_device_plugin_t); empty leaves the default.
+	SELinuxType string
 }
 
 // Database is one service's role and database in PostgreSQL.
