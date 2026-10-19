@@ -63,6 +63,8 @@ None of the OpenShift fixes has run on OpenShift.
 
 - Local `make e2e`: not possible in this container's disk quota (the room
   image build peaks ~20 GB).
-- Remaining smaller gaps from HANDOFF-2: platform default-deny blocks
-  in-cluster model providers; cert-manager covers only the control center;
-  diskLow semantics.
+- Smaller gaps from HANDOFF-2, now closed: cert-manager also issues
+  forge.<hostname>'s certificate; the workspace diskLow follows the
+  design's 15% node rule (pool condition NodeDiskLow); in-cluster model
+  servers are documented (LiteLLM may reach any namespace; the platform
+  namespace's default-deny only blocks servers deployed inside it).
