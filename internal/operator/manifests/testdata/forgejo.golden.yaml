@@ -124,6 +124,18 @@ spec:
           value: private
         - name: FORGEJO__log__LEVEL
           value: Info
+        - name: FORGEJO__repository_0X2E_signing__FORMAT
+          value: ssh
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_KEY
+          value: /etc/forgejo/signing/key.pub
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_NAME
+          value: Forgejo
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_EMAIL
+          value: forgejo@forgejo.swarmageddon-platform.svc
+        - name: FORGEJO__repository_0X2E_signing__MERGES
+          value: always
+        - name: FORGEJO__repository_0X2E_signing__CRUD_ACTIONS
+          value: always
         - name: SSL_CERT_DIR
           value: /etc/ssl/certs:/etc/swarm/ca
         image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
@@ -162,6 +174,9 @@ spec:
           name: tmp
         - mountPath: /etc/swarm/ca
           name: ca
+          readOnly: true
+        - mountPath: /etc/forgejo/signing
+          name: signing
           readOnly: true
       enableServiceLinks: false
       initContainers:
@@ -248,6 +263,18 @@ spec:
           value: private
         - name: FORGEJO__log__LEVEL
           value: Info
+        - name: FORGEJO__repository_0X2E_signing__FORMAT
+          value: ssh
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_KEY
+          value: /etc/forgejo/signing/key.pub
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_NAME
+          value: Forgejo
+        - name: FORGEJO__repository_0X2E_signing__SIGNING_EMAIL
+          value: forgejo@forgejo.swarmageddon-platform.svc
+        - name: FORGEJO__repository_0X2E_signing__MERGES
+          value: always
+        - name: FORGEJO__repository_0X2E_signing__CRUD_ACTIONS
+          value: always
         - name: SSL_CERT_DIR
           value: /etc/ssl/certs:/etc/swarm/ca
         image: codeberg.org/forgejo/forgejo:17.0.0-rootless@sha256:6554520f7574602100b7d6620c6ac5b18cec30325f823777497eac36234f5cf8
@@ -265,6 +292,9 @@ spec:
         - mountPath: /etc/swarm/ca
           name: ca
           readOnly: true
+        - mountPath: /etc/forgejo/signing
+          name: signing
+          readOnly: true
       securityContext:
         fsGroup: 1000
         runAsGroup: 1000
@@ -278,6 +308,15 @@ spec:
       - configMap:
           name: platform-ca-bundle
         name: ca
+      - name: signing
+        secret:
+          defaultMode: 288
+          items:
+          - key: signingKey
+            path: key
+          - key: signingKey.pub
+            path: key.pub
+          secretName: forgejo-secrets
   volumeClaimTemplates:
   - metadata:
       name: data

@@ -12,6 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/gateway"
@@ -190,6 +191,20 @@ func dbNames() string {
 	return strings.Join(n, ", ")
 }
 
+// ensureForgejoSecrets keeps Forgejo's secret key and the SSH key it signs
+// merges with (§9.3); a Secret from before the key gets one added.
+func (r *Reconciler) ensureForgejoSecrets(ctx context.Context, owner client.Object) error {
+	_, err := r.ensureSecret(ctx, owner, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "forgejo-secrets"}, "forgejo",
+		func() (map[string][]byte, error) {
+			priv, pub, err := newSSHKey("forgejo")
+			if err != nil {
+				return nil, err
+			}
+			return map[string][]byte{"secretKey": []byte(randomHex(32)), "signingKey": priv, "signingKey.pub": pub}, nil
+		})
+	return err
+}
+
 func (r *Reconciler) applyForgejo(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {
 	ns := v1alpha1.PlatformNamespace
 	admin, err := r.ensureSecret(ctx, p, types.NamespacedName{Namespace: ns, Name: "forgejo-admin"}, "forgejo",
@@ -197,8 +212,7 @@ func (r *Reconciler) applyForgejo(ctx context.Context, p *v1alpha1.Platform, v m
 	if err != nil {
 		return false, "", err
 	}
-	if _, err := r.ensureSecret(ctx, p, types.NamespacedName{Namespace: ns, Name: "forgejo-secrets"}, "forgejo",
-		staticData(map[string]string{"secretKey": randomHex(32)})); err != nil {
+	if err := r.ensureForgejoSecrets(ctx, p); err != nil {
 		return false, "", err
 	}
 	if err := r.render(ctx, p, manifests.Forgejo, v); err != nil {

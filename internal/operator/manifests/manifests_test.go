@@ -116,6 +116,19 @@ func TestForgejoConfig(t *testing.T) {
 		!strings.Contains(s, "name: platform-ca-bundle") {
 		t.Error("forgejo does not trust the platform CA")
 	}
+	// Merges into branches that require signed commits are signed by the
+	// instance's SSH key; without one Forgejo refuses them ("won't sign:
+	// nokey"), and its default conditions (twofa) never hold for agents.
+	for _, want := range []string{
+		"FORGEJO__repository_0X2E_signing__FORMAT", "value: ssh",
+		"FORGEJO__repository_0X2E_signing__SIGNING_KEY", "/etc/forgejo/signing/key.pub",
+		"FORGEJO__repository_0X2E_signing__MERGES", "FORGEJO__repository_0X2E_signing__CRUD_ACTIONS",
+		"secretName: forgejo-secrets", "key: signingKey.pub",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("forgejo manifest lacks %s", want)
+		}
+	}
 }
 
 // TestSentry: with a DSN, messaging, the warden and egress get SENTRY_* (the

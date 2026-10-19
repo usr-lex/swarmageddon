@@ -35,6 +35,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
+      # The room and runner images are large; the amd64 runner ran out of
+      # disk building the Go images after them.
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod

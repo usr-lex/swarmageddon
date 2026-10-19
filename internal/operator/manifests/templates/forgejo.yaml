@@ -88,6 +88,15 @@ spec:
             - {name: FORGEJO__repository__DEFAULT_PRIVATE, value: private}
             - {name: FORGEJO__webhook__ALLOWED_HOST_LIST, value: private}
             - {name: FORGEJO__log__LEVEL, value: Info}
+            # The instance signs merges and web edits with its SSH key, so
+            # branches that require signed commits can be merged (§9.3);
+            # Forgejo's default conditions (pubkey, twofa) never hold for agents.
+            - {name: FORGEJO__repository_0X2E_signing__FORMAT, value: ssh}
+            - {name: FORGEJO__repository_0X2E_signing__SIGNING_KEY, value: /etc/forgejo/signing/key.pub}
+            - {name: FORGEJO__repository_0X2E_signing__SIGNING_NAME, value: Forgejo}
+            - {name: FORGEJO__repository_0X2E_signing__SIGNING_EMAIL, value: {{ printf "forgejo@%s" .Forgejo.Domain | quote }}}
+            - {name: FORGEJO__repository_0X2E_signing__MERGES, value: always}
+            - {name: FORGEJO__repository_0X2E_signing__CRUD_ACTIONS, value: always}
             # Webhooks go to https://control-center.<system>.svc, whose
             # certificate is from the platform CA. Go reads every file in
             # SSL_CERT_DIR's directories on top of the system bundle file,
@@ -99,6 +108,7 @@ spec:
             - {name: data, mountPath: /var/lib/gitea}
             - {name: tmp, mountPath: /tmp/gitea}
             - {name: ca, mountPath: /etc/swarm/ca, readOnly: true}
+            - {name: signing, mountPath: /etc/forgejo/signing, readOnly: true}
       containers:
         - name: forgejo
           image: {{ .Images.Forgejo }}
@@ -121,11 +131,19 @@ spec:
             - {name: data, mountPath: /var/lib/gitea}
             - {name: tmp, mountPath: /tmp/gitea}
             - {name: ca, mountPath: /etc/swarm/ca, readOnly: true}
+            - {name: signing, mountPath: /etc/forgejo/signing, readOnly: true}
       volumes:
         - name: tmp
           emptyDir: {}
         - name: ca
           configMap: {name: platform-ca-bundle}
+        - name: signing
+          secret:
+            secretName: forgejo-secrets
+            defaultMode: 0440
+            items:
+              - {key: signingKey, path: key}
+              - {key: signingKey.pub, path: key.pub}
   volumeClaimTemplates:
     - metadata:
         name: data

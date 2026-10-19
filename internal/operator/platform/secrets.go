@@ -2,12 +2,16 @@ package platform
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
+	"strings"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
+	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +38,23 @@ func randomBytes(n int) []byte {
 		panic(err)
 	}
 	return b
+}
+
+// newSSHKey returns an OpenSSH ed25519 private key and its authorized_keys line.
+func newSSHKey(comment string) (priv, pub []byte, err error) {
+	pk, sk, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	block, err := ssh.MarshalPrivateKey(sk, comment)
+	if err != nil {
+		return nil, nil, err
+	}
+	sp, err := ssh.NewPublicKey(pk)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pem.EncodeToMemory(block), []byte(strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sp))) + " " + comment + "\n"), nil
 }
 
 // NewSetupToken is 32 random bytes in unpadded base32 (design §3.3).
