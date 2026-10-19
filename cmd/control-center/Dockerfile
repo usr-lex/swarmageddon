@@ -1,7 +1,15 @@
 # control-center: a static Go binary on distroless. Build from the repository root:
 #   docker build -f cmd/control-center/Dockerfile -t ghcr.io/usr-lex/swarmageddon/control-center:dev .
-# The web UI build stage (Vite, into web/dist) will be added in front of the
-# Go stage; until then web/embed.go serves a placeholder page.
+# The web UI is built by Vite into web/dist and embedded in the binary
+# (web/embed.go); the build fails if the UI did not build, rather than ship
+# the placeholder page.
+FROM node:24 AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY web/ ./
+RUN npm run build && test -s dist/index.html
+
 FROM golang:1.26 AS build
 ARG VERSION=dev
 ENV GOTOOLCHAIN=go1.26.9 CGO_ENABLED=0
@@ -12,6 +20,8 @@ RUN --mount=type=secret,id=build_ca,required=false \
     if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
     go mod download
 COPY . .
+COPY --from=web /web/dist/ web/dist/
+RUN test -s web/dist/index.html
 RUN go build -trimpath -ldflags "-s -w -X github.com/usr-lex/swarmageddon/internal/version.Version=${VERSION}" \
       -o /out/control-center ./cmd/control-center
 
