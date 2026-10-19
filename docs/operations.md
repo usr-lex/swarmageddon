@@ -112,6 +112,22 @@ kubectl -n ws-acme get rooms                   # phase of each room
 kubectl -n ws-acme describe room athena        # conditions: forge account, keys, gateway key, pod
 ```
 
+### Models served inside the cluster
+
+A provider of kind `openaiCompatible` can point at a model server in the
+cluster (vLLM, Ollama, a LiteLLM of your own), e.g.
+`baseURL: http://vllm.models.svc:8000/v1`. LiteLLM may reach any namespace,
+but run the server in a namespace of its own: the platform namespace denies
+ingress to anything the operator doesn't deploy. If that namespace has its
+own NetworkPolicies, allow LiteLLM in:
+
+```yaml
+ingress:
+  - from:
+      - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: swarmageddon-platform}}
+        podSelector: {matchLabels: {swarmageddon.dev/component: litellm}}
+```
+
 ## Rooms
 
 ### Isolation tiers
