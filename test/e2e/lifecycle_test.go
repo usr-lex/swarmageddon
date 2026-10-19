@@ -82,20 +82,41 @@ func (s *suite) addRemoveRoom(t *testing.T) {
 }
 
 // gatewayStatus asks the gateway for a model reply with the room's own key,
-// from inside the room, and returns the HTTP status.
-func (s *suite) gatewayStatus(room string) (string, error) {
-	out, err := s.inRoom(room, `curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X POST `+
-		`http://gateway.swarmageddon-platform.svc:4000/v1/messages -H "x-api-key: $(cat /run/swarm/identity/gateway_key)" `+
-		`-H 'content-type: application/json' -H 'anthropic-version: 2023-06-01' `+
-		`-d '{"model":"mock-claude","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}'`)
+// from inside the room, and returns the HTTP status. api is messages
+// (Anthropic, as Claude Code calls it) or responses (OpenAI, as ore does).
+func (s *suite) gatewayStatus(room, api, model string) (string, error) {
+	body := `{"model":"` + model + `","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}`
+	if api == "responses" {
+		body = `{"model":"` + model + `","input":"ping"}`
+	}
+	out, err := s.inRoomAsRoot(room, `k=$(cat /run/swarm/identity/gateway_key); curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X POST `+
+		`http://gateway.swarmageddon-platform.svc:4000/v1/`+api+` -H "x-api-key: $k" -H "Authorization: Bearer $k" `+
+		`-H 'content-type: application/json' -H 'anthropic-version: 2023-06-01' -d '`+body+`'`)
 	return strings.TrimSpace(out), err
 }
+
+// modelReplies: each CLI's model API answers through the gateway (warden,
+// LiteLLM, the mock model) with a room's own key (§10.1, §14).
+func (s *suite) modelReplies(t *testing.T) {
+	for _, c := range []struct{ room, api, model string }{
+		{"athena", "messages", "mock-claude"},
+		{"hermes", "responses", "mock-ore"},
+	} {
+		if code, err := s.gatewayStatus(c.room, c.api, c.model); err != nil || code != "200" {
+			t.Errorf("%s: POST /v1/%s (%s) through the gateway: %v: HTTP %s, want 200", c.room, c.api, c.model, err, code)
+		}
+	}
+}
+
+// passed says the warden let a request through to LiteLLM: anything but its
+// refusals (401 unknown key, 403 quarantined) or no answer.
+func passed(code string) bool { return code != "" && code != "000" && code != "401" && code != "403" }
 
 // quarantine quarantines athena from the control center and checks the warden
 // refuses her model requests with 403 until she is released (§6.5).
 func (s *suite) quarantine(t *testing.T) {
-	if code, err := s.gatewayStatus("athena"); err != nil || code != "200" {
-		t.Errorf("athena's gateway request before the quarantine: %v: HTTP %s, want 200", err, code)
+	if code, err := s.gatewayStatus("athena", "messages", "mock-claude"); err != nil || !passed(code) {
+		t.Errorf("athena's gateway request before the quarantine: %v: HTTP %s, want it passed on", err, code)
 	}
 	if _, err := call(s.cc.rooms.QuarantineRoom, &ccv1.QuarantineRoomRequest{Room: ref("athena"), Reason: "e2e " + s.nonce}); err != nil {
 		t.Fatalf("QuarantineRoom: %v", err)
@@ -117,22 +138,22 @@ func (s *suite) quarantine(t *testing.T) {
 		return nil
 	})
 	s.eventually(t, 3*time.Minute, "the warden refuses athena with 403", func() error {
-		code, err := s.gatewayStatus("athena")
+		code, err := s.gatewayStatus("athena", "messages", "mock-claude")
 		if err != nil || code != "403" {
 			return fmt.Errorf("%v: HTTP %s", err, code)
 		}
 		return nil
 	})
-	if code, err := s.gatewayStatus("artemis"); err != nil || code != "200" {
-		t.Errorf("artemis (not quarantined) while athena is: %v: HTTP %s, want 200", err, code)
+	if code, err := s.gatewayStatus("artemis", "messages", "mock-claude"); err != nil || !passed(code) {
+		t.Errorf("artemis (not quarantined) while athena is: %v: HTTP %s, want it passed on", err, code)
 	}
 	if _, err := call(s.cc.rooms.ReleaseRoom, &ccv1.ReleaseRoomRequest{Room: ref("athena"), Note: "e2e: checked"}); err != nil {
 		t.Fatalf("ReleaseRoom: %v", err)
 	}
 	released = true
-	s.eventually(t, 3*time.Minute, "athena's gateway requests work again", func() error {
-		code, err := s.gatewayStatus("athena")
-		if err != nil || code != "200" {
+	s.eventually(t, 3*time.Minute, "athena's gateway requests pass again", func() error {
+		code, err := s.gatewayStatus("athena", "messages", "mock-claude")
+		if err != nil || !passed(code) {
 			return fmt.Errorf("%v: HTTP %s", err, code)
 		}
 		return nil
