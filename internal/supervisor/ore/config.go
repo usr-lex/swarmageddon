@@ -4,6 +4,7 @@ package ore
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"os"
 	"sort"
@@ -41,6 +42,9 @@ type Policy struct {
 	SwarmCommand string
 	// SwarmEnv is passed to `swarm mcp` (e.g. SWARM_SOCKET in tests).
 	SwarmEnv map[string]string
+	// SwarmToolsApproval is swarm's default_tools_approval_mode (default
+	// "approve"); the canary sets "prompt" to test the driver's answer.
+	SwarmToolsApproval string
 }
 
 func (p Policy) approval() string {
@@ -120,7 +124,7 @@ func Config(p Policy) ([]byte, error) {
 	swarm := map[string]any{
 		"command":                     p.swarm(),
 		"args":                        []string{"mcp"},
-		"default_tools_approval_mode": "approve",
+		"default_tools_approval_mode": cmp.Or(p.SwarmToolsApproval, "approve"),
 	}
 	if tools := p.MCPTools["swarm"]; len(tools) > 0 && (len(tools) != 1 || tools[0] != "*") {
 		swarm["enabled_tools"] = tools

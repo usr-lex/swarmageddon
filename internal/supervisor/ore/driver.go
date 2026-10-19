@@ -57,6 +57,16 @@ type Driver struct {
 	approvals  map[string]context.CancelFunc
 	pendingN   int
 	items      map[string]json.RawMessage
+	// swarmAsked counts swarm tool approvals ore asked for despite the
+	// config's default_tools_approval_mode; the canary expects none.
+	swarmAsked int
+}
+
+// SwarmApprovalsAsked is how many times ore asked to approve a swarm tool.
+func (d *Driver) SwarmApprovalsAsked() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.swarmAsked
 }
 
 func (d *Driver) init() {
@@ -607,6 +617,10 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 		e := classifyElicitation(params)
 		switch {
 		case e.Auto:
+			d.mu.Lock()
+			d.swarmAsked++
+			d.mu.Unlock()
+			d.Log.Warn("ore asked to approve a swarm tool; approved for the session (check default_tools_approval_mode)")
 			if err := c.Respond(ctx, id, e.Result); err != nil {
 				d.Log.Warn("answering a swarm tool approval", "err", err)
 			}

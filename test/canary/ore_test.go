@@ -200,6 +200,10 @@ func TestOre(t *testing.T) {
 			}
 			return false
 		})
+		// The config pre-approves swarm: ore must not ask (OpenShift report 3).
+		if n := drv.SwarmApprovalsAsked(); n != 0 {
+			t.Errorf("ore asked %d times to approve a swarm tool", n)
+		}
 	})
 
 	t.Run("resume after restart", func(t *testing.T) {
@@ -282,5 +286,72 @@ func TestOreSchemaSnapshot(t *testing.T) {
 	}
 	if string(want) != string(b) {
 		t.Errorf("ore app-server schema changed for the methods we use; review the diff, update the supervisor, then run with -update-schema")
+	}
+}
+
+// With swarm's tools not pre-approved, ore 1.161 asks through
+// mcpServer/elicitation/request; the driver answers for the room's own
+// tools, so the call goes through without a person (OpenShift report 3).
+func TestOreAsksForSwarmTools(t *testing.T) {
+	bin := oreBinary(t)
+	swarmBin := buildSwarm(t)
+	m, url := mock(t, oreScript)
+	home := shortTemp(t)
+	work := filepath.Join(home, "work")
+	codexHome := filepath.Join(home, ".ore")
+	os.MkdirAll(work, 0o755)
+	os.MkdirAll(filepath.Join(codexHome, "rules"), 0o755)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	var drv *ore.Driver
+	r := newRoom(t, ctx, "ore", func(c *supervisor.Core) agent.Agent {
+		drv = &ore.Driver{Home: home, WorkDir: work, CodexHome: codexHome, Events: c, Log: c.Log}
+		return drv
+	})
+	policy := ore.Policy{
+		GatewayURL: url + "/v1", WireAPI: "responses", Model: "gpt-mock",
+		SwarmCommand: swarmBin, SwarmEnv: map[string]string{"SWARM_SOCKET": r.sock},
+		SwarmToolsApproval: "prompt",
+	}
+	req, err := ore.Requirements(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ore.Config(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drv.Binary = etcOverlay(t, map[string][]byte{"codex/requirements.toml": req, "codex/config.toml": cfg}, bin)
+	drv.Socket = filepath.Join(shortTemp(t), "ore.sock")
+	drv.Env = []string{"HOME=" + home, ore.GatewayKeyEnv + "=canary-key"}
+	drv.Settings = ore.UserSettings{Model: "gpt-mock"}
+	drv.FirstTurn = "You have just started. MARK-FIRST"
+	drv.DeveloperInstructions = "You are a canary."
+	drv.Session = tmux.Session{Socket: "swarm-canary-ore-ask"}
+	defer drv.Session.Kill()
+
+	runCtx, stop := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { drv.Run(runCtx); close(done) }()
+	defer func() { stop(); <-done }()
+
+	waitFor(t, "first turn at the model", 90*time.Second, func() bool { return len(requestsWith(m, "MARK-FIRST", 0)) > 0 })
+	waitFor(t, "idle", 60*time.Second, func() bool { return r.core.CurrentPresence() == messagingv1.Presence_PRESENCE_IDLE })
+	r.fake.PushMessage("01MCPASK", "alice@acme", "MARK-MCP")
+	waitFor(t, "message sent through swarm mcp", 90*time.Second, func() bool {
+		sent, _, _, _, _, _ := r.fake.Snapshot()
+		for _, s := range sent {
+			if s.GetBody() == "hello from ore" {
+				return true
+			}
+		}
+		return false
+	})
+	if n := drv.SwarmApprovalsAsked(); n == 0 {
+		t.Error("ore never asked: the test no longer exercises the elicitation path")
+	}
+	if _, _, _, _, approvals, _ := r.fake.Snapshot(); len(approvals) != 0 {
+		t.Errorf("swarm tool approval reached the inbox: %s", dump(approvals))
 	}
 }
