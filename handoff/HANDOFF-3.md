@@ -16,10 +16,16 @@ events have no `lastTimestamp` (fixed: the dump lists them explicitly).
 
 Fix (commit a5a82ab): operator flag `--dev-overcommit=N` divides rooms' and
 runner pods' CPU and memory *requests* (never limits); `hack/dev/values.yaml`
-sets 8. **Run 30 was dispatched on it; its result was not read yet.**
-Memory may still be tight with six real rooms on 7 GiB. The robust fix is
-a 4-vCPU runner (a public repository's standard runner, or a larger runner
-for a private one): the owner's decision.
+sets 8. The repository is now public, so runners have 4 vCPUs / 16 GB.
+
+**Run 30** (a5a82ab): every e2e subtest passed but one, *forge merge by the
+mergers team*: Forgejo refused the merge ("won't sign: nokey").
+`require_signed_commits` needs the instance to sign the merge commit, and it
+had no key. Fixed in 63f73f2: the operator keeps an SSH signing key in
+`forgejo-secrets` and Forgejo signs merges with it (`MERGES=always`;
+reproduced and verified on Forgejo 17 in Docker). The amd64 images job ran
+out of runner disk (it now frees disk first). **Run 32 was dispatched on
+63f73f2.**
 
 Also fixed on the way: the control-center image's Node stage didn't trust
 `BUILD_CA` (npm failed behind the proxy); "VolumesReady: expanding" was
