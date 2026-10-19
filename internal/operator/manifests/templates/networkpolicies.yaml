@@ -144,12 +144,13 @@ spec:
   # The proxy reaches DNS, the API server (its allowlist) and the public
   # internet only; it also refuses private addresses itself.
   egress:
-    - ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+{{- $dns := .DNSTarget }}
+    - ports: [{{ range $i, $p := $dns.Ports }}{{ if $i }}, {{ end }}{port: {{ $p }}, protocol: UDP}, {port: {{ $p }}, protocol: TCP}{{ end }}]
       to:
         - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: kube-system}
+            matchLabels: {kubernetes.io/metadata.name: {{ $dns.Namespace }}}
           podSelector:
-            matchLabels: {k8s-app: kube-dns}
+            matchLabels: {{ json $dns.Labels }}
     - ports: [{port: 443, protocol: TCP}, {port: 6443, protocol: TCP}]
       to:
         - ipBlock: {cidr: 0.0.0.0/0}

@@ -369,6 +369,11 @@ func dataHash(data map[string]string) string {
 // egress is a room's egress for its network mode on this platform (§11.2).
 func (r *Reconciler) egress(ctx context.Context, ws *v1.Workspace, mode v1.NetworkMode, quarantined bool) Egress {
 	e := Egress{Internet: mode == v1.NetworkFull, Proxy: mode == v1.NetworkLimited, Quarantined: quarantined}
+	if dns, err := r.Deps.DNS.Target(ctx); err != nil {
+		log.FromContext(ctx).Info("cluster DNS not found; allowing kube-system/kube-dns", "err", err)
+	} else {
+		e.DNS = dns
+	}
 	if mode != v1.NetworkNone {
 		e.Allowed = ws.Spec.AllowedCIDRs
 	}

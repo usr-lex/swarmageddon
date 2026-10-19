@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 )
 
@@ -58,6 +59,10 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 		b, _ := json.Marshal(s)
 		return string(b)
 	},
+	"json": func(v any) string {
+		b, _ := json.Marshal(v)
+		return string(b)
+	},
 	"indent": func(n int, s string) string {
 		pad := strings.Repeat(" ", n)
 		lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
@@ -87,6 +92,16 @@ type Values struct {
 	// Sentry is messaging's, the warden's and egress's error reporting
 	// (templates/sentry.yaml); the zero value is off.
 	Sentry SentryValues
+	// DNS is where the cluster's DNS pods are; the zero value is kube-dns.
+	DNS clusterdns.Target
+}
+
+// DNSTarget is v.DNS, or kube-system's kube-dns when unset.
+func (v Values) DNSTarget() clusterdns.Target {
+	if v.DNS.Namespace == "" {
+		return clusterdns.Default
+	}
+	return v.DNS
 }
 
 // SentrySecret is the Secret in the platform namespace with the services'

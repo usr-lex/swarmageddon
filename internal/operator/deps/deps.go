@@ -12,6 +12,7 @@ import (
 
 	"github.com/usr-lex/swarmageddon/internal/forgejo"
 	"github.com/usr-lex/swarmageddon/internal/gateway"
+	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 	"github.com/usr-lex/swarmageddon/internal/telemetry"
@@ -54,6 +55,9 @@ type Deps struct {
 	// Sentry is the error reporting the platform services get; an empty DSN
 	// turns it off.
 	Sentry telemetry.Config
+	// DNS finds the cluster's DNS pods for NetworkPolicies; nil means
+	// kube-system's kube-dns on port 53.
+	DNS *clusterdns.Finder
 }
 
 // ErrNotReady means a platform service isn't deployed or reachable yet;

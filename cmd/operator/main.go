@@ -22,6 +22,7 @@ import (
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/operator/addons"
+	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 	"github.com/usr-lex/swarmageddon/internal/operator/platform"
@@ -140,6 +141,8 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 		Version:      version.Version,
 		// The platform services report with the operator's settings.
 		Sentry: telemetry.Current(),
+		// Uncached: one lookup every few minutes needs no cluster-wide watch.
+		DNS: &clusterdns.Finder{Reader: mgr.GetAPIReader()},
 	}
 	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs}
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {

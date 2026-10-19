@@ -102,6 +102,7 @@ func (r *Reconciler) values(ctx context.Context, p *v1alpha1.Platform) (manifest
 		v.Ntfy.BaseURL = "https://ntfy." + p.Spec.Hostname
 	}
 	v.Sentry = sentryValues(r.Deps.Sentry)
+	v.DNS, _ = r.Deps.DNS.Target(ctx) // kube-dns when not found
 	return v, nil
 }
 

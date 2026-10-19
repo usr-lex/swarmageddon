@@ -465,6 +465,7 @@ func (r *Reconciler) ensureNetworkPolicy(ctx context.Context, pool *v1.RunnerPoo
 	// way; room network modes (§11.2) don't apply to runners.
 	internet := ws.Spec.Internet == nil || *ws.Spec.Internet //nolint:staticcheck // deprecated field still honored
 	e := room.Egress{Internet: internet, Allowed: ws.Spec.AllowedCIDRs}
+	e.DNS, _ = r.Deps.DNS.Target(ctx) // the default when not found
 	var p v1.Platform
 	if err := r.Get(ctx, types.NamespacedName{Name: v1.PlatformName}, &p); err == nil {
 		cl := p.Spec.Egress.ClusterCIDRs

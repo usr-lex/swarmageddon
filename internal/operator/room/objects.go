@@ -19,6 +19,7 @@ import (
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/devices"
+	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 )
 
 // Platform endpoints (docs/conventions.md).
@@ -293,6 +294,8 @@ type Egress struct {
 	Denied []string
 	// Allowed are reachable even inside denied ranges.
 	Allowed []string
+	// DNS is where the cluster's DNS pods are; the zero value is kube-dns.
+	DNS clusterdns.Target
 }
 
 // AlwaysDenied are kept from rooms on top of the cluster's own ranges (§11.2).
@@ -322,20 +325,14 @@ var GatewayPeer = PlatformPeer{App: "gateway", Ports: []int32{4000}}
 // EgressRules builds egress rules: DNS, the given platform services, and the
 // internet per e.
 func EgressRules(peers []PlatformPeer, e Egress) []networkingv1.NetworkPolicyEgressRule {
-	tcp, udp := corev1.ProtocolTCP, corev1.ProtocolUDP
+	tcp := corev1.ProtocolTCP
 	port := func(p corev1.Protocol, n int32) networkingv1.NetworkPolicyPort {
 		return networkingv1.NetworkPolicyPort{Protocol: ptr.To(p), Port: ptr.To(intstr.FromInt32(n))}
 	}
 	nsSel := func(ns string) *metav1.LabelSelector {
 		return &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns}}
 	}
-	rules := []networkingv1.NetworkPolicyEgressRule{{
-		To: []networkingv1.NetworkPolicyPeer{{
-			NamespaceSelector: nsSel("kube-system"),
-			PodSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"k8s-app": "kube-dns"}},
-		}},
-		Ports: []networkingv1.NetworkPolicyPort{port(udp, 53), port(tcp, 53)},
-	}}
+	rules := []networkingv1.NetworkPolicyEgressRule{e.DNS.EgressRule()}
 	for _, p := range peers {
 		r := networkingv1.NetworkPolicyEgressRule{To: []networkingv1.NetworkPolicyPeer{{
 			NamespaceSelector: nsSel(v1.PlatformNamespace),
@@ -402,7 +399,7 @@ func roomPeers(e Egress) []PlatformPeer {
 // its quarantine (only DNS and the gateway).
 func desiredNetworkPolicy(r *v1.Room, ws string, e Egress) *networkingv1.NetworkPolicy {
 	if e.Quarantined {
-		e = Egress{Quarantined: true}
+		e = Egress{Quarantined: true, DNS: e.DNS}
 	}
 	tcp := corev1.ProtocolTCP
 	return &networkingv1.NetworkPolicy{

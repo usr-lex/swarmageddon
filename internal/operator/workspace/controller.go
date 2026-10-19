@@ -22,11 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
@@ -205,8 +205,10 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 	if r.Deps.PKI == nil {
 		return fmt.Errorf("no PKI")
 	}
-	tcp, udp := corev1.ProtocolTCP, corev1.ProtocolUDP
-	dns := intstr.FromInt32(53)
+	dns, err := r.Deps.DNS.Target(ctx)
+	if err != nil {
+		log.FromContext(ctx).Info("cluster DNS not found; allowing kube-system/kube-dns", "err", err)
+	}
 	objs := []client.Object{
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "platform-ca-bundle", Namespace: ns},
@@ -224,13 +226,7 @@ func (r *Reconciler) ensureNamespace(ctx context.Context, w *v1alpha1.Workspace,
 			Spec: networkingv1.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{},
 				PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
-				Egress: []networkingv1.NetworkPolicyEgressRule{{
-					To: []networkingv1.NetworkPolicyPeer{{
-						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "kube-system"}},
-						PodSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"k8s-app": "kube-dns"}},
-					}},
-					Ports: []networkingv1.NetworkPolicyPort{{Protocol: &udp, Port: &dns}, {Protocol: &tcp, Port: &dns}},
-				}},
+				Egress:      []networkingv1.NetworkPolicyEgressRule{dns.EgressRule()},
 			},
 		},
 		&corev1.ResourceQuota{

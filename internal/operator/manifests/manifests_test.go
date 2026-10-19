@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/operator/clusterdns"
 	"github.com/usr-lex/swarmageddon/internal/operator/images"
 )
 
@@ -240,4 +241,29 @@ func TestGatewayIsTheWarden(t *testing.T) {
 	if sel["litellm"]["swarmageddon.dev/component"] != "litellm" || labels["litellm"]["app.kubernetes.io/name"] != "litellm" {
 		t.Errorf("litellm selector %v, labels %v", sel["litellm"], labels["litellm"])
 	}
+}
+
+// On OpenShift the egress proxy resolves names through openshift-dns's pods
+// on 5353 (OpenShift report, issue 5.2).
+func TestEgressDNSOnOpenShift(t *testing.T) {
+	v := testValues()
+	v.DNS = clusterdns.Target{Namespace: "openshift-dns", Labels: map[string]string{"dns.operator.openshift.io/daemonset-dns": "default"}, Ports: []int32{53, 5353}}
+	objs, err := Render(NetworkPolicies, v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range objs {
+		if o.GetName() != "egress" {
+			continue
+		}
+		b, _ := yaml.Marshal(o.Object)
+		s := string(b)
+		for _, want := range []string{"kubernetes.io/metadata.name: openshift-dns", "dns.operator.openshift.io/daemonset-dns: default", "port: 5353"} {
+			if !strings.Contains(s, want) {
+				t.Errorf("egress policy lacks %q:\n%s", want, s)
+			}
+		}
+		return
+	}
+	t.Fatal("no egress policy")
 }
