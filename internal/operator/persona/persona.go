@@ -522,6 +522,9 @@ type oreMCPServer struct {
 	Required      bool              `toml:"required"`
 	EnabledTools  []string          `toml:"enabled_tools,omitempty"`
 	DisabledTools []string          `toml:"disabled_tools,omitempty"`
+	// DefaultToolsApprovalMode "approve" runs the server's tools without
+	// asking (ore 1.161: auto, prompt, writes, approve).
+	DefaultToolsApprovalMode string `toml:"default_tools_approval_mode,omitempty"`
 }
 
 type oreConfig struct {
@@ -576,7 +579,9 @@ func oreFiles(in Input, rj RoomJSON) (string, string, error) {
 			req.AllowedSandboxModes = []string{"read-only", sandbox}
 		}
 	}
-	swarm := oreMCPServer{Command: "swarm", Args: []string{"mcp"}, Required: true}
+	// The room's own messaging tools never ask: an unattended agent would
+	// wait on a TUI prompt (OpenShift report, issue 3).
+	swarm := oreMCPServer{Command: "swarm", Args: []string{"mcp"}, Required: true, DefaultToolsApprovalMode: "approve"}
 	if tools, ok := o.MCPTools["swarm"]; ok && len(tools) > 0 && (len(tools) != 1 || tools[0] != "*") {
 		swarm.EnabledTools = tools
 	}

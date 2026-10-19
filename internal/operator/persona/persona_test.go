@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/usr-lex/swarmageddon/api/v1alpha1"
+	"github.com/usr-lex/swarmageddon/internal/supervisor/ore"
 	"github.com/usr-lex/swarmageddon/internal/supervisor/roomcfg"
 )
 
@@ -140,6 +141,21 @@ func TestOreGolden(t *testing.T) {
 	sw := cfg["mcp_servers"].(map[string]any)["swarm"].(map[string]any)
 	if sw["command"] != "swarm" || len(sw["enabled_tools"].([]any)) != 2 {
 		t.Errorf("swarm mcp = %v", sw)
+	}
+	// The room's own tools never ask (OpenShift report, issue 3): ore asked
+	// for every swarm call and "always allow" couldn't persist. The canary
+	// runs on ore.Config; the setting must match what ships.
+	canary, err := ore.Config(ore.Policy{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cc map[string]any
+	if _, err := toml.Decode(string(canary), &cc); err != nil {
+		t.Fatal(err)
+	}
+	want := cc["mcp_servers"].(map[string]any)["swarm"].(map[string]any)["default_tools_approval_mode"]
+	if want != "approve" || sw["default_tools_approval_mode"] != want {
+		t.Errorf("swarm default_tools_approval_mode = %v, canary's %v", sw["default_tools_approval_mode"], want)
 	}
 	if cfg["approval_policy"] != "on-request" || cfg["approvals_reviewer"] != "user" {
 		t.Errorf("cfg = %v", cfg)

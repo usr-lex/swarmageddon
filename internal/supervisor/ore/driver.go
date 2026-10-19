@@ -560,6 +560,17 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 		reason = *p.Reason
 	}
 	var a agent.Approval
+	// result turns a decision into the request's answer.
+	result := func(dec agent.Decision) any {
+		decision := "decline"
+		switch {
+		case dec.Allow && dec.ForSession:
+			decision = "acceptForSession"
+		case dec.Allow:
+			decision = "accept"
+		}
+		return map[string]any{"decision": decision}
+	}
 	switch method {
 	case "item/commandExecution/requestApproval":
 		cmd := ""
@@ -576,6 +587,19 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 			detail = string(item)
 		}
 		a = agent.Approval{Tool: "patch", Summary: oneLine("file change: " + reason), Detail: detail, Reason: reason, SessionScope: true}
+	case MethodElicitation:
+		e := classifyElicitation(params)
+		switch {
+		case e.Auto:
+			if err := c.Respond(ctx, id, e.Result); err != nil {
+				d.Log.Warn("answering a swarm tool approval", "err", err)
+			}
+			return
+		case e.Approval == nil:
+			d.Log.Info("elicitation for a person; left to the TUI", "params", oneLine(string(params)))
+			return
+		}
+		a, result = *e.Approval, func(dec agent.Decision) any { return elicitationResult(dec) }
 	default:
 		d.Log.Info("unhandled app-server request; left to the TUI", "method", method)
 		return
@@ -588,9 +612,12 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 		if c2, _, ok := ItemCall(json.RawMessage(a.Detail)); ok && a.Tool == "patch" {
 			call = c2
 		}
+		if method == MethodElicitation {
+			call = agent.ToolCall{Tool: a.Tool, Command: a.Detail, Input: a.Detail}
+		}
 		switch res := g.Guard(ctx, call); res.Action {
 		case agent.GuardDeny:
-			if err := c.Respond(ctx, id, map[string]any{"decision": "decline"}); err != nil {
+			if err := c.Respond(ctx, id, result(agent.Decision{})); err != nil {
 				d.Log.Warn("declining for the warden", "err", err)
 			}
 			return
@@ -616,14 +643,7 @@ func (d *Driver) onRequest(ctx context.Context, c *Client, id json.RawMessage, m
 		if err != nil {
 			return // answered in the TUI, or the app-server went away
 		}
-		decision := "decline"
-		switch {
-		case dec.Allow && dec.ForSession:
-			decision = "acceptForSession"
-		case dec.Allow:
-			decision = "accept"
-		}
-		if err := c.Respond(ctx, id, map[string]any{"decision": decision}); err != nil {
+		if err := c.Respond(ctx, id, result(dec)); err != nil {
 			d.Log.Warn("answering approval", "err", err)
 		}
 		d.Events.Presence(messagingv1.Presence_PRESENCE_WORKING)

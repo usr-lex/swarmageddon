@@ -11,3 +11,4 @@ command = "swarm"
 args = ["mcp"]
 required = true
 enabled_tools = ["send_message", "list_agents"]
+default_tools_approval_mode = "approve"
