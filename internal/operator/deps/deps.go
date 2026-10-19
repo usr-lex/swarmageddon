@@ -6,6 +6,7 @@ package deps
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 
 	"k8s.io/utils/clock"
@@ -61,9 +62,16 @@ type Deps struct {
 	// OpenShift: bind the chart's security context constraints in each
 	// namespace the operator creates (package openshift).
 	OpenShift bool
+	// Exec runs commands in pods (pods/exec); nil where unavailable.
+	Exec Execer
 	// DevOvercommit divides rooms' and runner pods' CPU and memory requests
 	// (not limits) on dev and CI clusters smaller than the plan; 0 or 1 is off.
 	DevOvercommit int64
+}
+
+// Execer runs a command in a pod's container (pods/exec).
+type Execer interface {
+	Exec(ctx context.Context, namespace, pod, container string, cmd []string, stdin io.Reader, stdout, stderr io.Writer) error
 }
 
 // ErrNotReady means a platform service isn't deployed or reachable yet;

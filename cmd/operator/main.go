@@ -153,6 +153,7 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 		// Uncached: one lookup every few minutes needs no cluster-wide watch.
 		DNS:           &clusterdns.Finder{Reader: mgr.GetAPIReader()},
 		OpenShift:     onOpenShift,
+		Exec:          platform.KubeExec{Config: mgr.GetConfig()},
 		DevOvercommit: overcommit,
 	}
 	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs, OpenShift: onOpenShift}

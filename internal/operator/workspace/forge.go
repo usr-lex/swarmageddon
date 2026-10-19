@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -217,6 +218,12 @@ func (r *Reconciler) reconcileRepo(ctx context.Context, w *v1alpha1.Workspace, f
 	var err error
 	if repo.ImportURL != "" {
 		opt := forgejo.MigrateOption{CloneAddr: repo.ImportURL, RepoName: repo.Name, RepoOwner: org, Private: true}
+		if repo.ImportGitHub {
+			// The whole history (ADR 0012): authors stay GitHub accounts
+			// until linkGitHubAccounts attributes them to rooms.
+			opt.Service = "github"
+			opt.Issues, opt.PullRequests, opt.Labels, opt.Milestones, opt.Releases, opt.Wiki = true, true, true, true, true, true
+		}
 		if repo.ImportSecretName != "" {
 			if _, err := fc.GetRepo(ctx, org, repo.Name); forgejo.IsNotFound(err) {
 				// Read the credential only when there is something to import.
@@ -228,6 +235,13 @@ func (r *Reconciler) reconcileRepo(ctx context.Context, w *v1alpha1.Workspace, f
 			}
 		}
 		got, err = fc.EnsureMigratedRepo(ctx, opt)
+		if err == nil && repo.ImportGitHub && repo.ImportSecretName != "" {
+			// The GitHub token is for this one import: don't keep it.
+			sec := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: v1alpha1.WorkspaceNamespace(w.Name), Name: repo.ImportSecretName}}
+			if derr := r.Delete(ctx, sec); client.IgnoreNotFound(derr) != nil {
+				return fmt.Errorf("deleting the import credential: %w", derr)
+			}
+		}
 	} else {
 		got, err = fc.EnsureOrgRepo(ctx, org, repo.Name)
 	}

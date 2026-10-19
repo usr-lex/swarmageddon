@@ -28,6 +28,10 @@ type WorkspaceSpec struct {
 	// Owners are control center users (by email or handle) who operate this workspace.
 	// +optional
 	Owners []string `json:"owners,omitempty"`
+	// GitHubAccounts map imported GitHub accounts to rooms, so their posts
+	// in imported history become the room's own (ADR 0012).
+	// +optional
+	GitHubAccounts []GitHubAccount `json:"githubAccounts,omitempty"`
 	// RoomDefaults apply to every room of the workspace (docs/design.md §6.6).
 	// +optional
 	RoomDefaults RoomDefaults `json:"roomDefaults,omitempty"`
@@ -320,6 +324,12 @@ type RepositorySpec struct {
 	// for the one import only.
 	// +optional
 	ImportSecretName string `json:"importSecretName,omitempty"`
+	// ImportGitHub imports from GitHub with its history: issues, pull
+	// requests with their reviews, comments, labels, milestones, releases
+	// and the wiki (Forgejo's GitHub migration, ADR 0012). The credential
+	// Secret is deleted once the import succeeds.
+	// +optional
+	ImportGitHub bool `json:"importGitHub,omitempty"`
 	// Group whose team owns it; empty: the default teams.
 	// +optional
 	Group string `json:"group,omitempty"`
@@ -445,4 +455,15 @@ type WorkspaceList struct {
 
 func init() {
 	SchemeBuilder.Register(&Workspace{}, &WorkspaceList{})
+}
+
+// GitHubAccount is a GitHub account whose imported history belongs to a room.
+type GitHubAccount struct {
+	// Login on GitHub, e.g. bot-athena.
+	Login string `json:"login"`
+	// ID is GitHub's numeric user ID, what imported posts are keyed by.
+	// +kubebuilder:validation:Minimum=1
+	ID int64 `json:"id"`
+	// Room whose forge user takes over the account's posts.
+	Room string `json:"room"`
 }

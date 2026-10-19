@@ -125,6 +125,33 @@ spec:
                   - ciFailed
                   type: string
                 type: array
+              githubAccounts:
+                description: |-
+                  GitHubAccounts map imported GitHub accounts to rooms, so their posts
+                  in imported history become the room's own (ADR 0012).
+                items:
+                  description: GitHubAccount is a GitHub account whose imported history
+                    belongs to a room.
+                  properties:
+                    id:
+                      description: ID is GitHub's numeric user ID, what imported posts
+                        are keyed by.
+                      format: int64
+                      minimum: 1
+                      type: integer
+                    login:
+                      description: Login on GitHub, e.g. bot-athena.
+                      type: string
+                    room:
+                      description: Room whose forge user takes over the account's
+                        posts.
+                      type: string
+                  required:
+                  - id
+                  - login
+                  - room
+                  type: object
+                type: array
               groups:
                 items:
                   properties:
@@ -397,6 +424,13 @@ spec:
                     group:
                       description: 'Group whose team owns it; empty: the default teams.'
                       type: string
+                    importGitHub:
+                      description: |-
+                        ImportGitHub imports from GitHub with its history: issues, pull
+                        requests with their reviews, comments, labels, milestones, releases
+                        and the wiki (Forgejo's GitHub migration, ADR 0012). The credential
+                        Secret is deleted once the import succeeds.
+                      type: boolean
                     importSecretName:
                       description: |-
                         ImportSecretName is a Secret in the workspace namespace with the

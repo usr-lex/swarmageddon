@@ -149,6 +149,17 @@ func (r *Reconciler) reconcile(ctx context.Context, w *v1alpha1.Workspace) (ctrl
 		}
 		retry = true
 	}
+	if err := r.linkGitHubAccounts(ctx, w); err != nil {
+		if errors.Is(err, deps.ErrNotReady) {
+			setCond(w, ConditionGitHubHistory, false, "Waiting", err.Error())
+		} else {
+			setCond(w, ConditionGitHubHistory, false, "Error", err.Error())
+			ctrl.LoggerFrom(ctx).Error(err, "github history")
+		}
+		retry = true
+	} else if len(w.Spec.GitHubAccounts) > 0 {
+		setCond(w, ConditionGitHubHistory, true, "Linked", fmt.Sprintf("%d GitHub accounts' imported posts belong to their rooms", len(w.Spec.GitHubAccounts)))
+	}
 	if err := r.reconcileGateway(ctx, w, ns); err != nil {
 		if !errors.Is(err, deps.ErrNotReady) {
 			ctrl.LoggerFrom(ctx).Error(err, "gateway")

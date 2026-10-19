@@ -610,6 +610,11 @@ func (c *Client) EnsureOrgRepo(ctx context.Context, org, name string) (*Reposito
 	return &out, err
 }
 
+// RunCron runs one of Forgejo's cron tasks now (POST /admin/cron/{task}).
+func (c *Client) RunCron(ctx context.Context, task string) error {
+	return c.do(ctx, http.MethodPost, "/admin/cron/"+esc(task), nil, nil)
+}
+
 // MigrateOption is the body of POST /repos/migrate.
 type MigrateOption struct {
 	CloneAddr    string `json:"clone_addr"`
@@ -619,6 +624,13 @@ type MigrateOption struct {
 	AuthUsername string `json:"auth_username,omitempty"`
 	AuthToken    string `json:"auth_token,omitempty"`
 	Service      string `json:"service,omitempty"`
+	// What else to bring, for a service such as github.
+	Issues       bool `json:"issues,omitempty"`
+	PullRequests bool `json:"pull_requests,omitempty"`
+	Labels       bool `json:"labels,omitempty"`
+	Milestones   bool `json:"milestones,omitempty"`
+	Releases     bool `json:"releases,omitempty"`
+	Wiki         bool `json:"wiki,omitempty"`
 }
 
 // EnsureMigratedRepo imports a repo from a URL if it doesn't exist yet.
@@ -629,8 +641,16 @@ func (c *Client) EnsureMigratedRepo(ctx context.Context, o MigrateOption) (*Repo
 		return r, err
 	}
 	o.Private = true
+	// Forgejo migrates within the request; with issues and pull requests
+	// that can take many minutes.
+	long := *c
+	hc := *c.HTTP
+	hc.Timeout = 0
+	long.HTTP = &hc
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
+	defer cancel()
 	var out Repository
-	err = c.do(ctx, http.MethodPost, "/repos/migrate", o, &out)
+	err = long.do(ctx, http.MethodPost, "/repos/migrate", o, &out)
 	return &out, err
 }
 
