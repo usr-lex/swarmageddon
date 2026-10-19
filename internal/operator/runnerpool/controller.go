@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,6 +47,9 @@ const (
 
 	ConditionReady   = "Ready"
 	ConditionDiskLow = "DiskLow"
+	// ConditionNodeDiskLow: a node running the workspace's pods has under
+	// NodeLowFraction of its disk free, the workspace-wide diskLow (§12).
+	ConditionNodeDiskLow = "NodeDiskLow"
 
 	pollInterval = 10 * time.Second
 	tokenPath    = "/run/runner/token"
@@ -155,6 +160,13 @@ func (r *Reconciler) round(ctx context.Context, pool *v1.RunnerPool, st *v1.Runn
 	org := ws.Spec.Forge.Org
 	if err := r.ensureNetworkPolicy(ctx, pool, &ws); err != nil {
 		return err
+	}
+	if low, msg, known := r.nodeDiskLow(ctx, pool.Namespace); known {
+		cond := metav1.Condition{Type: ConditionNodeDiskLow, Status: metav1.ConditionFalse, Reason: "Enough", Message: msg, ObservedGeneration: pool.Generation}
+		if low {
+			cond.Status, cond.Reason = metav1.ConditionTrue, "NodeBelow15Percent"
+		}
+		meta.SetStatusCondition(&st.Conditions, cond)
 	}
 	if r.Deps.Forge == nil {
 		return fmt.Errorf("no forge client")
@@ -550,6 +562,67 @@ func (r *Reconciler) nodeFree(ctx context.Context) (int64, bool, error) {
 		return r.allocatableFree(ctx)
 	}
 	return best, true, nil
+}
+
+// NodeLowFraction is the free share of a node's disk under which the
+// workspace gets diskLow (design §12).
+const NodeLowFraction = 0.15
+
+// nodeDiskLow checks, from kubelet's stats, the nodes the namespace's pods
+// run on; known is false when no node's disk could be read.
+func (r *Reconciler) nodeDiskLow(ctx context.Context, ns string) (low bool, msg string, known bool) {
+	if r.Summary == nil {
+		return false, "", false
+	}
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, client.InNamespace(ns)); err != nil {
+		return false, "", false
+	}
+	nodes := map[string]bool{}
+	for _, p := range pods.Items {
+		if p.Spec.NodeName != "" {
+			nodes[p.Spec.NodeName] = true
+		}
+	}
+	var lows, oks []string
+	for _, n := range slices.Sorted(maps.Keys(nodes)) {
+		raw, err := r.Summary(ctx, n)
+		if err != nil {
+			continue
+		}
+		avail, capacity, ok := fsBytes(raw)
+		if !ok || capacity <= 0 {
+			continue
+		}
+		known = true
+		pct := float64(avail) / float64(capacity)
+		s := fmt.Sprintf("node %s: %.0f%% of its disk free", n, pct*100)
+		if pct < NodeLowFraction {
+			lows = append(lows, s)
+		} else {
+			oks = append(oks, s)
+		}
+	}
+	if len(lows) > 0 {
+		return true, strings.Join(lows, "; "), known
+	}
+	return false, strings.Join(oks, "; "), known
+}
+
+// fsBytes reads node.fs.availableBytes and capacityBytes from a stats summary.
+func fsBytes(raw []byte) (avail, capacity int64, ok bool) {
+	var s struct {
+		Node struct {
+			Fs *struct {
+				AvailableBytes *uint64 `json:"availableBytes"`
+				CapacityBytes  *uint64 `json:"capacityBytes"`
+			} `json:"fs"`
+		} `json:"node"`
+	}
+	if json.Unmarshal(raw, &s) != nil || s.Node.Fs == nil || s.Node.Fs.AvailableBytes == nil || s.Node.Fs.CapacityBytes == nil {
+		return 0, 0, false
+	}
+	return int64(min(*s.Node.Fs.AvailableBytes, math.MaxInt64)), int64(min(*s.Node.Fs.CapacityBytes, math.MaxInt64)), true
 }
 
 // availableBytes reads node.fs.availableBytes from a stats summary.

@@ -12,6 +12,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -136,5 +137,31 @@ func TestNodeFreeFromKubeletSummary(t *testing.T) {
 	free, ok, err = r.nodeFree(ctx)
 	if err != nil || !ok || free != 100<<30 {
 		t.Errorf("fallback free = %d GB %v %v", free>>30, ok, err)
+	}
+}
+
+// A node running the workspace's pods with under 15% of its disk free raises
+// the workspace-wide diskLow (design §12), whether or not jobs wait.
+func TestNodeDiskLow(t *testing.T) {
+	c, r, _ := setup(t)
+	ctx := context.Background()
+	for _, name := range []string{"n1", "n2"} {
+		must(t, c.Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}))
+	}
+	must(t, c.Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "room-athena-0", Namespace: ns},
+		Spec: corev1.PodSpec{NodeName: "n1", Containers: []corev1.Container{{Name: "c", Image: "x"}}}}))
+	free := map[string]int64{"n1": 10, "n2": 1} // percent; n2 runs nothing of ours
+	r.Summary = func(_ context.Context, node string) ([]byte, error) {
+		return []byte(`{"node":{"fs":{"availableBytes":` + strconv.FormatInt(free[node]<<30, 10) + `,"capacityBytes":` + strconv.FormatInt(100<<30, 10) + `}}}`), nil
+	}
+	reconcile(t, r)
+	cond := meta.FindStatusCondition(pool(t, c).Status.Conditions, ConditionNodeDiskLow)
+	if cond == nil || cond.Status != metav1.ConditionTrue || !strings.Contains(cond.Message, "n1") || strings.Contains(cond.Message, "n2") {
+		t.Fatalf("condition %+v", cond)
+	}
+	free["n1"] = 40
+	reconcile(t, r)
+	if meta.IsStatusConditionTrue(pool(t, c).Status.Conditions, ConditionNodeDiskLow) {
+		t.Error("still low at 40% free")
 	}
 }
