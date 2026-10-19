@@ -16,6 +16,7 @@ import (
 	"github.com/usr-lex/swarmageddon/api/v1alpha1"
 	"github.com/usr-lex/swarmageddon/internal/gateway"
 	"github.com/usr-lex/swarmageddon/internal/operator/manifests"
+	"github.com/usr-lex/swarmageddon/internal/operator/stuck"
 	"github.com/usr-lex/swarmageddon/internal/pki"
 )
 
@@ -126,7 +127,25 @@ func (r *Reconciler) statefulSetReady(ctx context.Context, name string, min int3
 		return false, "", err
 	}
 	msg := fmt.Sprintf("%d/%d replicas ready", sts.Status.ReadyReplicas, ptrOr(sts.Spec.Replicas, 1))
-	return sts.Status.ReadyReplicas >= min, msg, nil
+	ready := sts.Status.ReadyReplicas >= min
+	if !ready {
+		msg += r.stuck(ctx, name)
+	}
+	return ready, msg, nil
+}
+
+// stuck explains a workload that isn't coming up from its Warning events
+// (an admission refusal, a pod that doesn't fit), as "; Reason: message".
+func (r *Reconciler) stuck(ctx context.Context, name string) string {
+	reader := r.APIReader
+	if reader == nil {
+		reader = r.Client
+	}
+	why, err := stuck.Reason(ctx, reader, v1alpha1.PlatformNamespace, name)
+	if err != nil || why == "" {
+		return ""
+	}
+	return "; " + why
 }
 
 func ptrOr(p *int32, d int32) int32 {
@@ -296,6 +315,12 @@ func (r *Reconciler) applyGateway(ctx context.Context, p *v1alpha1.Platform, v m
 	}
 	msg := fmt.Sprintf("LiteLLM %d/%d, warden %d/%d replicas available; %d providers", lAvail, lWant, wAvail, wWant, len(v.Gateway.Providers))
 	ready := lAvail >= 1 && wAvail >= 1
+	if lAvail < 1 {
+		msg += r.stuck(ctx, "litellm")
+	}
+	if wAvail < 1 {
+		msg += r.stuck(ctx, "warden")
+	}
 	if ready {
 		r.ensureWardenReviewKey(ctx, p)
 		r.ensureControlCenterGatewayKey(ctx, p)
@@ -332,7 +357,11 @@ func (r *Reconciler) applyEgress(ctx context.Context, p *v1alpha1.Platform, v ma
 	if err != nil {
 		return false, "", err
 	}
-	return avail >= 1, fmt.Sprintf("%d/%d replicas available", avail, want), nil
+	msg := fmt.Sprintf("%d/%d replicas available", avail, want)
+	if avail < 1 {
+		msg += r.stuck(ctx, "egress")
+	}
+	return avail >= 1, msg, nil
 }
 
 func (r *Reconciler) applyRegistry(ctx context.Context, p *v1alpha1.Platform, v manifests.Values) (bool, string, error) {

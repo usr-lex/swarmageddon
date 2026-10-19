@@ -40,6 +40,7 @@ import (
 	"github.com/usr-lex/swarmageddon/internal/gateway"
 	"github.com/usr-lex/swarmageddon/internal/operator/deps"
 	"github.com/usr-lex/swarmageddon/internal/operator/persona"
+	"github.com/usr-lex/swarmageddon/internal/operator/stuck"
 )
 
 const (
@@ -85,7 +86,10 @@ type Reconciler struct {
 	Idle IdleChecker
 	// ScanHostKey fetches Forgejo's SSH host key; nil skips it.
 	ScanHostKey HostKeyScanner
-	Now         func() time.Time
+	// APIReader reads events around the cache; nil skips explaining a pod
+	// that doesn't come up.
+	APIReader client.Reader
+	Now       func() time.Time
 
 	mu       sync.Mutex
 	lastRoll map[string]time.Time // workspace -> when a room was last rolled
@@ -103,7 +107,7 @@ type Reconciler struct {
 // also runs the idle checker over messaging presence, so whenIdle rooms
 // roll by themselves; a room waiting for a roll is looked at every minute.
 func SetupWithManager(mgr ctrl.Manager, d deps.Deps) error {
-	r := &Reconciler{Client: mgr.GetClient(), Deps: d, Idle: NeverIdle{}, ScanHostKey: ScanHostKey}
+	r := &Reconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Deps: d, Idle: NeverIdle{}, ScanHostKey: ScanHostKey}
 	if d.PKI != nil {
 		idle, err := NewPresenceIdle(d.PKI, MessagingURL)
 		if err != nil {
@@ -852,7 +856,14 @@ func (r *Reconciler) reconcileStatefulSet(ctx context.Context, room *v1.Room, ws
 		setCond(st, gen, v1.ConditionPodReady, true, "Ready", "")
 	default:
 		st.Phase = v1.RoomProvisioning
-		setCond(st, gen, v1.ConditionPodReady, false, "NotReady", "waiting for the pod")
+		msg := "waiting for the pod"
+		if r.APIReader != nil {
+			// An admission refusal or a pod that doesn't fit is only an event.
+			if why, err := stuck.Reason(ctx, r.APIReader, room.Namespace, Name(room.Name)); err == nil && why != "" {
+				msg += ": " + why
+			}
+		}
+		setCond(st, gen, v1.ConditionPodReady, false, "NotReady", msg)
 		if res.RequeueAfter == 0 {
 			res.RequeueAfter = 30 * time.Second
 		}

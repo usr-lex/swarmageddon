@@ -2,6 +2,7 @@ package preflight
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -202,5 +204,27 @@ func TestRunWithFakeCluster(t *testing.T) {
 	_ = c.List(ctx, &left, client.InNamespace(Namespace))
 	if len(left.Items) != 0 {
 		t.Fatalf("%d pods left after cleanup", len(left.Items))
+	}
+}
+
+// An admission policy refusing the probe pods is said as such, and the tier
+// check's fix points at it rather than at the kernel (OpenShift report 5.4:
+// "probe error: pods \"idmap\" is forbidden: unable to validate against any
+// security context constraint" became "use a 6.3+ kernel").
+func TestAdmissionRefusal(t *testing.T) {
+	err := apierrors.NewForbidden(corev1.Resource("pods"), "idmap",
+		errors.New("unable to validate against any security context constraint: [provider \"restricted-v2\": Forbidden: not usable by user or serviceaccount]"))
+	c := probeErr(CheckIdmap, err)
+	if c.Result != v1alpha1.CheckFail || !strings.HasPrefix(c.Message, refusedPrefix) || !strings.Contains(c.Message, "security context constraint") || c.Fix == "" {
+		t.Fatalf("idmap check: %+v", c)
+	}
+	podman := probeErr(CheckPodmanUserns, err)
+	_, tier := ChooseTier(&v1alpha1.PlatformSpec{}, 35, c, podman, false, false)
+	if tier.Result != v1alpha1.CheckFail || !strings.Contains(tier.Message, "admission") || strings.Contains(tier.Fix, "kernel") {
+		t.Fatalf("tier check: %+v", tier)
+	}
+	// Other errors stay warnings.
+	if c := probeErr(CheckIdmap, errors.New("connection refused")); c.Result != v1alpha1.CheckWarn {
+		t.Fatalf("plain error: %+v", c)
 	}
 }

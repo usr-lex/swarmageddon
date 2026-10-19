@@ -183,8 +183,23 @@ func pending(name, msg string) v1alpha1.PreflightCheck {
 }
 
 func probeErr(name string, err error) v1alpha1.PreflightCheck {
+	if apierrors.IsForbidden(err) {
+		// Admission (an OpenShift SCC, Pod Security, a policy engine)
+		// refused the probe pod: rooms would be refused the same way.
+		return v1alpha1.PreflightCheck{Name: name, Result: v1alpha1.CheckFail, Message: refusedPrefix + err.Error(), Fix: admissionFix}
+	}
 	return v1alpha1.PreflightCheck{Name: name, Result: v1alpha1.CheckWarn, Message: "probe error: " + err.Error()}
 }
+
+// refusedPrefix starts the message of a check whose probe pod admission refused.
+const refusedPrefix = "refused by admission policy: "
+
+const admissionFix = "Let namespace " + Namespace + " (and the workspace namespaces) run user-namespaced pods with the rooms' capabilities. " +
+	"On OpenShift, install the chart with helm (or openshift.enabled=true) so it ships SCC swarmageddon-rooms; elsewhere, " +
+	"exempt these namespaces in your Pod Security, Kyverno or Gatekeeper policy. Then re-run preflight."
+
+// refused reports whether a check's probe pod was refused by admission.
+func refused(c v1alpha1.PreflightCheck) bool { return strings.HasPrefix(c.Message, refusedPrefix) }
 
 // volumeSharing: one pod writes to a ReadWriteMany claim, a second reads it.
 func (r *Runner) volumeSharing(ctx context.Context) v1alpha1.PreflightCheck {

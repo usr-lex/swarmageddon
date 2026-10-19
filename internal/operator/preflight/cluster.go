@@ -297,11 +297,15 @@ func (r *Runner) ensureNamespace(ctx context.Context) error {
 // ChooseTier picks the isolation tier (ADR 0001) from the probes.
 func ChooseTier(spec *v1alpha1.PlatformSpec, minor int, idmap, podman v1alpha1.PreflightCheck, sysbox, privAdmitted bool) (v1alpha1.IsolationTier, v1alpha1.PreflightCheck) {
 	c := v1alpha1.PreflightCheck{Name: CheckTier}
+	admission := refused(idmap) || refused(podman)
 	privileged := func(why string) (v1alpha1.IsolationTier, v1alpha1.PreflightCheck) {
 		if !privAdmitted {
 			c.Result = v1alpha1.CheckFail
 			c.Message = why + ", and privileged pods are refused: no tier can run rooms"
 			c.Fix = "Use Kubernetes 1.33+ with a 6.3+ kernel and containerd 2 for user namespaces, or install Sysbox."
+			if admission {
+				c.Fix = admissionFix
+			}
 			return "", c
 		}
 		if !spec.PrivilegedAccepted {
@@ -341,6 +345,9 @@ func ChooseTier(spec *v1alpha1.PlatformSpec, minor int, idmap, podman v1alpha1.P
 	if sysbox {
 		c.Result, c.Message = v1alpha1.CheckPass, "sysbox: the sysbox-runc RuntimeClass exists"
 		return v1alpha1.TierSysbox, c
+	}
+	if admission {
+		return privileged("an admission policy refused the user-namespace probes (see above) and there is no Sysbox")
 	}
 	return privileged("user namespaces can't run rooms here and there is no Sysbox")
 }
