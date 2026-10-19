@@ -205,6 +205,8 @@ type NtfyValues struct {
 type IngressValues struct {
 	ClassName string
 	Hostname  string
+	// TLSSecret the ingress serves; forge.<hostname>'s defaults to forgejo-tls.
+	TLSSecret string
 	// ControllerPods are the pod labels of the IngressClass's controller
 	// (IngressControllerPods); nil when it isn't one we know.
 	ControllerPods map[string]string

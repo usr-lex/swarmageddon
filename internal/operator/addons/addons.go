@@ -19,7 +19,9 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +51,9 @@ const (
 	NtfyAdmin = "swarm-admin"
 	// ForgejoTLSSecret holds forge.<hostname>'s certificate.
 	ForgejoTLSSecret = "forgejo-tls"
+	// ForgejoPublicTLSSecret is cert-manager's certificate for
+	// forge.<hostname>, in the certManager TLS mode.
+	ForgejoPublicTLSSecret = "forgejo-public-tls"
 )
 
 // Reconciler applies the add-ons for the Platform.
@@ -276,8 +281,12 @@ func (r *Reconciler) forgeIngress(ctx context.Context, p *v1alpha1.Platform) err
 		}); err != nil {
 		return fmt.Errorf("forgejo certificate: %w", err)
 	}
+	secret, waiting := r.forgeTLSSecret(ctx, p, host)
+	if waiting != nil && !errors.Is(waiting, deps.ErrNotReady) {
+		return waiting
+	}
 	objs, err := manifests.Render(manifests.ForgejoIngress, manifests.Values{Namespace: ns,
-		Ingress: manifests.IngressValues{ClassName: class, Hostname: host}})
+		Ingress: manifests.IngressValues{ClassName: class, Hostname: host, TLSSecret: secret}})
 	if err != nil {
 		return err
 	}
@@ -286,7 +295,73 @@ func (r *Reconciler) forgeIngress(ctx context.Context, p *v1alpha1.Platform) err
 			return err
 		}
 	}
-	return nil
+	return waiting
+}
+
+var certificateGVK = schema.GroupVersionKind{Group: "cert-manager.io", Version: "v1", Kind: "Certificate"}
+
+func forgeCertificate() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(certificateGVK)
+	u.SetNamespace(v1alpha1.PlatformNamespace)
+	u.SetName("forgejo")
+	return u
+}
+
+// forgeTLSSecret is the Secret forge.<hostname>'s ingress serves. In the
+// certManager TLS mode it keeps a cert-manager Certificate for the host from
+// spec.tls.issuerRef, like the control center's, and switches to it once it
+// is issued (until then it returns the platform CA's Secret and an error
+// wrapping deps.ErrNotReady, to look again soon). In every other case, or
+// without cert-manager, it is the platform CA's.
+func (r *Reconciler) forgeTLSSecret(ctx context.Context, p *v1alpha1.Platform, host string) (string, error) {
+	_, err := r.RESTMapper().RESTMapping(certificateGVK.GroupKind(), certificateGVK.Version)
+	installed := err == nil
+	issuer := p.Spec.TLS.IssuerRef
+	if p.Spec.TLS.Mode != v1alpha1.TLSCertManager || issuer == nil || issuer.Name == "" || !installed {
+		if installed {
+			if err := r.Delete(ctx, forgeCertificate()); client.IgnoreNotFound(err) != nil {
+				return ForgejoTLSSecret, err
+			}
+		}
+		return ForgejoTLSSecret, nil
+	}
+	kind := issuer.Kind
+	if kind == "" {
+		kind = "ClusterIssuer"
+	}
+	cert := forgeCertificate()
+	cert.Object["spec"] = map[string]any{
+		"secretName": ForgejoPublicTLSSecret,
+		"dnsNames":   []any{host},
+		"issuerRef":  map[string]any{"group": "cert-manager.io", "kind": kind, "name": issuer.Name},
+	}
+	cert.SetLabels(map[string]string{v1alpha1.LabelComponent: "forgejo"})
+	if err := r.applier().Apply(ctx, p, cert); err != nil {
+		return ForgejoTLSSecret, err
+	}
+	cur := forgeCertificate()
+	if err := r.Get(ctx, client.ObjectKeyFromObject(cur), cur); err != nil {
+		return ForgejoTLSSecret, err
+	}
+	conds, _, _ := unstructured.NestedSlice(cur.Object, "status", "conditions")
+	ready := false
+	for _, c := range conds {
+		if m, ok := c.(map[string]any); ok && m["type"] == "Ready" && m["status"] == "True" {
+			ready = true
+		}
+	}
+	if !ready {
+		return ForgejoTLSSecret, fmt.Errorf("%w: cert-manager is issuing forge.%s's certificate", deps.ErrNotReady, p.Spec.Hostname)
+	}
+	var sec corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: ForgejoPublicTLSSecret}, &sec); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ForgejoTLSSecret, fmt.Errorf("%w: Secret %s not written yet", deps.ErrNotReady, ForgejoPublicTLSSecret)
+		}
+		return ForgejoTLSSecret, err
+	}
+	return ForgejoPublicTLSSecret, nil
 }
 
 func defaultIngressClass(ctx context.Context, c client.Client) (string, error) {

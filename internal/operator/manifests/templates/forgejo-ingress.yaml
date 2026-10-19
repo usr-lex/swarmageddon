@@ -15,7 +15,7 @@ metadata:
 spec:
   ingressClassName: {{ .Ingress.ClassName }}
   tls:
-    - secretName: forgejo-tls
+    - secretName: {{ or .Ingress.TLSSecret "forgejo-tls" }}
       hosts: [{{ quote .Ingress.Hostname }}]
   rules:
     - host: {{ quote .Ingress.Hostname }}
