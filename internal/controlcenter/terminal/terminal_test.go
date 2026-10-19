@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -145,7 +148,7 @@ func TestTerminal(t *testing.T) {
 	cmd := strings.Join(ex.cmd, " ")
 	sizes := ex.sizes
 	ex.mu.Unlock()
-	if cmd != "runuser -u athena -- env TERM=xterm-256color tmux attach -r -t agent" || ex.pod != "room-athena-0" || ex.ns != "ws-acme" {
+	if cmd != "runuser -u athena -- env TERM=xterm-256color sh -c "+attachScript(true)+" attach 1" || ex.pod != "room-athena-0" || ex.ns != "ws-acme" {
 		t.Fatalf("exec %q in %s/%s", cmd, ex.ns, ex.pod)
 	}
 	if len(sizes) != 1 || sizes[0] != (Size{120, 40}) {
@@ -220,5 +223,37 @@ func TestVNC(t *testing.T) {
 	c.CloseNow()
 	if evs := audits.wait(1); len(evs) == 0 || evs[0].Action != "vnc.open" {
 		t.Fatalf("audits %+v", evs)
+	}
+}
+
+// While a room starts, the agent's tmux session doesn't exist yet: attach
+// waits for it, saying so, instead of failing with "exit code 1" (OpenShift
+// report, issue 4).
+func TestAttachWaitsForTheSession(t *testing.T) {
+	dir := t.TempDir()
+	// A tmux whose session appears on the third has-session.
+	fake := "#!/bin/sh\ncase \"$1\" in\nhas-session) n=$(cat " + dir + "/n 2>/dev/null || echo 0); n=$((n+1)); echo $n > " + dir + "/n; [ $n -ge 3 ];;\nattach) echo \"attached $*\";;\nesac\n"
+	if err := os.WriteFile(filepath.Join(dir, "tmux"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", attachScript(true), "attach", "0.01")
+	cmd.Env = append(os.Environ(), "PATH="+dir+":"+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if !strings.Contains(string(out), "Waiting for the agent's session") || !strings.Contains(string(out), "attached attach -r -t agent") {
+		t.Fatalf("output %q", out)
+	}
+
+	// It never appears: a clear message and exit 1.
+	if err := os.WriteFile(filepath.Join(dir, "tmux"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("sh", "-c", strings.Replace(attachScript(false), "-ge 30", "-ge 2", 1), "attach", "0.01")
+	cmd.Env = append(os.Environ(), "PATH="+dir+":"+os.Getenv("PATH"))
+	out, err = cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "isn't running") {
+		t.Fatalf("no session: %v %q", err, out)
 	}
 }

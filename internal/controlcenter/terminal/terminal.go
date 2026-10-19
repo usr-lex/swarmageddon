@@ -80,13 +80,31 @@ var roomRE = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
 func Command(mode, room string) ([]string, error) {
 	switch mode {
 	case "agent", "":
-		return []string{"runuser", "-u", room, "--", "env", "TERM=xterm-256color", "tmux", "attach", "-t", "agent"}, nil
+		return []string{"runuser", "-u", room, "--", "env", "TERM=xterm-256color", "sh", "-c", attachScript(false), "attach", "1"}, nil
 	case "view":
-		return []string{"runuser", "-u", room, "--", "env", "TERM=xterm-256color", "tmux", "attach", "-r", "-t", "agent"}, nil
+		return []string{"runuser", "-u", room, "--", "env", "TERM=xterm-256color", "sh", "-c", attachScript(true), "attach", "1"}, nil
 	case "shell":
 		return []string{"env", "TERM=xterm-256color", "runuser", "-l", room}, nil
 	}
 	return nil, fmt.Errorf("unknown mode %q", mode)
+}
+
+// attachScript attaches to the agent's tmux session, waiting up to 30 tries
+// ($1 seconds apart) for it to exist: the supervisor creates it only once
+// the CLI starts, a few seconds into a room's start.
+func attachScript(readOnly bool) string {
+	ro := ""
+	if readOnly {
+		ro = "-r "
+	}
+	return `i=0
+until tmux has-session -t agent 2>/dev/null; do
+  i=$((i+1))
+  if [ "$i" -ge 30 ]; then echo "The agent's session isn't running. Is the room starting or stopped?"; exit 1; fi
+  [ "$i" -eq 1 ] && echo "Waiting for the agent's session to start..."
+  sleep "$1"
+done
+exec tmux attach ` + ro + `-t agent`
 }
 
 // authorize checks the request and returns the principal, workspace and room.

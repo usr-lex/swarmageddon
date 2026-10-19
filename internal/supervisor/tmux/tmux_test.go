@@ -53,3 +53,38 @@ func TestRunWaitsForExit(t *testing.T) {
 		t.Error("session still exists")
 	}
 }
+
+// A restarted command runs in the same session, so a person attached to it
+// (the control center's `tmux attach -t agent`) stays attached instead of
+// seeing the session end (OpenShift report, issue 1: Ctrl+C under Take
+// control quit ore's TUI, and the restart replaced the session).
+func TestRunKeepsTheSessionAcrossRestarts(t *testing.T) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		t.Skip("no tmux")
+	}
+	dir := t.TempDir()
+	s := &Session{Name: "t2", Socket: "swarm-test-" + filepath.Base(dir)}
+	defer s.tmux("kill-server").Run()
+	id := func() string {
+		t.Helper()
+		out, err := s.tmux("display-message", "-p", "-t", "="+s.Name+":", "#{session_id}").Output()
+		if err != nil {
+			t.Fatalf("session gone: %v", err)
+		}
+		return string(out)
+	}
+	if err := s.Run(context.Background(), []string{"true"}); err != nil {
+		t.Fatal(err)
+	}
+	first := id()
+	out := filepath.Join(dir, "second")
+	if err := s.Run(context.Background(), []string{"sh", "-c", "echo ran > " + out}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(out); string(b) != "ran\n" {
+		t.Fatalf("second command didn't run: %q", b)
+	}
+	if got := id(); got != first {
+		t.Fatalf("session replaced: %s then %s", first, got)
+	}
+}

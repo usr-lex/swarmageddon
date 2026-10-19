@@ -47,10 +47,9 @@ func (s *Session) Exists() bool {
 
 // Run starts argv in the session and blocks until it exits or ctx ends (then
 // the session is killed). The exit is signalled through `tmux wait-for`.
+// The session outlives the command (remain-on-exit) and the next Run
+// respawns its pane, so people attached to it stay attached across restarts.
 func (s *Session) Run(ctx context.Context, argv []string) error {
-	if s.Exists() {
-		_ = s.Kill()
-	}
 	channel := "exit-" + s.Name
 	w, h := s.Width, s.Height
 	if w == 0 {
@@ -69,16 +68,23 @@ func (s *Session) Run(ctx context.Context, argv []string) error {
 		}
 		script = "set -a; . " + quote(s.EnvFile) + "; set +a; " + script
 	}
-	args := []string{"new-session", "-d", "-s", s.Name, "-x", fmt.Sprint(w), "-y", fmt.Sprint(h)}
+	var args []string
+	if s.Exists() {
+		// -k ends whatever still runs in the pane.
+		args = []string{"respawn-pane", "-k", "-t", "=" + s.Name + ":"}
+	} else {
+		args = []string{"new-session", "-d", "-s", s.Name, "-x", fmt.Sprint(w), "-y", fmt.Sprint(h)}
+	}
 	if s.Dir != "" {
 		args = append(args, "-c", s.Dir)
 	}
 	args = append(args, "sh", "-c", script)
+	// In the same tmux command, so the option is set before the command
+	// can exit.
+	args = append(args, ";", "set-option", "-w", "-t", "="+s.Name+":", "remain-on-exit", "on")
 	if out, err := s.tmux(args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("tmux new-session: %v: %s", err, out)
+		return fmt.Errorf("tmux %s: %v: %s", args[0], err, out)
 	}
-	// Keep the window around long enough to capture a crash message? No:
-	// the supervisor restarts it, and logs say why.
 	wait := s.tmux("wait-for", channel)
 	errc := make(chan error, 1)
 	if err := wait.Start(); err != nil {
@@ -87,11 +93,7 @@ func (s *Session) Run(ctx context.Context, argv []string) error {
 	go func() { errc <- wait.Wait() }()
 	select {
 	case <-errc:
-		if s.Exists() {
-			// wait-for returned for another reason (the server died
-			// differently); treat as exit anyway.
-			_ = s.Kill()
-		}
+		// The pane stays (dead) until the next Run respawns it.
 		return nil
 	case <-ctx.Done():
 		_ = s.Kill()

@@ -8,7 +8,7 @@ import { Badge } from "./ui";
 
 type Status = "connecting" | "open" | "closed";
 
-/** An xterm attached to a room through /ws/terminal. Reconnects when mode or read-only changes. */
+/** An xterm attached to a room through /ws/terminal. Reconnects when mode or read-only changes, and the agent session whenever it closes. */
 export function TerminalView({ workspace, room, mode, readOnly }: { workspace: string; room: string; mode: TerminalMode; readOnly: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("connecting");
@@ -51,39 +51,67 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
 
     setStatus("connecting");
     setRecording(false);
-    const ws = new WebSocket(terminalURL(workspace, room, mode, readOnly));
-    ws.binaryType = "arraybuffer";
     const enc = new TextEncoder();
+    let ws: WebSocket | undefined;
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let backoff = 1000;
+    let failures = 0;
     const sendResize = () => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     };
-    ws.onopen = () => {
-      setStatus("open");
-      sendResize();
-      if (!readOnly) term.focus();
+    // The agent session reconnects: its TUI restarts in place (Ctrl+C quits
+    // it) and, while a room starts, the session doesn't exist yet.
+    const connect = () => {
+      const sock = new WebSocket(terminalURL(workspace, room, mode, readOnly));
+      ws = sock;
+      sock.binaryType = "arraybuffer";
+      sock.onopen = () => {
+        setStatus("open");
+        setReason("");
+        sendResize();
+        if (!readOnly) term.focus();
+      };
+      let exitError = "";
+      let opened = false;
+      sock.onmessage = (ev) => {
+        opened = true;
+        if (typeof ev.data === "string") {
+          const c = parseControl(ev.data);
+          if (c?.type === "exit") exitError = c.error ?? "";
+          else if (c?.type === "recording") setRecording(true);
+          else if (!c) term.write(ev.data);
+        } else term.write(new Uint8Array(ev.data as ArrayBuffer));
+      };
+      sock.onclose = (ev) => {
+        if (disposed) return;
+        const why = exitError || ev.reason || (ev.code === 1000 ? "Session ended." : `Disconnected (${ev.code}).`);
+        failures = opened ? 0 : failures + 1;
+        // Refusals (sign-in, role) also arrive as a close: stop after about a minute.
+        if (mode !== "agent" || failures > 6) {
+          setStatus("closed");
+          setReason(why);
+          return;
+        }
+        if (opened) backoff = 1000;
+        setStatus("connecting");
+        setReason(opened ? "The agent's session ended; reattaching." : `The agent's session isn't up yet (${why}); retrying.`);
+        retry = setTimeout(connect, backoff);
+        backoff = Math.min(backoff * 2, 10000);
+      };
     };
-    let exitError = "";
-    ws.onmessage = (ev) => {
-      if (typeof ev.data === "string") {
-        const c = parseControl(ev.data);
-        if (c?.type === "exit") exitError = c.error ?? "";
-        else if (c?.type === "recording") setRecording(true);
-        else if (!c) term.write(ev.data);
-      } else term.write(new Uint8Array(ev.data as ArrayBuffer));
-    };
-    ws.onclose = (ev) => {
-      setStatus("closed");
-      setReason(exitError || ev.reason || (ev.code === 1000 ? "Session ended." : `Disconnected (${ev.code}).`));
-    };
+    connect();
     const data = term.onData((s) => {
-      if (!readOnly && ws.readyState === WebSocket.OPEN) ws.send(enc.encode(s));
+      if (!readOnly && ws?.readyState === WebSocket.OPEN) ws.send(enc.encode(s));
     });
     const resize = term.onResize(sendResize);
     return () => {
+      disposed = true;
+      clearTimeout(retry);
       data.dispose();
       resize.dispose();
       ro.disconnect();
-      ws.close(1000);
+      ws?.close(1000);
       term.dispose();
     };
   }, [workspace, room, mode, readOnly]);
@@ -94,7 +122,8 @@ export function TerminalView({ workspace, room, mode, readOnly }: { workspace: s
         <Badge tone={status === "open" ? "ok" : status === "connecting" ? "info" : "bad"}>{status}</Badge>
         {readOnly && <Badge>read-only</Badge>}
         {recording && <Badge tone="warn">input recorded</Badge>}
-        {status === "closed" && <span className="text-muted">{reason}</span>}
+        {reason && status !== "open" && <span className="text-muted">{reason}</span>}
+        {mode === "agent" && !readOnly && status === "open" && <span className="text-muted">Ctrl+C quits the agent's TUI; it restarts in a second.</span>}
       </div>
       <div
         ref={ref}
