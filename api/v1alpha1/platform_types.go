@@ -195,7 +195,9 @@ type ModelProvider struct {
 	// Base URL, for openaiCompatible (e.g. a local vLLM) or a proxy.
 	// +optional
 	BaseURL string `json:"baseURL,omitempty"`
-	// Secret in the platform namespace with key apiKey. Optional for local servers.
+	// Secret with key apiKey. One in the system namespace (where the control
+	// center writes it) is copied to the platform namespace for the gateway;
+	// otherwise it is read from the platform namespace. Optional for local servers.
 	// +optional
 	APIKeySecretRef *corev1.LocalObjectReference `json:"apiKeySecretRef,omitempty"`
 	// Models this provider serves, as the gateway exposes them.

@@ -268,6 +268,13 @@ func (r *Reconciler) applyGateway(ctx context.Context, p *v1alpha1.Platform, v m
 	if _, err := pki.EnsureTLSSecret(ctx, r.Client, ca, types.NamespacedName{Namespace: ns, Name: "warden-client"}, req, r.now(), r.ownedBy(p, "warden")); err != nil {
 		return false, "", err
 	}
+	keys, err := r.syncProviderKeys(ctx, p)
+	if err != nil {
+		return false, "", err
+	}
+	if keys != "" {
+		v.Gateway.ConfigHash = manifests.Hash(v.Gateway.ConfigHash + keys)
+	}
 	if err := r.render(ctx, p, manifests.Gateway, v); err != nil {
 		return false, "", err
 	}
