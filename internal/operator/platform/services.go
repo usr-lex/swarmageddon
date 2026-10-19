@@ -94,7 +94,8 @@ func (r *Reconciler) values(ctx context.Context, p *v1alpha1.Platform) (manifest
 	v.Messaging = manifests.MessagingValues{Replicas: replicas, Storage: storage(s.Messaging.Storage, "10Gi"), Routes: strings.Join(routes, ",")}
 
 	cfg, provs := manifests.LiteLLMConfig(s.Gateway.Providers)
-	v.Gateway = manifests.GatewayValues{Config: cfg, ConfigHash: manifests.Hash(cfg), Providers: provs}
+	env, _ := manifests.GatewayEnv(s.Gateway.Env)
+	v.Gateway = manifests.GatewayValues{Config: cfg, ConfigHash: manifests.Hash(cfg), Providers: provs, Env: env}
 
 	v.Registry = manifests.RegistryValues{Storage: storage(s.RegistryCache.Storage, "100Gi"), RemoteURL: "https://registry-1.docker.io", TTL: "168h"}
 
@@ -314,6 +315,9 @@ func (r *Reconciler) applyGateway(ctx context.Context, p *v1alpha1.Platform, v m
 		return false, "", err
 	}
 	msg := fmt.Sprintf("LiteLLM %d/%d, warden %d/%d replicas available; %d providers", lAvail, lWant, wAvail, wWant, len(v.Gateway.Providers))
+	if _, ignored := manifests.GatewayEnv(p.Spec.Services.Gateway.Env); len(ignored) > 0 {
+		msg += "; env ignored (set by the operator): " + strings.Join(ignored, ", ")
+	}
 	ready := lAvail >= 1 && wAvail >= 1
 	if lAvail < 1 {
 		msg += r.stuck(ctx, "litellm")

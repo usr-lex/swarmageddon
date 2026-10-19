@@ -5,6 +5,7 @@
 package manifests
 
 import (
+	"slices"
 	"bytes"
 	"crypto/sha256"
 	"embed"
@@ -153,6 +154,26 @@ type MessagingValues struct {
 	Routes string
 }
 
+// EnvVar is one name=value for a container.
+type EnvVar struct{ Name, Value string }
+
+// GatewayEnv sorts the admin's extra LiteLLM environment and leaves out the
+// names the template sets (the master key, the database, logging, provider
+// keys), returning those as ignored.
+func GatewayEnv(env map[string]string) (out []EnvVar, ignored []string) {
+	for name, value := range env {
+		if name == "LITELLM_MASTER_KEY" || name == "DATABASE_URL" || name == "LITELLM_LOG" ||
+			name == "LITELLM_TELEMETRY" || strings.HasPrefix(name, "PROVIDER_") || strings.HasPrefix(name, "SENTRY_") {
+			ignored = append(ignored, name)
+			continue
+		}
+		out = append(out, EnvVar{Name: name, Value: value})
+	}
+	slices.SortFunc(out, func(a, b EnvVar) int { return strings.Compare(a.Name, b.Name) })
+	slices.Sort(ignored)
+	return out, ignored
+}
+
 // Provider is a model provider as the gateway template needs it.
 type Provider struct {
 	// EnvVar carrying the API key, e.g. PROVIDER_ANTHROPIC_API_KEY.
@@ -166,6 +187,8 @@ type GatewayValues struct {
 	Config     string
 	ConfigHash string
 	Providers  []Provider
+	// Env is extra environment for LiteLLM, sorted by name.
+	Env []EnvVar
 }
 
 type RegistryValues struct {

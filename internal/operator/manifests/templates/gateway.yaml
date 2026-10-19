@@ -56,6 +56,9 @@ spec:
               valueFrom: {secretKeyRef: {name: {{ .SecretName }}, key: apiKey}}
 {{- end }}
 {{- end }}
+{{- range .Gateway.Env }}
+            - {name: {{ quote .Name }}, value: {{ quote .Value }}}
+{{- end }}
           ports:
             - {name: http, containerPort: 4000}
           readinessProbe:

@@ -289,3 +289,30 @@ func TestDevicesSELinuxType(t *testing.T) {
 		}
 	}
 }
+
+// The admin's extra LiteLLM environment (OpenShift report 5.7: CRC on Apple
+// silicon needs OPENSSL_armcap=0) reaches the container; names the template
+// sets are left out.
+func TestGatewayEnv(t *testing.T) {
+	env, ignored := GatewayEnv(map[string]string{"OPENSSL_armcap": "0", "LITELLM_MASTER_KEY": "x", "PROVIDER_A_API_KEY": "y", "HTTP_TIMEOUT": "30"})
+	if len(env) != 2 || env[0].Name != "HTTP_TIMEOUT" || env[1].Name != "OPENSSL_armcap" || strings.Join(ignored, ",") != "LITELLM_MASTER_KEY,PROVIDER_A_API_KEY" {
+		t.Fatalf("env %v ignored %v", env, ignored)
+	}
+	v := testValues()
+	v.Gateway.Env = env
+	objs, err := Render(Gateway, v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, o := range objs {
+		if o.GetKind() != "Deployment" || o.GetName() != "litellm" {
+			continue
+		}
+		b, _ := yaml.Marshal(o.Object)
+		found = strings.Contains(string(b), "name: OPENSSL_armcap") && strings.Contains(string(b), `value: "0"`)
+	}
+	if !found {
+		t.Fatal("OPENSSL_armcap not in LiteLLM's env")
+	}
+}

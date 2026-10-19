@@ -66,10 +66,9 @@ and `swarmageddon-devices` (the device plugin), and lets its own pods use
 DNS (`openshift-dns`, port 5353) by themselves.
 
 On arm64 OpenShift Local (CRC) on Apple silicon, the node advertises SVE2
-and OpenSSL crashes in LiteLLM (SIGILL, exit 132, no output). Until the
-gateway takes extra environment variables,
-`kubectl -n swarmageddon-platform set env deploy/litellm OPENSSL_armcap=0`
-works around it (the operator may undo it on its next update).
+and OpenSSL crashes in LiteLLM (SIGILL, exit 132, no output). Set
+`OPENSSL_armcap=0` for it:
+`kubectl patch platform default --type merge -p '{"spec":{"services":{"gateway":{"env":{"OPENSSL_armcap":"0"}}}}}'`.
 
 ### Getting the setup token again
 

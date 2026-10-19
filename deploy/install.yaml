@@ -219,12 +219,21 @@ spec:
                     type: object
                   gateway:
                     properties:
+                      env:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Env adds environment variables to LiteLLM, e.g. OPENSSL_armcap=0 where
+                          OpenSSL crashes on the node's CPU. Names it sets itself are refused.
+                        type: object
                       providers:
                         items:
                           properties:
                             apiKeySecretRef:
-                              description: Secret in the platform namespace with key
-                                apiKey. Optional for local servers.
+                              description: |-
+                                Secret with key apiKey. One in the system namespace (where the control
+                                center writes it) is copied to the platform namespace for the gateway;
+                                otherwise it is read from the platform namespace. Optional for local servers.
                               properties:
                                 name:
                                   default: ""

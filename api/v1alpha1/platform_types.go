@@ -186,6 +186,10 @@ const (
 type GatewayService struct {
 	// +optional
 	Providers []ModelProvider `json:"providers,omitempty"`
+	// Env adds environment variables to LiteLLM, e.g. OPENSSL_armcap=0 where
+	// OpenSSL crashes on the node's CPU. Names it sets itself are refused.
+	// +optional
+	Env map[string]string `json:"env,omitempty"`
 }
 
 type ModelProvider struct {
