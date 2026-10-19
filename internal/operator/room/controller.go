@@ -295,7 +295,7 @@ func (r *Reconciler) reconcile(ctx context.Context, room *v1.Room, wsName string
 		return retry, err
 	}
 
-	res, err := r.reconcileStatefulSet(ctx, room, &ws, st, podExtras{Env: set.Env, Shared: shared, PersonaHash: dataHash(data)})
+	res, err := r.reconcileStatefulSet(ctx, room, &ws, st, podExtras{Env: set.Env, Shared: shared, PersonaHash: dataHash(data), Overcommit: r.Deps.DevOvercommit})
 	if err != nil {
 		return retry, err
 	}

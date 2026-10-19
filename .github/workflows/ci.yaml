@@ -136,6 +136,9 @@ jobs:
           kc get platform default -o yaml
           kc get workspaces,rooms,runnerpools -A -o wide
           kc get events -A --sort-by=.lastTimestamp | tail -100
+          # Scheduler events (events.k8s.io) have no lastTimestamp, so the
+          # sort above can drop them.
+          kc get events -A --field-selector reason=FailedScheduling
           kc describe nodes
           kc -n ws-acme describe pods
           docker logs k3d-swarm-dev-server-0 2>&1 | grep -iE 'schedul|volume.?bind|local-path' | tail -80 || true

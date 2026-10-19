@@ -372,6 +372,7 @@ func (r *Reconciler) startJob(ctx context.Context, fc *forgejo.Client, pool *v1.
 		}
 	}
 	pod := desiredPod(pool, ws.Name, name, image, tier, reg, j)
+	pod.Spec.Containers[0].Resources.Requests = room.Overcommitted(pod.Spec.Containers[0].Resources.Requests, r.Deps.DevOvercommit)
 	if repo != "" {
 		pod.Annotations[AnnRunnerRepo] = repo
 	}

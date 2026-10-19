@@ -120,9 +120,29 @@ func ApplyTier(spec *corev1.PodSpec, c *corev1.Container, tier string) {
 	}
 }
 
+// Overcommitted divides CPU and memory requests by n (operator flag
+// --dev-overcommit, for dev and CI clusters smaller than the plan); n <= 1
+// leaves them. Limits are never divided, so a room may still use what it was
+// planned to.
+func Overcommitted(req corev1.ResourceList, n int64) corev1.ResourceList {
+	if n <= 1 {
+		return req
+	}
+	out := req.DeepCopy()
+	if q, ok := req[corev1.ResourceCPU]; ok {
+		out[corev1.ResourceCPU] = *resource.NewMilliQuantity(max(q.MilliValue()/n, 10), resource.DecimalSI)
+	}
+	if q, ok := req[corev1.ResourceMemory]; ok {
+		out[corev1.ResourceMemory] = *resource.NewQuantity(max(q.Value()/n, 64<<20), resource.BinarySI)
+	}
+	return out
+}
+
 // podExtras are what the pod template takes from the layered settings and
 // the workspace (§6.6).
 type podExtras struct {
+	// Overcommit divides the room's requests (--dev-overcommit).
+	Overcommit int64
 	// Env is the merged environment; nil means the room's own spec.env.
 	Env map[string]string
 	// Shared are the workspace's shared volumes the room mounts.
@@ -199,7 +219,7 @@ func desiredStatefulSet(r *v1.Room, ws, image, tier string, x podExtras) *appsv1
 		Command: []string{"tini", "--", "supervisor"},
 		Env:     env,
 		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: mem},
+			Requests: Overcommitted(corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: mem}, x.Overcommit),
 			Limits:   corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: mem},
 		},
 		VolumeMounts: mounts,

@@ -44,6 +44,7 @@ func main() {
 		imagesFrom  = flag.String("images-from", "", "YAML or JSON file overriding image references (keys as in internal/operator/images)")
 		roomImage   = flag.String("room-image", "", "room image, overriding the default and --images-from")
 		showVersion = flag.Bool("version", false, "print the version and exit")
+		overcommit  = flag.Int64("dev-overcommit", 1, "development only: divide rooms' and runner pods' CPU and memory requests (not limits) by this, to fit a small cluster")
 	)
 	if len(os.Args) > 1 && os.Args[1] == "welcome" {
 		if err := welcome(15 * time.Minute); err != nil {
@@ -68,7 +69,7 @@ func main() {
 	if terr != nil {
 		log.Error(terr, "error reporting is off")
 	}
-	if err := run(*metricsAddr, *probeAddr, *leaderElect, *imagesFrom, *roomImage); err != nil {
+	if err := run(*metricsAddr, *probeAddr, *leaderElect, *imagesFrom, *roomImage, *overcommit); err != nil {
 		log.Error(err, "operator failed")
 		flush()
 		os.Exit(1)
@@ -76,7 +77,7 @@ func main() {
 	flush()
 }
 
-func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage string) error {
+func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage string, overcommit int64) error {
 	log := ctrl.Log.WithName("setup")
 	base := images.Defaults(version.Version)
 	// Our own images come from the chart's image.registry and image.tag;
@@ -150,8 +151,9 @@ func run(metricsAddr, probeAddr string, leaderElect bool, imagesFrom, roomImage 
 		// The platform services report with the operator's settings.
 		Sentry: telemetry.Current(),
 		// Uncached: one lookup every few minutes needs no cluster-wide watch.
-		DNS:       &clusterdns.Finder{Reader: mgr.GetAPIReader()},
-		OpenShift: onOpenShift,
+		DNS:           &clusterdns.Finder{Reader: mgr.GetAPIReader()},
+		OpenShift:     onOpenShift,
+		DevOvercommit: overcommit,
 	}
 	pf := &preflight.Runner{Client: c, ServerVersion: dc.ServerVersion, Images: imgs, OpenShift: onOpenShift}
 	if err := platform.SetupWithManager(mgr, d, pf); err != nil {

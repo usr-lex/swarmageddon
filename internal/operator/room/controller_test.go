@@ -463,3 +463,25 @@ func TestInWindow(t *testing.T) {
 		}
 	}
 }
+
+// --dev-overcommit (make dev, CI's 2-CPU runner) divides what a room
+// reserves, not what it may use: limits stay as planned.
+func TestDevOvercommit(t *testing.T) {
+	r := &v1.Room{ObjectMeta: metav1.ObjectMeta{Name: "athena", Namespace: "ws-acme"}}
+	cpu, mem := resource.MustParse("2"), resource.MustParse("6Gi")
+	r.Spec.Resources.CPU, r.Spec.Resources.Memory = &cpu, &mem
+	c := desiredStatefulSet(r, "acme", "room:1", "privileged", podExtras{Overcommit: 8}).Spec.Template.Spec.Containers[0].Resources
+	if got := c.Requests.Cpu().MilliValue(); got != 250 {
+		t.Errorf("cpu request %dm, want 250m", got)
+	}
+	if got := c.Requests.Memory().Value(); got != 768<<20 {
+		t.Errorf("memory request %d, want 768Mi", got)
+	}
+	if !c.Limits.Cpu().Equal(cpu) || !c.Limits.Memory().Equal(mem) {
+		t.Errorf("limits changed: %v", c.Limits)
+	}
+	plain := desiredStatefulSet(r, "acme", "room:1", "privileged", podExtras{}).Spec.Template.Spec.Containers[0].Resources
+	if !plain.Requests.Cpu().Equal(cpu) || !plain.Requests.Memory().Equal(mem) {
+		t.Errorf("without overcommit, requests %v", plain.Requests)
+	}
+}

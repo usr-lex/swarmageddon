@@ -61,6 +61,9 @@ type Deps struct {
 	// OpenShift: bind the chart's security context constraints in each
 	// namespace the operator creates (package openshift).
 	OpenShift bool
+	// DevOvercommit divides rooms' and runner pods' CPU and memory requests
+	// (not limits) on dev and CI clusters smaller than the plan; 0 or 1 is off.
+	DevOvercommit int64
 }
 
 // ErrNotReady means a platform service isn't deployed or reachable yet;

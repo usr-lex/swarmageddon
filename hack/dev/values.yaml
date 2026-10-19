@@ -5,3 +5,8 @@ image:
   pullPolicy: Always
 welcome:
   ttlSecondsAfterFinished: 600
+operator:
+  # Reserve an eighth of each room's and runner pod's CPU and memory (limits
+  # unchanged): CI's runner has 2 vCPUs and 7 GiB, and the e2e plan wants
+  # five rooms, a sixth and a CI job on top of the platform.
+  extraArgs: ["--dev-overcommit=8"]
