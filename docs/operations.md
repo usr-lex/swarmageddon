@@ -32,6 +32,28 @@ comes from. Check the fingerprint your browser shows before typing the token.
 The install creates only the operator and the control center, in the
 `swarmageddon-system` namespace. The web wizard deploys everything else.
 
+### Building from source
+
+Until a release is published (or to run your own changes), build the
+images and install the chart from the repository:
+
+```sh
+make images REGISTRY=registry.example.com/swarm VERSION=0.1.0   # docker buildx
+# or: make images CONTAINER_TOOL=podman REGISTRY=... VERSION=...
+for i in room runner operator control-center messaging warden egress mockmodel devices; do
+  docker push registry.example.com/swarm/$i:0.1.0   # or podman push
+done
+helm install swarmageddon charts/swarmageddon -n swarmageddon-system --create-namespace \
+  --set image.registry=registry.example.com/swarm --set image.tag=0.1.0
+```
+
+The operator deploys every other image from the same registry and tag.
+Give each build a new tag: nodes keep an image they already pulled under the
+same tag (`IfNotPresent`). `--set image.pullPolicy=Always` covers only the
+chart's own pods (operator, control center), not the rooms and services the
+operator creates. Behind a TLS-intercepting proxy, add
+`BUILD_CA=/path/to/ca.pem` to `make images`.
+
 ### OpenShift
 
 Install with `helm install` (as above): the chart sees the

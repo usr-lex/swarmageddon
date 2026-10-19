@@ -66,8 +66,15 @@ ifneq ($(BUILD_CA),)
 BUILDX_FLAGS += --network host --secret id=build_ca,src=$(BUILD_CA) \
 	--build-arg HTTPS_PROXY --build-arg https_proxy --build-arg NO_PROXY --build-arg no_proxy
 endif
+# CONTAINER_TOOL=podman builds with podman (same Dockerfiles; images land in
+# podman's store, so IMAGE_OUTPUT doesn't apply).
+CONTAINER_TOOL ?= docker
+ifeq ($(CONTAINER_TOOL),podman)
+BUILDX = podman build --platform $(PLATFORMS) $(BUILDX_FLAGS) --build-arg VERSION=$(VERSION)
+else
 BUILDX = docker buildx build --platform $(PLATFORMS) $(IMAGE_OUTPUT) $(BUILDX_FLAGS) \
 	--build-arg VERSION=$(VERSION)
+endif
 
 .PHONY: images image-room image-runner $(addprefix image-,$(SERVICE_IMAGES))
 ## images: every image, tagged $(REGISTRY)/<name>:$(VERSION)
@@ -147,7 +154,7 @@ DEV_IMAGES ?= $(IMAGES)
 # Called by hack/dev/up.sh: build every image and push it to the dev registry.
 dev-images:
 	$(MAKE) $(addprefix image-,$(DEV_IMAGES)) REGISTRY=$(DEV_REGISTRY) VERSION=dev PLATFORMS=linux/$(HOST_ARCH) IMAGE_OUTPUT=--load
-	for i in $(DEV_IMAGES); do docker push $(DEV_REGISTRY)/$$i:dev; done
+	for i in $(DEV_IMAGES); do $(CONTAINER_TOOL) push $(DEV_REGISTRY)/$$i:dev; done
 
 dev-down: $(K3D)
 	K3D=$(K3D) hack/dev/down.sh
