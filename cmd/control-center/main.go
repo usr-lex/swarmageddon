@@ -286,7 +286,7 @@ func run(ctx context.Context, log *slog.Logger, o options) error {
 			return
 		}
 		cr := &certReloader{cert: o.tlsCert, key: o.tlsKey}
-		if _, err := cr.get(nil); err != nil {
+		if err := waitForCert(ctx, log, cr, 2*time.Second); err != nil {
 			errc <- fmt.Errorf("serving certificate: %w", err)
 			return
 		}
@@ -341,6 +341,28 @@ func connectDB(ctx context.Context, log *slog.Logger, kc *k8s.Client, srv *api.S
 		case <-ctx.Done():
 			return
 		case <-time.After(10 * time.Second):
+		}
+	}
+}
+
+// waitForCert waits until the serving certificate loads. On a fresh install
+// the operator creates Secret control-center-tls after this pod starts (the
+// volume is optional), and the kubelet projects it in place once it exists.
+func waitForCert(ctx context.Context, log *slog.Logger, cr *certReloader, every time.Duration) error {
+	logged := false
+	for {
+		_, err := cr.get(nil)
+		if err == nil {
+			return nil
+		}
+		if !logged {
+			log.Info("waiting for the serving certificate (Secret control-center-tls)", "err", err)
+			logged = true
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%w (last: %v)", ctx.Err(), err)
+		case <-time.After(every):
 		}
 	}
 }
