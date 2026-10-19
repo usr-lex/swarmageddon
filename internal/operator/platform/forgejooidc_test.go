@@ -24,6 +24,9 @@ import (
 type fakeExec struct {
 	list  string
 	fail  error
+	// failOn fails commands that contain this word, as Forgejo refuses to
+	// delete an auth source accounts use.
+	failOn string
 	calls [][]string
 	stdin []string
 }
@@ -41,6 +44,9 @@ func (f *fakeExec) Exec(_ context.Context, ns, pod, container string, cmd []stri
 	f.stdin = append(f.stdin, in)
 	if f.fail != nil {
 		return f.fail
+	}
+	if f.failOn != "" && slices.Contains(cmd, f.failOn) {
+		return errors.New("command terminated with exit code 1")
 	}
 	if slices.Equal(cmd, []string{"forgejo", "admin", "auth", "list"}) {
 		_, _ = io.WriteString(stdout, "ID\tName\tType\tEnabled\n"+f.list)
@@ -182,9 +188,35 @@ func TestForgejoOIDC(t *testing.T) {
 	if c := cond(); c.Status != metav1.ConditionFalse || c.Reason != "NoProvider" {
 		t.Errorf("condition = %+v", c)
 	}
+	// Turned off: the source the operator wrote is deleted. While accounts
+	// use it Forgejo refuses, and that is reported, not hidden.
 	p.Spec.Services.Forgejo.OIDCLogin = false
+	fx.calls, fx.list = nil, "7\tkeycloak\tOAuth2\ttrue\n"
+	fx.failOn = "delete"
+	if d := r.forgejoOIDC(ctx, p); d == 0 {
+		t.Error("no retry while the source is in use")
+	}
+	if c := cond(); c == nil || c.Status != metav1.ConditionFalse || c.Reason != "StillConfigured" {
+		t.Fatalf("condition = %+v", c)
+	}
+	fx.calls, fx.failOn = nil, ""
 	r.forgejoOIDC(ctx, p)
+	if len(fx.calls) != 2 || !slices.Equal(fx.calls[1], []string{"forgejo", "admin", "auth", "delete", "--id", "7"}) {
+		t.Fatalf("calls = %q", fx.calls)
+	}
 	if cond() != nil {
 		t.Error("condition kept with oidcLogin off")
+	}
+	if err := env.Client.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: "forgejo-0"}, &cur); err != nil {
+		t.Fatal(err)
+	}
+	if cur.Annotations[annForgejoOIDC] != "" {
+		t.Error("pod still annotated after the source was deleted")
+	}
+	// Nothing left to delete: nothing runs.
+	fx.calls = nil
+	r.forgejoOIDC(ctx, p)
+	if len(fx.calls) != 0 {
+		t.Fatalf("ran with nothing configured: %q", fx.calls)
 	}
 }

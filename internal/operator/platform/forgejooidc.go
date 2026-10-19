@@ -35,6 +35,10 @@ const ConditionForgejoOIDC = "ForgejoOIDCReady"
 // that) has none, and gets the source written again.
 const annForgejoOIDC = "swarmageddon.dev/oidc-login"
 
+// annForgejoOIDCName names the auth source written, so it can be removed
+// when the login is turned off.
+const annForgejoOIDCName = "swarmageddon.dev/oidc-login-source"
+
 const forgejoPod, forgejoContainer = "forgejo-0", "forgejo"
 
 // Execer runs a command in a pod's container (pods/exec).
@@ -80,8 +84,7 @@ func (k KubeExec) Exec(ctx context.Context, ns, pod, container string, cmd []str
 // how soon to look again.
 func (r *Reconciler) forgejoOIDC(ctx context.Context, p *v1alpha1.Platform) time.Duration {
 	if !p.Spec.Services.Forgejo.OIDCLogin {
-		meta.RemoveStatusCondition(&p.Status.Conditions, ConditionForgejoOIDC)
-		return 0
+		return r.removeForgejoOIDC(ctx, p)
 	}
 	fail := func(reason, msg string, retry time.Duration) time.Duration {
 		setCond(p, ConditionForgejoOIDC, false, reason, msg)
@@ -135,11 +138,50 @@ func (r *Reconciler) forgejoOIDC(ctx context.Context, p *v1alpha1.Platform) time
 	if err := r.Exec.Exec(ctx, v1alpha1.PlatformNamespace, forgejoPod, forgejoContainer, cmd, strings.NewReader(secret), io.Discard, &errOut); err != nil {
 		return fail("ExecFailed", fmt.Sprintf("forgejo admin auth %s: %v: %s", verb[0], err, strings.TrimSpace(errOut.String())), time.Minute)
 	}
-	patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"annotations": map[string]string{annForgejoOIDC: sum}}})
+	patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"annotations": map[string]string{annForgejoOIDC: sum, annForgejoOIDCName: prov.Name}}})
 	if err := r.Patch(ctx, &pod, client.RawPatch(types.MergePatchType, patch)); err != nil {
 		return fail("Error", "annotate "+forgejoPod+": "+err.Error(), time.Minute)
 	}
 	setCond(p, ConditionForgejoOIDC, true, "Configured", done)
+	return 0
+}
+
+// removeForgejoOIDC deletes the auth source forgejoOIDC wrote, once
+// services.forgejo.oidcLogin is off. Forgejo 17 can't deactivate an OAuth2
+// source and refuses to delete one that accounts use; then the condition
+// says people can still sign in with it, and why.
+func (r *Reconciler) removeForgejoOIDC(ctx context.Context, p *v1alpha1.Platform) time.Duration {
+	var pod corev1.Pod
+	err := r.Get(ctx, types.NamespacedName{Namespace: v1alpha1.PlatformNamespace, Name: forgejoPod}, &pod)
+	name := pod.Annotations[annForgejoOIDCName]
+	if err != nil || name == "" {
+		meta.RemoveStatusCondition(&p.Status.Conditions, ConditionForgejoOIDC)
+		return 0
+	}
+	still := func(why string) time.Duration {
+		setCond(p, ConditionForgejoOIDC, false, "StillConfigured", "services.forgejo.oidcLogin is off, but people can still sign in to Forgejo with "+name+": "+why)
+		return time.Minute
+	}
+	if !podReady(&pod) || r.Exec == nil {
+		return still("waiting for pod " + forgejoPod + " to remove the auth source")
+	}
+	var out, errOut bytes.Buffer
+	if err := r.Exec.Exec(ctx, v1alpha1.PlatformNamespace, forgejoPod, forgejoContainer, []string{"forgejo", "admin", "auth", "list"}, nil, &out, &errOut); err != nil {
+		return still(fmt.Sprintf("forgejo admin auth list: %v: %s", err, strings.TrimSpace(errOut.String())))
+	}
+	if id, ok := authSourceID(out.String(), name); ok {
+		errOut.Reset()
+		cmd := []string{"forgejo", "admin", "auth", "delete", "--id", strconv.FormatInt(id, 10)}
+		if err := r.Exec.Exec(ctx, v1alpha1.PlatformNamespace, forgejoPod, forgejoContainer, cmd, nil, io.Discard, &errOut); err != nil {
+			return still(fmt.Sprintf("forgejo admin auth delete: %v: %s. Forgejo refuses while accounts use the source: "+
+				"switch them to local sign-in in Forgejo's site administration (User accounts), or delete the source there", err, strings.TrimSpace(errOut.String())))
+		}
+	}
+	patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"annotations": map[string]any{annForgejoOIDC: nil, annForgejoOIDCName: nil}}})
+	if err := r.Patch(ctx, &pod, client.RawPatch(types.MergePatchType, patch)); err != nil {
+		return still("annotate " + forgejoPod + ": " + err.Error())
+	}
+	meta.RemoveStatusCondition(&p.Status.Conditions, ConditionForgejoOIDC)
 	return 0
 }
 
