@@ -136,6 +136,9 @@ jobs:
           kc get platform default -o yaml
           kc get workspaces,rooms,runnerpools -A -o wide
           kc get events -A --sort-by=.lastTimestamp | tail -100
+          kc describe nodes
+          kc -n ws-acme describe pods
+          df -h /
           kc -n swarmageddon-system logs deploy/swarmageddon-operator --tail=300
           kc -n swarmageddon-system logs deploy/control-center --all-containers --tail=200
           kc -n swarmageddon-platform logs sts/messaging --tail=100
