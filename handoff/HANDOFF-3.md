@@ -24,8 +24,22 @@ mergers team*: Forgejo refused the merge ("won't sign: nokey").
 had no key. Fixed in 63f73f2: the operator keeps an SSH signing key in
 `forgejo-secrets` and Forgejo signs merges with it (`MERGES=always`;
 reproduced and verified on Forgejo 17 in Docker). The amd64 images job ran
-out of runner disk (it now frees disk first). **Run 32 was dispatched on
-63f73f2.**
+out of runner disk (it now frees disk first).
+
+**Run 32** (63f73f2): images and every job but e2e green; the merge test
+passed. Two e2e failures, both fixed in c76c666:
+
+- *forge CI on an ephemeral runner*: each runner pod's first connection to
+  Forgejo was refused (the network policy controller hadn't added the new
+  pod's IP yet) and `one-job` gives up at once; the pod was replaced every
+  2 s for 15 minutes. The runner now waits for Forgejo before `one-job`.
+- *observatory edges*: a run of messages never reached the activity table.
+  Found one way records are lost: a failed insert dropped the rest of its
+  batch and the cursor moved past it. Fixed and tested, but the trigger in
+  run 32 isn't known (the dump didn't reach back far enough); the dump now
+  includes the control center's observatory log lines.
+
+**Run 33 was dispatched on c76c666.**
 
 Also fixed on the way: the control-center image's Node stage didn't trust
 `BUILD_CA` (npm failed behind the proxy); "VolumesReady: expanding" was
