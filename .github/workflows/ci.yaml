@@ -145,6 +145,7 @@ jobs:
           df -h /
           kc -n swarmageddon-system logs deploy/swarmageddon-operator --tail=300
           kc -n swarmageddon-system logs deploy/control-center --all-containers --tail=200
+          kc -n swarmageddon-system logs deploy/control-center --all-containers | grep -i observatory | tail -50
           kc -n swarmageddon-platform logs sts/messaging --tail=100
           kc -n swarmageddon-platform logs deploy/warden --tail=100
           for p in $(bin/tools/kubectl --context k3d-swarm-dev -n ws-acme get pods -o name 2>/dev/null); do

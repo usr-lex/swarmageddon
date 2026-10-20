@@ -87,6 +87,9 @@ func TestStartsOnePodPerJobUpToMax(t *testing.T) {
 	if ctr.Image != "runner:1" || ctr.Args[0] != "one-job" || !slices.Contains(ctr.Args, "--handle") || !slices.Contains(ctr.Args, "file:/run/runner/token") || !slices.Contains(ctr.Args, "swarm:host") {
 		t.Errorf("container = %v %v", ctr.Image, ctr.Args)
 	}
+	if len(ctr.Command) < 3 || ctr.Command[0] != "/bin/sh" || ctr.Command[len(ctr.Command)-1] != "forgejo-runner" {
+		t.Errorf("command = %q, want the wait for Forgejo, then forgejo-runner", ctr.Command)
+	}
 	if p.Spec.RestartPolicy != corev1.RestartPolicyNever || *p.Spec.AutomountServiceAccountToken || p.Spec.HostUsers == nil || *p.Spec.HostUsers {
 		t.Errorf("pod spec = %+v", p.Spec)
 	}

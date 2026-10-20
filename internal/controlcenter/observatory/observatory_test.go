@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	messagingv1 "github.com/usr-lex/swarmageddon/gen/swarm/messaging/v1"
@@ -236,5 +237,65 @@ func TestObservatory(t *testing.T) {
 	// Retention.
 	if n, _ := db.DeleteActivityBefore(ctx, "acme", day(11, 0)); n != 5 {
 		t.Fatalf("retention removed %d", n)
+	}
+}
+
+// A record that fails to store (in CI run 32 most likely the database going
+// away for a moment; here a trigger refusing it) costs neither the records
+// after it in the same poll nor, through the cursor, itself: the next poll
+// reads it again. Text PostgreSQL can't store (NUL) is
+// cleaned instead of failing every poll.
+func TestAuditFollowerKeepsTheCursorOnInsertErrors(t *testing.T) {
+	url := storetest.URL(t)
+	ctx := context.Background()
+	db, err := store.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(db.Close)
+	sql, err := pgx.Connect(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sql.Close(ctx) }()
+	if _, err := sql.Exec(ctx, `CREATE FUNCTION refuse_m2() RETURNS trigger AS $$
+		BEGIN IF NEW.dedup = 'audit/refusal/m2/2026-10-20T00:02:00Z' THEN RAISE EXCEPTION 'database went away'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql;
+		CREATE TRIGGER refuse_m2 BEFORE INSERT ON activity_events FOR EACH ROW EXECUTE FUNCTION refuse_m2()`); err != nil {
+		t.Fatal(err)
+	}
+	rec := &Recorder{DB: func() *store.Store { return db }}
+	at := func(m int) *timestamppb.Timestamp { return timestamppb.New(time.Date(2026, 10, 20, 0, m, 0, 0, time.UTC)) }
+	fm := &fakeMessaging{records: []*messagingv1.AuditRecord{
+		{Kind: "message", At: at(1), From: "athena@acme", To: "hermes@acme", MessageId: "m1"},
+		{Kind: "refusal", At: at(2), From: "athena@acme", To: "metis@acme", MessageId: "m2", Reason: "refused"},
+		{Kind: "message", At: at(3), From: "admin@acme", To: "athena@acme", MessageId: "m3"},
+		{Kind: "refusal", At: at(4), From: "athena@acme", To: "metis@acme", MessageId: "m4", Reason: "a \x00 byte"},
+	}}
+	rooms := map[string]bool{"athena": true, "hermes": true, "metis": true}
+	f := &AuditFollower{Msg: client(t, fm), R: rec, Backfill: 365 * 24 * time.Hour, IsRoom: func(_ context.Context, _, n string) bool { return rooms[n] }}
+
+	if err := f.Poll(ctx, "acme"); err == nil {
+		t.Error("Poll: no error for the record that wasn't stored")
+	}
+	edges, _ := db.Edges(ctx, "acme", at(0).AsTime(), at(10).AsTime())
+	if len(edges) != 2 {
+		t.Fatalf("edges %+v, want athena>hermes and admin>athena", edges)
+	}
+	if cur, _ := db.ActivityCursor(ctx, "acme"); cur.After(at(2).AsTime()) {
+		t.Errorf("cursor moved to %v, past the record that failed", cur)
+	}
+
+	if _, err := sql.Exec(ctx, `DROP TRIGGER refuse_m2 ON activity_events`); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Poll(ctx, "acme"); err != nil {
+		t.Fatal(err)
+	}
+	tl, _ := db.Timeline(ctx, "acme", store.TimelineFilter{Kinds: []string{store.KindRefusal}})
+	if len(tl) != 2 {
+		t.Errorf("refusals on the timeline: %d, want 2", len(tl))
+	}
+	if cur, _ := db.ActivityCursor(ctx, "acme"); !cur.Equal(at(4).AsTime()) {
+		t.Errorf("cursor %v, want %v", cur, at(4).AsTime())
 	}
 }

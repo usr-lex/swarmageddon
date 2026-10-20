@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -64,6 +66,7 @@ type Activity struct {
 // returns the events actually stored, with their IDs.
 func (s *Store) InsertActivity(ctx context.Context, evs ...Activity) ([]Activity, error) {
 	var out []Activity
+	var errs []error
 	for _, e := range evs {
 		var dedup any
 		if e.Dedup != "" {
@@ -72,17 +75,31 @@ func (s *Store) InsertActivity(ctx context.Context, evs ...Activity) ([]Activity
 		err := s.pool.QueryRow(ctx, `INSERT INTO activity_events (ts, workspace, actor, kind, target, repo, number, summary, ref_url, value, dedup)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			ON CONFLICT (workspace, dedup) WHERE dedup IS NOT NULL DO NOTHING RETURNING id`,
-			e.TS, e.Workspace, e.Actor, e.Kind, e.Target, e.Repo, e.Number, truncate(e.Summary, 500), e.RefURL, e.Value, dedup).Scan(&e.ID)
+			e.TS, e.Workspace, noNUL(e.Actor), e.Kind, noNUL(e.Target), noNUL(e.Repo), e.Number, noNUL(truncate(e.Summary, 500)), noNUL(e.RefURL), e.Value, dedup).Scan(&e.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			continue
 		}
 		if err != nil {
-			return out, err
+			// The rest of the batch is still stored; the caller retries the failed ones.
+			errs = append(errs, &InsertError{Event: e, Err: err})
+			continue
 		}
 		out = append(out, e)
 	}
-	return out, nil
+	return out, errors.Join(errs...)
 }
+
+// InsertError is an event InsertActivity couldn't store.
+type InsertError struct {
+	Event Activity
+	Err   error
+}
+
+func (e *InsertError) Error() string { return fmt.Sprintf("activity %s at %s: %v", e.Event.Kind, e.Event.TS.Format(time.RFC3339), e.Err) }
+func (e *InsertError) Unwrap() error { return e.Err }
+
+// noNUL drops NUL characters, which PostgreSQL text can't hold.
+func noNUL(s string) string { return strings.ReplaceAll(s, "\x00", "") }
 
 func truncate(s string, n int) string {
 	r := []rune(s)

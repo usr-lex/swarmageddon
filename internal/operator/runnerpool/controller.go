@@ -432,9 +432,9 @@ func desiredPod(pool *v1.RunnerPool, ws, name, image, tier string, reg *forgejo.
 	c := corev1.Container{
 		Name:    "runner",
 		Image:   image,
-		Command: []string{"forgejo-runner"},
+		Command: waitCommand(),
 		Args:    args,
-		Env:     []corev1.EnvVar{{Name: "DOCKER_HOST", Value: "unix:///var/run/docker.sock"}},
+		Env:     []corev1.EnvVar{{Name: "DOCKER_HOST", Value: "unix:///var/run/docker.sock"}, {Name: "FORGE_URL", Value: room.ForgeURL}},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: mem, corev1.ResourceEphemeralStorage: disk},
 			Limits:   corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: mem, corev1.ResourceEphemeralStorage: disk},
@@ -465,6 +465,22 @@ func desiredPod(pool *v1.RunnerPool, ws, name, image, tier string, reg *forgejo.
 		Spec: spec,
 	}
 }
+
+// waitScript waits up to two minutes for Forgejo to answer, then runs
+// forgejo-runner with the container's arguments. A new pod's first
+// connections can be refused until the cluster's network policy knows its
+// address, and one-job gives up on the first refusal.
+const waitScript = `i=0
+until curl -fsS -o /dev/null --max-time 2 "$FORGE_URL/api/healthz"; do
+	i=$((i + 1))
+	if [ "$i" -ge 120 ]; then echo "Forgejo at $FORGE_URL did not answer; trying anyway" >&2; break; fi
+	sleep 1
+done
+exec forgejo-runner "$@"`
+
+// waitCommand is the runner container's command: waitScript, with the
+// arguments after it ($0 is forgejo-runner).
+func waitCommand() []string { return []string{"/bin/sh", "-c", waitScript, "forgejo-runner"} }
 
 // RunnerPlatformPeers are what runner pods reach: Forgejo and the registry
 // cache, never rooms (§9.4).

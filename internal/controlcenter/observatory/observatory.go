@@ -7,6 +7,7 @@ package observatory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -34,14 +35,21 @@ type Recorder struct {
 // Record stores events and returns the new ones; duplicates (by dedup key)
 // are dropped silently.
 func (r *Recorder) Record(ctx context.Context, evs ...store.Activity) []store.Activity {
-	db := r.DB()
-	if db == nil || len(evs) == 0 {
-		return nil
-	}
-	stored, err := db.InsertActivity(ctx, evs...)
+	stored, err := r.Store(ctx, evs...)
 	if err != nil {
 		r.log().Warn("observatory: insert", "err", err)
 	}
+	return stored
+}
+
+// Store is Record that also returns the error for events it couldn't store
+// (*store.InsertError, joined); the others are stored either way.
+func (r *Recorder) Store(ctx context.Context, evs ...store.Activity) ([]store.Activity, error) {
+	db := r.DB()
+	if db == nil || len(evs) == 0 {
+		return nil, nil
+	}
+	stored, err := db.InsertActivity(ctx, evs...)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, e := range stored {
@@ -54,7 +62,7 @@ func (r *Recorder) Record(ctx context.Context, evs ...store.Activity) []store.Ac
 			}
 		}
 	}
-	return stored
+	return stored, err
 }
 
 func (r *Recorder) log() *slog.Logger {
@@ -183,7 +191,7 @@ func (f *AuditFollower) Run(ctx context.Context) {
 		if f.R.DB() != nil {
 			for _, ws := range f.Workspaces(ctx) {
 				if err := f.Poll(ctx, ws); err != nil {
-					f.R.log().Debug("observatory: audit poll", "workspace", ws, "err", err)
+					f.R.log().Warn("observatory: audit poll", "workspace", ws, "err", err)
 				}
 			}
 		}
@@ -266,9 +274,18 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 	if err := stream.Err(); err != nil {
 		return err
 	}
-	for _, e := range f.R.Record(ctx, evs...) {
+	stored, insertErr := f.R.Store(ctx, evs...)
+	for _, e := range stored {
 		if v := verdicts[e.Dedup]; v != nil && f.OnVerdict != nil {
 			f.OnVerdict(ctx, ws, v)
+		}
+	}
+	// A record that wasn't stored is read again next time (they're
+	// deduplicated): the cursor stops at the earliest one.
+	var ie *store.InsertError
+	for _, err := range unjoin(insertErr) {
+		if errors.As(err, &ie) && ie.Event.TS.Before(latest) {
+			latest = ie.Event.TS
 		}
 	}
 	// A crossing is also a message: it replaces the plain message event.
@@ -278,9 +295,22 @@ func (f *AuditFollower) Poll(ctx context.Context, ws string) error {
 		}
 	}
 	if latest.After(since) {
-		return db.SetActivityCursor(ctx, ws, latest)
+		if err := db.SetActivityCursor(ctx, ws, latest); err != nil {
+			return err
+		}
 	}
-	return nil
+	return insertErr
+}
+
+// unjoin lists the errors errors.Join joined, or err itself.
+func unjoin(err error) []error {
+	if j, ok := err.(interface{ Unwrap() []error }); ok {
+		return j.Unwrap()
+	}
+	if err == nil {
+		return nil
+	}
+	return []error{err}
 }
 
 func severityName(s messagingv1.Severity) string {
