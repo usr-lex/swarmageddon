@@ -171,6 +171,24 @@ func (s *suite) observatory(t *testing.T) {
 		{"hermes", "metis", ccv1.EdgeKind_EDGE_KIND_CROSSING},
 		{admin, "athena", ccv1.EdgeKind_EDGE_KIND_HUMAN},
 	}
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+		// What the audit follower stored, oldest first: where it stops
+		// and what comes before the gap.
+		res, err := call(s.cc.observatory.Timeline, &ccv1.TimelineRequest{Workspace: ws, Limit: 200,
+			Kinds: []string{"message", "human", "crossing", "post", "refusal", "verdict"}})
+		if err != nil {
+			t.Logf("timeline: %v", err)
+			return
+		}
+		ev := res.GetEvents()
+		for i := len(ev) - 1; i >= 0; i-- {
+			e := ev[i]
+			t.Logf("timeline %s %-8s %s -> %s %s", e.GetAt().AsTime().Format(time.RFC3339Nano), e.GetKind(), e.GetActor(), e.GetTarget(), clip(e.GetSummary()))
+		}
+	}()
 	s.eventually(t, 3*time.Minute, "observatory edges", func() error {
 		res, err := call(s.cc.observatory.Edges, &ccv1.EdgesRequest{Workspace: ws, Since: timestamppb.New(s.start.Add(-time.Minute))})
 		if err != nil {

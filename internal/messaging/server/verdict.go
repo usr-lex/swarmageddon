@@ -41,8 +41,11 @@ func (s *Server) ReportVerdict(ctx context.Context, req *connect.Request[messagi
 	default:
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only rooms and the warden report verdicts"))
 	}
-	if v.At == nil {
-		v.At = timestamppb.Now()
+	// The reporter's time, never later than ours: the audit is read from
+	// a cursor on these times, and a record dated ahead of when it was
+	// stored stops the control center's follower until the clock gets there.
+	if now := timestamppb.Now(); v.At == nil || v.At.AsTime().After(now.AsTime()) {
+		v.At = now
 	}
 	body, err := protojson.Marshal(v)
 	if err != nil {
