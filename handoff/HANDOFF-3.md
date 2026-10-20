@@ -39,7 +39,13 @@ passed. Two e2e failures, both fixed in c76c666:
   run 32 isn't known (the dump didn't reach back far enough); the dump now
   includes the control center's observatory log lines.
 
-**Run 33 was dispatched on c76c666.**
+**Run 33** (c76c666): forge CI passed (runner fix confirmed). Only
+*observatory edges* failed, with the same four edges and no observatory
+errors, so the insert-error path wasn't the cause. 0e14b8d fixes a real
+stall found with a JetStream test: a verdict dated ahead of the messaging
+server stopped the follower. It also makes the e2e step print the stored
+timeline on failure. Whether the stall is what CI hit is not yet shown.
+**Run 34 was dispatched on 0e14b8d.**
 
 Also fixed on the way: the control-center image's Node stage didn't trust
 `BUILD_CA` (npm failed behind the proxy); "VolumesReady: expanding" was
