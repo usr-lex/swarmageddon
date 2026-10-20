@@ -45,7 +45,10 @@ errors, so the insert-error path wasn't the cause. 0e14b8d fixes a real
 stall found with a JetStream test: a verdict dated ahead of the messaging
 server stopped the follower. It also makes the e2e step print the stored
 timeline on failure. Whether the stall is what CI hit is not yet shown.
-**Run 34 was dispatched on 0e14b8d.**
+**Run 34** (0e14b8d): **all green, including the full e2e suite.** The
+observatory test, which failed the same way in runs 32 and 33, passed once
+verdict times were capped at the messaging server's clock. That points to
+the stall as the cause, though no run showed it directly.
 
 Also fixed on the way: the control-center image's Node stage didn't trust
 `BUILD_CA` (npm failed behind the proxy); "VolumesReady: expanding" was
